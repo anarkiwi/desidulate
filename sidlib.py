@@ -191,6 +191,7 @@ def clock_to_qn(sid, clock, bpm):
     return clock / sid.clock_frequency * bpm / 60
 
 
+# Read a VICE "-sounddev dump" register dump (emulator or vsid)
 def get_reg_writes(snd_log_name, skipsilence=1e6):
     state = SidRegState()
     maxreg = max(state.regstate)
