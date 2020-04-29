@@ -7,6 +7,7 @@
 from datetime import timedelta
 import numpy as np
 import scipy.io.wavfile
+# https://github.com/packet23/pyresidfp
 from pyresidfp import SoundInterfaceDevice
 from pyresidfp.sound_interface_device import ChipModel
 
