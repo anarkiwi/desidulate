@@ -9,6 +9,12 @@ from midiutil import MIDIFile
 
 A = 440
 MIDI_N_TO_F = {n: (A / 32) * (2 ** ((n - 9) / 12)) for n in range(128)}
+MIDI_F_TO_N = {f: n for n, f in MIDI_N_TO_F.items()}
+
+
+def closest_midi(sid_f):
+    closest_midi_f = min(MIDI_N_TO_F.values(), key=lambda x: abs(x - sid_f))
+    return (closest_midi_f, MIDI_F_TO_N[closest_midi_f])
 
 
 def get_midi_file(bpm, voices):
