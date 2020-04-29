@@ -187,6 +187,10 @@ def real_sid_freq(sid, freq_reg):
     return freq_reg * sid.clock_frequency / 16777216
 
 
+def clock_to_qn(sid, clock, bpm):
+    return clock / sid.clock_frequency * bpm / 60
+
+
 def get_reg_writes(snd_log_name, skipsilence=1e6):
     state = SidRegState()
     maxreg = max(state.regstate)
