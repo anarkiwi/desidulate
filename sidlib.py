@@ -219,7 +219,7 @@ def get_reg_changes(reg_writes):
     return change_only_writes
 
 
-def get_consolidated_changes(writes):
+def get_consolidated_changes(writes, reg_write_clock_timeout=16):
     state = SidRegState()
     pendingclock = 0
     pendingregevent = None
@@ -227,7 +227,7 @@ def get_consolidated_changes(writes):
     for clock, reg, val in writes:
         regevent = state.set(reg, val)
         if pendingregevent:
-            if regevent.otherreg == pendingregevent.reg and clock - pendingclock < 16:
+            if regevent.otherreg == pendingregevent.reg and clock - pendingclock < reg_write_clock_timeout:
                 consolidated.append((clock, regevent, copy.deepcopy(state)))
                 pendingregevent = None
                 continue

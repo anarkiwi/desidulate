@@ -4,5 +4,15 @@
 
 ## The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 
+
+from midiutil import MIDIFile
+
 A = 440
 MIDI_N_TO_F = {n: (A / 32) * (2 ** ((n - 9) / 12)) for n in range(128)}
+
+
+def get_midi_file(bpm, voices):
+    midi_file = MIDIFile(voices)
+    for voice in range(1, voices+1):
+        midi_file.addTempo(track=voice, time=0, tempo=bpm)
+    return midi_file
