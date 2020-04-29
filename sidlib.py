@@ -181,6 +181,10 @@ class SidRegState:
         return SidRegEvent(reg, regevent, voicenum=voicenum, otherreg=otherreg)
 
 
+def real_sid_freq(sid, freq_reg):
+    return freq_reg * sid.clock_frequency / 16777216
+
+
 def get_reg_writes(snd_log_name, skipsilence=1e6):
     state = SidRegState()
     maxreg = max(state.regstate)
