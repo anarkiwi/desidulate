@@ -179,3 +179,31 @@ class SidRegState:
             return None
         self.regstate[reg] = val
         return SidRegEvent(reg, regevent, voicenum=voicenum, otherreg=otherreg)
+
+
+def get_reg_writes(snd_log_name, skipsilence=1e6):
+    state = SidRegState()
+    maxreg = max(state.regstate)
+    writes = []
+    clock = 0
+    silenceskipped = False
+    with open(snd_log_name) as snd_log:
+        for line in snd_log:
+            ts_offset, reg, val = (int(i) for i in line.strip().split())
+            assert reg >= 0 and reg <= maxreg, reg
+            assert val >= 0 and reg <= 255, val
+            # skip first pause of > 1e6
+            if ts_offset > skipsilence and not silenceskipped:
+                continue
+            clock += ts_offset
+            writes.append((clock, reg, val))
+    return writes
+
+
+def get_reg_changes(reg_writes):
+    change_only_writes = []
+    state = SidRegState()
+    for clock, reg, val in reg_writes:
+        if state.set(reg, val):
+            change_only_writes.append((clock, reg, val))
+    return change_only_writes
