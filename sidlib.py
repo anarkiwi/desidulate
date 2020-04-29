@@ -6,6 +6,7 @@
 
 ## THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABL E FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+import copy
 
 
 class SidRegEvent:
@@ -212,3 +213,25 @@ def get_reg_changes(reg_writes):
         if state.set(reg, val):
             change_only_writes.append((clock, reg, val))
     return change_only_writes
+
+
+def get_consolidated_changes(writes):
+    state = SidRegState()
+    pendingclock = 0
+    pendingregevent = None
+    consolidated = []
+    for clock, reg, val in writes:
+        regevent = state.set(reg, val)
+        if pendingregevent:
+            if regevent.otherreg == pendingregevent.reg and clock - pendingclock < 16:
+                consolidated.append((clock, regevent, copy.deepcopy(state)))
+                pendingregevent = None
+                continue
+            consolidated.append((pendingclock, pendingregevent, copy.deepcopy(state)))
+            pendingregevent = None
+        if regevent.otherreg is not None:
+            pendingregevent = regevent
+            pendingclock = clock
+            continue
+        consolidated.append((clock, regevent, copy.deepcopy(state)))
+    return consolidated
