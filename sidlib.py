@@ -181,6 +181,7 @@ class SidRegState:
         return SidRegEvent(reg, regevent, voicenum=voicenum, otherreg=otherreg)
 
 
+# http://www.sidmusic.org/sid/sidtech2.html
 def real_sid_freq(sid, freq_reg):
     return freq_reg * sid.clock_frequency / 16777216
 
