@@ -10,6 +10,8 @@ import copy
 
 VOICES = {1, 2, 3}
 
+# https://www.c64-wiki.com/wiki/SID
+
 
 class SidRegEvent:
 
