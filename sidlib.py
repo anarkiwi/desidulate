@@ -20,7 +20,7 @@ class SidRegEvent:
         self.otherreg = otherreg
 
     def __str__(self):
-        return '%x %s %s %s' % (self.reg, self.descr, self.voicenum, self.otherreg)
+        return '%.2x %s voicenum %s otherreg %s' % (self.reg, self.descr, self.voicenum, self.otherreg)
 
 
 class SidRegHandler:
@@ -44,7 +44,7 @@ class SidRegHandler:
     def lohi_attr(self, lo, hi, attr):
         val = self.lohi(lo, hi)
         setattr(self, attr, val)
-        return '%s %x' % (attr, val)
+        return '%s: %.2x' % (attr, val)
 
     def byte2nib(self, reg):
         val = self.regstate[reg]
@@ -56,7 +56,7 @@ class SidRegHandler:
         descrs = []
         for lit, val in ((lo_lit, lo), (hi_lit, hi)):
             setattr(self, lit, val)
-            descrs.append('%s: %x' % (lit, val))
+            descrs.append('%s: %.2x' % (lit, val))
         return ', '.join(descrs)
 
     def decodebits(self, val, decodemap):
@@ -71,7 +71,7 @@ class SidRegHandler:
     def _set(self, reg, val):
         self.regstate[reg] = val
         decoded, otherreg = self.REGMAP[reg](reg)
-        descr = '%s %u %s val %x -> reg %x' % (self.NAME, self.instance, decoded, val, reg)
+        descr = '%s %u %.2x -> %.2x %s' % (self.NAME, self.instance, val, reg, decoded)
         return (descr, otherreg)
 
     def set(self, reg, val):
@@ -130,13 +130,13 @@ class SidFilterMainRegState(SidRegHandler):
 
     def _filterresonanceroute(self, _):
         route, self.filter_res = self.byte2nib(2)
-        return ('filter res %x, route %s' % (self.filter_res, self.decodebits(route, {
+        return ('filter res %.2x, route %s' % (self.filter_res, self.decodebits(route, {
             0: 'filter_voice1', 1: 'filter_voice2', 2: 'filter_voice3',
             3: 'filter_external'})), None)
 
     def _filtermain(self, _):
         self.vol, filtcon = self.byte2nib(3)
-        return ('vol %x, filter type %s' % (self.vol, self.decodebits(filtcon, {
+        return ('vol %.2x, filter type %s' % (self.vol, self.decodebits(filtcon, {
             0: 'filter_low', 1: 'filter_band', 2: 'filter_high', 3: 'mute_voice3'})), None)
 
     def __init__(self, instance=0):
@@ -180,6 +180,16 @@ class SidRegState:
             return None
         self.regstate[reg] = val
         return SidRegEvent(reg, regevent, voicenum=voicenum, otherreg=otherreg)
+
+    def hashreg(self):
+        return hash(frozenset(self.regstate.items()))
+
+    def __eq__(self, other):
+        return self.hashreg == other.hashreg
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
 
 
 # http://www.sidmusic.org/sid/sidtech2.html
@@ -227,13 +237,17 @@ def get_reg_changes(reg_writes, voicemask=VOICES):
 def get_events(writes, voicemask=VOICES):
     events = []
     state = SidRegState()
+    statecache = {}
     for clock, reg, val in writes:
         regevent = state.set(reg, val)
         if not regevent:
             continue
         if regevent.voicenum and regevent.voicenum not in voicemask:
             continue
-        events.append((clock, regevent, copy.deepcopy(state)))
+        hashedreg = state.hashreg()
+        if hashedreg not in statecache:
+            statecache[hashedreg] = copy.deepcopy(state)
+        events.append((clock, regevent, statecache[hashedreg]))
     return events
 
 
