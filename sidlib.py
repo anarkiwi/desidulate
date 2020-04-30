@@ -56,7 +56,7 @@ class SidRegHandler:
         descrs = []
         for lit, val in ((lo_lit, lo), (hi_lit, hi)):
             setattr(self, lit, val)
-            descrs.append('%s/%x' % (lit, val))
+            descrs.append('%s: %x' % (lit, val))
         return ', '.join(descrs)
 
     def decodebits(self, val, decodemap):
@@ -91,10 +91,10 @@ class SidVoiceRegState(SidRegHandler):
         return (self.lohi_attr(2, 3, 'pw_duty'), {2, 3} - {reg})
 
     def _attack_decay(self, _):
-        return (self.byte2nib_literal(4, 'decay', 'attack'), None)
+        return (self.byte2nib_literal(5, 'decay', 'attack'), None)
 
     def _sustain_release(self, _):
-        return (self.byte2nib_literal(5, 'release', 'sustain'), None)
+        return (self.byte2nib_literal(6, 'release', 'sustain'), None)
 
     def _control(self, _):
         val = self.regstate[4]
