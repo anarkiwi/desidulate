@@ -8,6 +8,8 @@
 
 import copy
 
+VOICES = {1, 2, 3}
+
 
 class SidRegEvent:
 
@@ -151,12 +153,10 @@ class SidFilterMainRegState(SidRegHandler):
 
 class SidRegState:
 
-    VOICES = 3
-
     def __init__(self):
         self.reghandlers = {}
         self.voices = {}
-        for voicenum in range(1, self.VOICES+1):
+        for voicenum in VOICES:
             voice = SidVoiceRegState(voicenum)
             regbase = voice.regbase()
             for reg in voice.REGMAP:
@@ -211,32 +211,47 @@ def get_reg_writes(snd_log_name, skipsilence=1e6):
     return writes
 
 
-def get_reg_changes(reg_writes):
+def get_reg_changes(reg_writes, voicemask=VOICES):
     change_only_writes = []
     state = SidRegState()
     for clock, reg, val in reg_writes:
-        if state.set(reg, val):
-            change_only_writes.append((clock, reg, val))
+        regevent = state.set(reg, val)
+        if not regevent:
+            continue
+        if regevent.voicenum and regevent.voicenum not in voicemask:
+            continue
+        change_only_writes.append((clock, reg, val))
     return change_only_writes
 
 
-def get_consolidated_changes(writes, reg_write_clock_timeout=16):
+def get_events(writes, voicemask=VOICES):
+    events = []
     state = SidRegState()
+    for clock, reg, val in writes:
+        regevent = state.set(reg, val)
+        if not regevent:
+            continue
+        if regevent.voicenum and regevent.voicenum not in voicemask:
+            continue
+        events.append((clock, regevent, copy.deepcopy(state)))
+    return events
+
+
+def get_consolidated_changes(writes, reg_write_clock_timeout=16, voicemask=VOICES):
     pendingclock = 0
     pendingregevent = None
     consolidated = []
-    for clock, reg, val in writes:
-        regevent = state.set(reg, val)
+    for clock, regevent, state in get_events(writes, voicemask=VOICES):
         if pendingregevent:
             if regevent.otherreg == pendingregevent.reg and clock - pendingclock < reg_write_clock_timeout:
-                consolidated.append((clock, regevent, copy.deepcopy(state)))
+                consolidated.append((clock, regevent, state))
                 pendingregevent = None
                 continue
-            consolidated.append((pendingclock, pendingregevent, copy.deepcopy(state)))
+            consolidated.append((pendingclock, pendingregevent, state))
             pendingregevent = None
         if regevent.otherreg is not None:
             pendingregevent = regevent
             pendingclock = clock
             continue
-        consolidated.append((clock, regevent, copy.deepcopy(state)))
+        consolidated.append((clock, regevent, state))
     return consolidated
