@@ -185,7 +185,7 @@ class SidRegState:
         return hash(frozenset(self.regstate.items()))
 
     def __eq__(self, other):
-        return self.hashreg == other.hashreg
+        return self.hashreg() == other.hashreg()
 
     def __ne__(self, other):
         return not self.__eq__(other)
