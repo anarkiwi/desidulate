@@ -241,7 +241,7 @@ def get_consolidated_changes(writes, reg_write_clock_timeout=16, voicemask=VOICE
     pendingclock = 0
     pendingregevent = None
     consolidated = []
-    for clock, regevent, state in get_events(writes, voicemask=VOICES):
+    for clock, regevent, state in get_events(writes, voicemask=voicemask):
         if pendingregevent:
             if regevent.otherreg == pendingregevent.reg and clock - pendingclock < reg_write_clock_timeout:
                 consolidated.append((clock, regevent, state))
