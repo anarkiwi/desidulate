@@ -24,6 +24,9 @@ class SidRegEvent:
     def __str__(self):
         return '%.2x %s voicenum %s otherreg %s' % (self.reg, self.descr, self.voicenum, self.otherreg)
 
+    def __repr__(self):
+        return self.__str__()
+
 
 class SidRegHandler:
 
@@ -253,7 +256,7 @@ def get_events(writes, voicemask=VOICES):
     return events
 
 
-def get_consolidated_changes(writes, reg_write_clock_timeout=16, voicemask=VOICES):
+def get_consolidated_changes(writes, voicemask=VOICES, reg_write_clock_timeout=16):
     pendingclock = 0
     pendingregevent = None
     consolidated = []
@@ -271,3 +274,57 @@ def get_consolidated_changes(writes, reg_write_clock_timeout=16, voicemask=VOICE
             continue
         consolidated.append((clock, regevent, state))
     return consolidated
+
+
+def get_gate_events(reg_writes, voicemask):
+    mainevents = []
+    voiceevents = {v: [] for v in voicemask}
+    voiceeventstack = {v: [] for v in voicemask}
+    voiceeventstack_clock = {v: 0 for v in voicemask}
+
+    def despool_events(voicenum):
+        if voiceeventstack[voicenum]:
+            first_event = voiceeventstack[voicenum][0]
+            first_state = first_event[2]
+            if first_state.voices[voicenum].gate:
+                voiceevents[voicenum].append((voiceeventstack_clock[voicenum], voiceeventstack[voicenum]))
+            voiceeventstack[voicenum] = []
+
+    def append_event(voicenum, event):
+        clock, regevent, state = event
+        if voiceeventstack[voicenum]:
+            last_event = voiceeventstack[voicenum][-1]
+            relative_clock = clock - last_event[0]
+        else:
+            relative_clock = 0
+            voiceeventstack_clock[voicenum] = clock
+        relative_event = (relative_clock, regevent, state)
+        voiceeventstack[voicenum].append(relative_event)
+
+    for event in reg_writes:
+        clock, regevent, state = event
+        voicenum = regevent.voicenum
+        if voicenum is None:
+            mainevents.append(event)
+        else:
+            last_voiceevent = None
+            last_gate = None
+            if voiceeventstack[voicenum]:
+                last_voiceevent = voiceeventstack[voicenum][-1]
+                _, _, last_state = last_voiceevent
+                last_gate = last_state.voices[voicenum].gate
+            voice_state = state.voices[voicenum]
+            gate = voice_state.gate
+            if last_gate is not None and last_gate != gate:
+                if gate:
+                    despool_events(voicenum)
+                    append_event(voicenum, event)
+                else:
+                    append_event(voicenum, event)
+                continue
+            if gate or voice_state.release > 0:
+                append_event(voicenum, event)
+
+    for voicenum in voicemask:
+        despool_events(voicenum)
+    return mainevents, voiceevents
