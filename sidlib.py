@@ -77,6 +77,8 @@ class SidRegHandler:
         self.regstate[reg] = val
         decoded, otherreg = self.REGMAP[reg](reg)
         descr = '%s %u %.2x -> %.2x %s' % (self.NAME, self.instance, val, reg, decoded)
+        if otherreg is not None:
+            otherreg = list(otherreg)[0] + self.regbase()
         return (descr, otherreg)
 
     def set(self, reg, val):
@@ -201,8 +203,6 @@ class SidRegState:
         if isinstance(handler, SidVoiceRegState):
             voicenum = handler.voicenum
         regevent, otherreg = handler.set(reg, val)
-        if otherreg:
-            otherreg = list(otherreg)[0]
         if self.regstate[reg] == val:
             return None
         self.regstate[reg] = val
@@ -280,28 +280,22 @@ def get_events(writes, voicemask=VOICES):
 
 # consolidate events across multiple byte writes (e.g. collapse update of voice frequency to one event)
 def get_consolidated_changes(writes, voicemask=VOICES, reg_write_clock_timeout=64):
-    pendingregevents = {}
+    pendingevent = None
     consolidated = []
-
     for event in get_events(writes, voicemask=voicemask):
         clock, regevent, state = event
-        if regevent.otherreg is None:
-            consolidated.append(event)
-        else:
-            regkey = min(regevent.otherreg, regevent.reg)
-            pendingregevent = pendingregevents.get(regkey, None)
-            if pendingregevent is None:
-                pendingregevents[regkey] = event
-            else:
-                age = clock - pendingregevent[0]
-                if age > reg_write_clock_timeout:
-                    consolidated.append(event)
-                    del pendingregevents[regkey]
-                else:
-                    pendingregevents[regkey] = event
-
-    for pendingregevent in pendingregevents.values():
-        consolidated.append(pendingregevent)
+        if pendingevent:
+            pendingclock, pendingregevent, pendingstate = pendingevent
+            age = clock - pendingclock
+            if regevent.otherreg == pendingregevent.reg and clock - pendingclock < reg_write_clock_timeout:
+                consolidated.append(event)
+                pendingregevent = None
+                continue
+            pendingevent = None
+        if regevent.otherreg is not None:
+            pendingevent = event
+            continue
+        consolidated.append(event)
     return sorted(consolidated)
 
 
