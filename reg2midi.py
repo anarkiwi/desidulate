@@ -21,7 +21,8 @@ smf = get_midi_file(bpm, max(voicemask))
 for voicenum, gated_voice_events in voiceevents.items():
     for event_start, events in gated_voice_events:
         midi_notes = get_midi_notes_from_events(sid, events)
-        for clock, pitch, duration in midi_notes:
+        max_midi_note = max(midi_note[1] for midi_note in midi_notes)
+        for clock, pitch, duration, _ in midi_notes:
             qn_clock = clock_to_qn(sid, clock, bpm)
             qn_duration = clock_to_qn(sid, duration, bpm)
             if qn_duration > 0.1:
