@@ -6,15 +6,11 @@
 
 
 from midiutil import MIDIFile
+from sidlib import real_sid_freq
 
 A = 440
 MIDI_N_TO_F = {n: (A / 32) * (2 ** ((n - 9) / 12)) for n in range(128)}
 MIDI_F_TO_N = {f: n for n, f in MIDI_N_TO_F.items()}
-
-
-def closest_midi(sid_f):
-    closest_midi_f = min(MIDI_N_TO_F.values(), key=lambda x: abs(x - sid_f))
-    return (closest_midi_f, MIDI_F_TO_N[closest_midi_f])
 
 
 def get_midi_file(bpm, voices):
@@ -22,3 +18,35 @@ def get_midi_file(bpm, voices):
     for voice in range(1, voices+1):
         midi_file.addTempo(track=voice, time=0, tempo=bpm)
     return midi_file
+
+
+def closest_midi(sid_f):
+    closest_midi_f = min(MIDI_N_TO_F.values(), key=lambda x: abs(x - sid_f))
+    return (closest_midi_f, MIDI_F_TO_N[closest_midi_f])
+
+
+# Convert gated voice events into possibly many MIDI notes
+def get_midi_notes_from_events(sid, events):
+    last_sid_f = None
+    last_midi_n = None
+    notes_starts = []
+    for clock, regevent, state in events:
+        voicenum = regevent.voicenum
+        voice_state = state.voices[voicenum]
+        sid_f = real_sid_freq(sid, voice_state.frequency)
+        closest_midi_f, closest_midi_n = closest_midi(sid_f)
+        # TODO: add pitch bend if significantly different to canonical note.
+        if closest_midi_n != last_midi_n:
+            notes_starts.append((closest_midi_n, clock))
+        last_sid_f = sid_f
+        last_midi_n = closest_midi_n
+    last_clock = clock
+    notes = []
+    for n, note_clocks in enumerate(notes_starts):
+        note, clock = note_clocks
+        try:
+            next_clock = notes_starts[n + 1][1]
+        except IndexError:
+            next_clock = last_clock
+        notes.append((clock, note, next_clock - clock))
+    return notes
