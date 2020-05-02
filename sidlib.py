@@ -52,7 +52,7 @@ class SidRegHandler:
         return '%s: %.2x' % (attr, val)
 
     def byte2nib(self, reg):
-        val = self.regstate[reg]
+        val = self.regstate.get(reg, 0)
         lo, hi = val & 0x0f, val >> 4
         return (lo, hi)
 
@@ -89,23 +89,45 @@ class SidVoiceRegState(SidRegHandler):
     REGBASE = 0
     NAME = 'voice'
 
+
+    def _freq_descr(self):
+        return self.lohi_attr(0, 1, 'frequency')
+
     def _freq(self, reg):
-        return (self.lohi_attr(0, 1, 'frequency'), {0, 1} - {reg})
+        return (self._freq_descr(), {0, 1} - {reg})
+
+    def _pwduty_descr(self):
+        return self.lohi_attr(2, 3, 'pw_duty')
 
     def _pwduty(self, reg):
-        return (self.lohi_attr(2, 3, 'pw_duty'), {2, 3} - {reg})
+        return (self._pwduty_descr(), {2, 3} - {reg})
+
+    def _attack_decay_descr(self):
+        return self.byte2nib_literal(5, 'decay', 'attack')
 
     def _attack_decay(self, _):
-        return (self.byte2nib_literal(5, 'decay', 'attack'), None)
+        return (self._attack_decay_descr(), None)
+
+    def _sustain_release_descr(self):
+        return self.byte2nib_literal(6, 'release', 'sustain')
 
     def _sustain_release(self, _):
-        return (self.byte2nib_literal(6, 'release', 'sustain'), None)
+        return (self._sustain_release_descr(), None)
+
+    def _control_descr(self):
+        val = self.regstate[4]
+        return self.decodebits(val, {
+            0: 'gate', 1: 'sync', 2: 'ring', 3: 'test',
+            4: 'triangle', 5: 'sawtooth', 6: 'pulse', 7: 'noise'})
 
     def _control(self, _):
-        val = self.regstate[4]
-        return (self.decodebits(val, {
-            0: 'gate', 1: 'sync', 2: 'ring', 3: 'test',
-            4: 'triangle', 5: 'sawtooth', 6: 'pulse', 7: 'noise'}), None)
+        descr = ' '.join((
+            self._control_descr(),
+            self._freq_descr(),
+            self._pwduty_descr(),
+            self._attack_decay_descr(),
+            self._sustain_release_descr()))
+        return (descr, None)
 
     def __init__(self, instance):
         self.REGMAP = {
@@ -257,24 +279,30 @@ def get_events(writes, voicemask=VOICES):
 
 
 # consolidate events across multiple byte writes (e.g. collapse update of voice frequency to one event)
-def get_consolidated_changes(writes, voicemask=VOICES, reg_write_clock_timeout=16):
-    pendingclock = 0
-    pendingregevent = None
+def get_consolidated_changes(writes, voicemask=VOICES, reg_write_clock_timeout=64):
+    pendingregevents = {}
     consolidated = []
-    for clock, regevent, state in get_events(writes, voicemask=voicemask):
-        if pendingregevent:
-            if regevent.otherreg == pendingregevent.reg and clock - pendingclock < reg_write_clock_timeout:
-                consolidated.append((clock, regevent, state))
-                pendingregevent = None
-                continue
-            consolidated.append((pendingclock, pendingregevent, state))
-            pendingregevent = None
-        if regevent.otherreg is not None:
-            pendingregevent = regevent
-            pendingclock = clock
-            continue
-        consolidated.append((clock, regevent, state))
-    return consolidated
+
+    for event in get_events(writes, voicemask=voicemask):
+        clock, regevent, state = event
+        if regevent.otherreg is None:
+            consolidated.append(event)
+        else:
+            regkey = min(regevent.otherreg, regevent.reg)
+            pendingregevent = pendingregevents.get(regkey, None)
+            if pendingregevent is None:
+                pendingregevents[regkey] = event
+            else:
+                age = clock - pendingregevent[0]
+                if age > reg_write_clock_timeout:
+                    consolidated.append(event)
+                    del pendingregevents[regkey]
+                else:
+                    pendingregevents[regkey] = event
+
+    for pendingregevent in pendingregevents.values():
+        consolidated.append(pendingregevent)
+    return sorted(consolidated)
 
 
 # bracket voice events by gate status changes.
