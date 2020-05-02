@@ -144,6 +144,9 @@ class SidVoiceRegState(SidRegHandler):
         super(SidVoiceRegState, self).__init__(instance)
         self.voicenum = instance
 
+    def any_waveform(self):
+        return self.triangle or self.sawtooth or self.pulse or self.noise
+
 
 
 class SidFilterMainRegState(SidRegHandler):
@@ -287,11 +290,14 @@ def get_consolidated_changes(writes, voicemask=VOICES, reg_write_clock_timeout=6
         if pendingevent:
             pendingclock, pendingregevent, pendingstate = pendingevent
             age = clock - pendingclock
-            if regevent.otherreg == pendingregevent.reg and clock - pendingclock < reg_write_clock_timeout:
-                consolidated.append(event)
-                pendingregevent = None
-                continue
-            pendingevent = None
+            if age > reg_write_clock_timeout:
+                consolidated.append(pendingevent)
+                pendingevent = None
+            elif regevent.otherreg == pendingregevent.reg:
+                if age < reg_write_clock_timeout:
+                    consolidated.append(event)
+                    pendingevent = None
+                    continue
         if regevent.otherreg is not None:
             pendingevent = event
             continue
