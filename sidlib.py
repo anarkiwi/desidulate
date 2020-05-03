@@ -294,6 +294,23 @@ def get_reg_changes(reg_writes, voicemask=VOICES, minclock=0, maxclock=0):
     return change_only_writes
 
 
+def debug_reg_writes(reg_writes):
+    lines = []
+    state = SidRegState()
+    for event in reg_writes:
+        clock, reg, val = event
+        regevent = state.set(reg, val)
+        line_items = (
+            '%9u' % clock,
+            '%2u' % reg,
+            '%3u' % val,
+        )
+        if regevent:
+            line_items += (regevent.descr,)
+        lines.append('\t'.join([str(i) for i in line_items]))
+    return lines
+
+
 def get_events(writes, voicemask=VOICES):
     events = []
     state = SidRegState()
