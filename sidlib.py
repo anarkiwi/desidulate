@@ -332,7 +332,7 @@ def get_consolidated_changes(writes, voicemask=VOICES, reg_write_clock_timeout=6
             pendingevent = event
             continue
         consolidated.append(event)
-    return sorted(consolidated)
+    return sorted(consolidated, key=lambda x: x[0])
 
 
 # bracket voice events by gate status changes.
