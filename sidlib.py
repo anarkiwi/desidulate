@@ -348,7 +348,6 @@ def get_consolidated_changes(writes, voicemask=VOICES, reg_write_clock_timeout=6
                 pendingevent = None
             elif regevent.otherreg == pendingregevent.reg:
                 if age < reg_write_clock_timeout:
-                    print('DROP', pendingevent)
                     consolidated.append(event)
                     pendingevent = None
                     continue
