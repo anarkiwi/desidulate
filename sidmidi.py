@@ -30,7 +30,7 @@ def get_midi_notes_from_events(sid, events):
     last_sid_f = None
     last_midi_n = None
     notes_starts = []
-    for clock, regevent, state in events:
+    for clock, _, _, regevent, state in events:
         voicenum = regevent.voicenum
         voice_state = state.voices[voicenum]
         sid_f = real_sid_freq(sid, voice_state.frequency)

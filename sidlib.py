@@ -330,7 +330,7 @@ def get_events(writes, voicemask=VOICES):
         hashedreg = state.hashreg()
         if hashedreg not in statecache:
             statecache[hashedreg] = copy.deepcopy(state)
-        events.append((clock, regevent, statecache[hashedreg]))
+        events.append((clock, reg, val, regevent, statecache[hashedreg]))
     return events
 
 
@@ -339,9 +339,9 @@ def get_consolidated_changes(writes, voicemask=VOICES, reg_write_clock_timeout=6
     pendingevent = None
     consolidated = []
     for event in get_events(writes, voicemask=voicemask):
-        clock, regevent, state = event
+        clock, reg, val, regevent, state = event
         if pendingevent:
-            pendingclock, pendingregevent, pendingstate = pendingevent
+            pendingclock, _, _, pendingregevent, pendingstate = pendingevent
             age = clock - pendingclock
             if age > reg_write_clock_timeout:
                 consolidated.append(pendingevent)
@@ -367,17 +367,16 @@ def get_gate_events(reg_writes, voicemask):
     def despool_events(voicenum):
         if voiceeventstack[voicenum]:
             first_event = voiceeventstack[voicenum][0]
-            first_clock, _, first_state = first_event
+            first_clock, _, _, _, first_state = first_event
             if first_state.voices[voicenum].gate:
                 voiceevents[voicenum].append((first_clock, voiceeventstack[voicenum]))
             voiceeventstack[voicenum] = []
 
     def append_event(voicenum, event):
-        clock, regevent, state = event
         voiceeventstack[voicenum].append(event)
 
     for event in reg_writes:
-        clock, regevent, state = event
+        clock, _, _, regevent, state = event
         voicenum = regevent.voicenum
         if voicenum is None:
             mainevents.append(event)
@@ -386,7 +385,7 @@ def get_gate_events(reg_writes, voicemask):
             last_gate = None
             if voiceeventstack[voicenum]:
                 last_voiceevent = voiceeventstack[voicenum][-1]
-                _, _, last_state = last_voiceevent
+                _, _, _, _, last_state = last_voiceevent
                 last_gate = last_state.voices[voicenum].gate
             voice_state = state.voices[voicenum]
             gate = voice_state.gate
