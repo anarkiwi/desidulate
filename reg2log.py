@@ -11,7 +11,7 @@
 
 
 import argparse
-from sidlib import debug_reg_writes, get_reg_changes, get_reg_writes, write_reg_writes, VOICES
+from sidlib import debug_reg_writes, get_consolidated_changes, get_reg_changes, get_reg_writes, write_reg_writes, VOICES
 from sidwav import get_sid
 
 
@@ -21,6 +21,7 @@ parser.add_argument('--logoutfile', default='', help='if defined, output only re
 parser.add_argument('--voicemask', default=','.join((str(v) for v in VOICES)), help='command separated list of SID voices to use')
 parser.add_argument('--minclock', default=0, type=int, help='start rendering from this clock value')
 parser.add_argument('--maxclock', default=0, type=int, help='if > 0, stop rendering at this clock value')
+parser.add_argument('--consolidate', default=0, type=int, help='if > 0, consolidate writes across two byte registers over this many clock values')
 pal_parser = parser.add_mutually_exclusive_group(required=False)
 pal_parser.add_argument('--pal', dest='pal', action='store_true', help='Use PAL clock')
 pal_parser.add_argument('--ntsc', dest='pal', action='store_false', help='Use NTSC clock')
@@ -30,6 +31,8 @@ voicemask = set((int(v) for v in args.voicemask.split(',')))
 
 sid = get_sid(pal=args.pal)
 reg_writes = get_reg_changes(get_reg_writes(args.logfile), voicemask=voicemask, minclock=args.minclock, maxclock=args.maxclock)
+if args.consolidate:
+    reg_writes = [c[:3] for c in get_consolidated_changes(reg_writes, reg_write_clock_timeout=args.consolidate)]
 
 for line in debug_reg_writes(reg_writes):
     print(line)
