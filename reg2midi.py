@@ -10,14 +10,13 @@
 # http://www.ucapps.de/howto_sid_wavetables_1.html
 
 import argparse
-from sidlib import clock_to_qn, get_consolidated_changes, get_gate_events, get_reg_changes, get_reg_writes, write_reg_writes, VOICES
+from sidlib import clock_to_qn, get_consolidated_changes, get_gate_events, get_reg_changes, get_reg_writes, VOICES
 from sidmidi import get_midi_file, get_midi_notes_from_events
 from sidwav import get_sid
 
 
 parser = argparse.ArgumentParser(description='Convert vicesnd.sid log into a MIDI file')
 parser.add_argument('--logfile', default='vicesnd.sid', help='log file to read')
-parser.add_argument('--logoutfile', default='', help='if defined, output only register changes to this file in vicesnd.sid format')
 parser.add_argument('--midifile', default='reg2midi.mid', help='MIDI file to write')
 parser.add_argument('--voicemask', default=','.join((str(v) for v in VOICES)), help='command separated list of SID voices to use')
 parser.add_argument('--minclock', default=0, type=int, help='start rendering from this clock value')
@@ -49,5 +48,3 @@ for voicenum, gated_voice_events in voiceevents.items():
 
 with open(args.midifile, 'wb') as midi_f:
     smf.writeFile(midi_f)
-if args.logoutfile:
-    write_reg_writes(args.logoutfile, reg_writes)
