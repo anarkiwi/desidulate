@@ -188,6 +188,7 @@ class SidRegState:
     def __init__(self):
         self.reghandlers = {}
         self.voices = {}
+        self.voicereg = {}
         for voicenum in VOICES:
             voice = SidVoiceRegState(voicenum)
             regbase = voice.regbase()
@@ -199,6 +200,12 @@ class SidRegState:
         for i in self.mainreghandler.REGMAP:
             self.reghandlers[regbase + i] = self.mainreghandler
         self.regstate = {i: 0 for i in self.reghandlers}
+
+    def reg_voicenum(self, reg):
+        handler = self.reghandlers[reg]
+        if isinstance(handler, SidVoiceRegState):
+            return handler.voicenum
+        return None
 
     def set(self, reg, val):
         voicenum = None
@@ -254,16 +261,27 @@ def get_reg_writes(snd_log_name, skipsilence=1e6):
     return writes
 
 
-def get_reg_changes(reg_writes, voicemask=VOICES):
+def get_reg_changes(reg_writes, voicemask=VOICES, minclock=0, maxclock=0):
     change_only_writes = []
     state = SidRegState()
+    relative_clock = 0
     for clock, reg, val in reg_writes:
         regevent = state.set(reg, val)
+        if clock < minclock:
+            continue
+        if maxclock and clock > maxclock:
+            break
         if not regevent:
             continue
         if regevent.voicenum and regevent.voicenum not in voicemask:
             continue
-        change_only_writes.append((clock, reg, val))
+        if not change_only_writes and minclock:
+            relative_clock = clock
+            for reg_pre, val_pre in state.regstate.items():
+                reg_pre_voicenum = state.reg_voicenum(reg_pre)
+                if reg_pre_voicenum is None or reg_pre_voicenum in voicemask:
+                    change_only_writes.append((clock - relative_clock, reg_pre, val_pre))
+        change_only_writes.append((clock - relative_clock, reg, val))
     return change_only_writes
 
 

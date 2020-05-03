@@ -12,8 +12,12 @@ from pyresidfp import SoundInterfaceDevice
 from pyresidfp.sound_interface_device import ChipModel
 
 
-def get_sid(model=ChipModel.MOS8580):
-    return SoundInterfaceDevice(model=model)
+def get_sid(model=ChipModel.MOS8580, pal=True):
+    if pal:
+        freq = SoundInterfaceDevice.PAL_CLOCK_FREQUENCY
+    else:
+        freq = SoundInterfaceDevice.NTSC_CLOCK_FREQUENCY
+    return SoundInterfaceDevice(model=model, clock_frequency=freq)
 
 
 def make_wav_from_reg(sid, writes, wav_file_name):
