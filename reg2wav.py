@@ -18,6 +18,7 @@ parser.add_argument('--wavfile', default='reg2wav.wav', help='WAV file to write'
 parser.add_argument('--voicemask', default=','.join((str(v) for v in VOICES)), help='command separated list of SID voices to use')
 parser.add_argument('--minclock', default=0, type=int, help='start rendering from this clock value')
 parser.add_argument('--maxclock', default=0, type=int, help='if > 0, stop rendering at this clock value')
+parser.add_argument('--padclock', default=int(1e3), type=int, help='pad beginning and end of WAV with this clock value')
 pal_parser = parser.add_mutually_exclusive_group(required=False)
 pal_parser.add_argument('--pal', dest='pal', action='store_true', help='Use PAL clock')
 pal_parser.add_argument('--ntsc', dest='pal', action='store_false', help='Use NTSC clock')
@@ -28,4 +29,4 @@ voicemask = set((int(v) for v in args.voicemask.split(',')))
 
 sid = get_sid(pal=args.pal)
 reg_writes = get_reg_changes(get_reg_writes(args.logfile), voicemask=voicemask, minclock=args.minclock, maxclock=args.maxclock)
-make_wav_from_reg(sid, reg_writes, args.wavfile)
+make_wav_from_reg(sid, reg_writes, args.wavfile, args.padclock)

@@ -20,14 +20,23 @@ def get_sid(model=ChipModel.MOS8580, pal=True):
     return SoundInterfaceDevice(model=model, clock_frequency=freq)
 
 
-def make_wav_from_reg(sid, writes, wav_file_name):
+def make_wav_from_reg(sid, writes, wav_file_name, padclock):
     lastevent = 0
     raw_samples = []
+
+    def add_samples(offset):
+        timeoffset_seconds = offset / sid.clock_frequency
+        raw_samples.extend(sid.clock(timedelta(seconds=timeoffset_seconds)))
+
+    add_samples(padclock)
+
     for clock, reg, val in writes:
         ts_offset = clock - lastevent
         lastevent = clock
-        timeoffset_seconds = ts_offset / sid.clock_frequency
         sid.write_register(reg, val)
-        raw_samples.extend(sid.clock(timedelta(seconds=timeoffset_seconds)))
+        add_samples(ts_offset)
+
+    add_samples(padclock)
+
     scipy.io.wavfile.write(
         wav_file_name, int(sid.sampling_frequency), np.array(raw_samples, dtype=np.float32) / 2**15)
