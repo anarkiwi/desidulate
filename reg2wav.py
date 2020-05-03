@@ -7,7 +7,7 @@
 ## The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 
 import argparse
-from sidlib import get_reg_changes, get_reg_writes, write_reg_writes, VOICES
+from sidlib import get_reg_changes, get_reg_writes, VOICES
 from sidwav import get_sid, make_wav_from_reg
 
 
@@ -29,5 +29,3 @@ voicemask = set((int(v) for v in args.voicemask.split(',')))
 sid = get_sid(pal=args.pal)
 reg_writes = get_reg_changes(get_reg_writes(args.logfile), voicemask=voicemask, minclock=args.minclock, maxclock=args.maxclock)
 make_wav_from_reg(sid, reg_writes, args.wavfile)
-if args.logoutfile:
-    write_reg_writes(args.logoutfile, reg_writes)
