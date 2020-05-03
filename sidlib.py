@@ -227,8 +227,11 @@ def real_sid_freq(sid, freq_reg):
     return freq_reg * sid.clock_frequency / 16777216
 
 
+def clock_to_s(sid, clock):
+    return clock / sid.clock_frequency
+
 def clock_to_qn(sid, clock, bpm):
-    return clock / sid.clock_frequency * bpm / 60
+    return clock_to_s(sid, clock) * bpm / 60
 
 
 # Read a VICE "-sounddev dump" register dump (emulator or vsid)
@@ -310,14 +313,13 @@ def get_gate_events(reg_writes, voicemask):
     mainevents = []
     voiceevents = {v: [] for v in voicemask}
     voiceeventstack = {v: [] for v in voicemask}
-    voiceeventstack_clock = {v: 0 for v in voicemask}
 
     def despool_events(voicenum):
         if voiceeventstack[voicenum]:
             first_event = voiceeventstack[voicenum][0]
-            first_state = first_event[2]
+            first_clock, _, first_state = first_event
             if first_state.voices[voicenum].gate:
-                voiceevents[voicenum].append((voiceeventstack_clock[voicenum], voiceeventstack[voicenum]))
+                voiceevents[voicenum].append((first_clock, voiceeventstack[voicenum]))
             voiceeventstack[voicenum] = []
 
     def append_event(voicenum, event):
