@@ -261,6 +261,15 @@ def get_reg_writes(snd_log_name, skipsilence=1e6):
     return writes
 
 
+def write_reg_writes(snd_log_name, reg_writes):
+    with open(snd_log_name, 'w') as snd_log_f:
+        last_clock = 0
+        for clock, reg, val in reg_writes:
+            rel_clock = clock - last_clock
+            last_clock = clock
+            snd_log_f.write(' '.join((str(i) for i in (rel_clock, reg, val))) + '\n')
+
+
 def get_reg_changes(reg_writes, voicemask=VOICES, minclock=0, maxclock=0):
     change_only_writes = []
     state = SidRegState()
