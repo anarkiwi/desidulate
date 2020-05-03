@@ -300,19 +300,31 @@ def get_reg_changes(reg_writes, voicemask=VOICES, minclock=0, maxclock=0):
     return change_only_writes
 
 
-def debug_reg_writes(reg_writes):
-    lines = []
+def debug_reg_writes(reg_writes, consolidate_mb_clock=10):
     state = SidRegState()
-    for event in reg_writes:
-        clock, reg, val = event
+    raw_regevents = []
+    for clock, reg, val in reg_writes:
         regevent = state.set(reg, val)
+        raw_regevents.append((clock, reg, val, regevent))
+    lines = []
+    for i, regevents in enumerate(raw_regevents):
+        clock, reg, val, regevent = regevents
+        try:
+            next_regevents = raw_regevents[i + 1]
+        except IndexError:
+            next_regevents = None
+        descr = regevent.descr
+        if next_regevents:
+            next_clock = next_regevents[0]
+            next_regevent = next_regevents[-1]
+            if next_regevent.reg == regevent.otherreg and next_clock - clock < consolidate_mb_clock:
+                descr = ''
         line_items = (
             '%9u' % clock,
             '%2u' % reg,
             '%3u' % val,
+            descr,
         )
-        if regevent:
-            line_items += (regevent.descr,)
         lines.append('\t'.join([str(i) for i in line_items]))
     return lines
 
@@ -339,9 +351,10 @@ def get_consolidated_changes(writes, voicemask=VOICES, reg_write_clock_timeout=6
     pendingevent = None
     consolidated = []
     for event in get_events(writes, voicemask=voicemask):
-        clock, reg, val, regevent, state = event
+        clock, _, _, regevent, state = event
+        event = (clock, regevent, state)
         if pendingevent:
-            pendingclock, _, _, pendingregevent, pendingstate = pendingevent
+            pendingclock, pendingregevent, pendingstate = pendingevent
             age = clock - pendingclock
             if age > reg_write_clock_timeout:
                 consolidated.append(pendingevent)
@@ -370,7 +383,7 @@ def get_gate_events(reg_writes, voicemask):
     def despool_events(voicenum):
         if voiceeventstack[voicenum]:
             first_event = voiceeventstack[voicenum][0]
-            first_clock, _, _, _, first_state = first_event
+            first_clock, _, first_state = first_event
             if first_state.voices[voicenum].gate:
                 voiceevents[voicenum].append((first_clock, voiceeventstack[voicenum]))
             voiceeventstack[voicenum] = []
@@ -379,7 +392,7 @@ def get_gate_events(reg_writes, voicemask):
         voiceeventstack[voicenum].append(event)
 
     for event in reg_writes:
-        clock, _, _, regevent, state = event
+        clock, regevent, state = event
         voicenum = regevent.voicenum
         if voicenum is None:
             mainevents.append(event)
@@ -388,7 +401,7 @@ def get_gate_events(reg_writes, voicemask):
             last_gate = None
             if voiceeventstack[voicenum]:
                 last_voiceevent = voiceeventstack[voicenum][-1]
-                _, _, _, _, last_state = last_voiceevent
+                _, _, last_state = last_voiceevent
                 last_gate = last_state.voices[voicenum].gate
             voice_state = state.voices[voicenum]
             gate = voice_state.gate
