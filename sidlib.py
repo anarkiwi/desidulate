@@ -75,11 +75,11 @@ class SidRegHandler:
 
     def _set(self, reg, val):
         self.regstate[reg] = val
-        decoded, otherreg = self.REGMAP[reg](reg)
-        descr = '%s %u %.2x -> %.2x %s' % (self.NAME, self.instance, val, reg, decoded)
+        descr, otherreg = self.REGMAP[reg](reg)
+        preamble = '%s %u %.2x -> %.2x' % (self.NAME, self.instance, val, reg)
         if otherreg is not None:
             otherreg = list(otherreg)[0] + self.regbase()
-        return (descr, otherreg)
+        return (preamble, descr, otherreg)
 
     def set(self, reg, val):
         reg -= self.regbase()
@@ -123,15 +123,7 @@ class SidVoiceRegState(SidRegHandler):
             4: 'triangle', 5: 'sawtooth', 6: 'pulse', 7: 'noise'})
 
     def _control(self, _):
-        descr = {}
-        for descr_func in (
-                self._control_descr,
-                self._freq_descr,
-                self._pwduty_descr,
-                self._attack_decay_descr,
-                self._sustain_release_descr):
-            descr.update(descr_func())
-        return (descr, None)
+        return (self._control_descr(), None)
 
     def __init__(self, instance):
         self.REGMAP = {
@@ -171,8 +163,10 @@ class SidFilterMainRegState(SidRegHandler):
 
     def _filtermain(self, _):
         self.vol, filtcon = self.byte2nib(3)
-        return ('main_vol: %.2x filter_type %s' % (self.vol, self.decodebits(filtcon, {
-            0: 'filter_low', 1: 'filter_band', 2: 'filter_high', 3: 'mute_voice3'})), None)
+        descr = {'main_vol': '%.2x' % self.vol}
+        descr.update(self.decodebits(filtcon, {
+            0: 'filter_low', 1: 'filter_band', 2: 'filter_high', 3: 'mute_voice3'}))
+        return(descr, None)
 
     def __init__(self, instance=0):
         self.REGMAP = {
@@ -203,6 +197,7 @@ class SidRegState:
         for i in self.mainreghandler.REGMAP:
             self.reghandlers[regbase + i] = self.mainreghandler
         self.regstate = {i: 0 for i in self.reghandlers}
+        self.last_descr = {i: {} for i in self.reghandlers}
 
     def reg_voicenum(self, reg):
         handler = self.reghandlers[reg]
@@ -210,16 +205,24 @@ class SidRegState:
             return handler.voicenum
         return None
 
+    def descr_diff(self, reg, last_descr, descr):
+        descr_diff = {}
+        descr_diff = {k: v for k, v in descr.items() if v != last_descr.get(k, None)}
+        descr_txt = ' '.join(('%s: %s' % (k, v) for k, v in sorted(descr_diff.items())))
+        return descr_txt
+
     def set(self, reg, val):
         voicenum = None
         handler = self.reghandlers[reg]
         if isinstance(handler, SidVoiceRegState):
             voicenum = handler.voicenum
-        descr, otherreg = handler.set(reg, val)
+        preamble, descr, otherreg = handler.set(reg, val)
         if self.regstate[reg] == val:
             return None
+        descr_txt = self.descr_diff(reg, self.last_descr[reg], descr)
         self.regstate[reg] = val
-        return SidRegEvent(reg, descr, voicenum=voicenum, otherreg=otherreg)
+        self.last_descr[reg] = descr
+        return SidRegEvent(reg, ' '.join((preamble, descr_txt)), voicenum=voicenum, otherreg=otherreg)
 
     def hashreg(self):
         return hash(frozenset(self.regstate.items()))
