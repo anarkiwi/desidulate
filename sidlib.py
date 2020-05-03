@@ -49,7 +49,7 @@ class SidRegHandler:
     def lohi_attr(self, lo, hi, attr):
         val = self.lohi(lo, hi)
         setattr(self, attr, val)
-        return '%s: %.2x' % (attr, val)
+        return {attr: '%.2x' % val}
 
     def byte2nib(self, reg):
         val = self.regstate.get(reg, 0)
@@ -58,20 +58,20 @@ class SidRegHandler:
 
     def byte2nib_literal(self, reg, lo_lit, hi_lit):
         lo, hi = self.byte2nib(reg)
-        descrs = []
+        descrs = {}
         for lit, val in ((lo_lit, lo), (hi_lit, hi)):
             setattr(self, lit, val)
-            descrs.append('%s: %.2x' % (lit, val))
-        return ', '.join(descrs)
+            descrs[lit] = '%.2x' % val
+        return descrs
 
     def decodebits(self, val, decodemap):
-        bstates = []
+        bstates = {}
         for b in decodemap:
             attr = decodemap[b]
             bval = int(bool(val & 2**b))
             setattr(self, attr, bval)
-            bstates.append('%s: %u' % (attr, bval))
-        return ', '.join(bstates)
+            bstates[attr] = '%u' % bval
+        return bstates
 
     def _set(self, reg, val):
         self.regstate[reg] = val
@@ -123,12 +123,14 @@ class SidVoiceRegState(SidRegHandler):
             4: 'triangle', 5: 'sawtooth', 6: 'pulse', 7: 'noise'})
 
     def _control(self, _):
-        descr = ' '.join((
-            self._control_descr(),
-            self._freq_descr(),
-            self._pwduty_descr(),
-            self._attack_decay_descr(),
-            self._sustain_release_descr()))
+        descr = {}
+        for descr_func in (
+                self._control_descr,
+                self._freq_descr,
+                self._pwduty_descr,
+                self._attack_decay_descr,
+                self._sustain_release_descr):
+            descr.update(descr_func())
         return (descr, None)
 
     def __init__(self, instance):
@@ -162,13 +164,13 @@ class SidFilterMainRegState(SidRegHandler):
 
     def _filterresonanceroute(self, _):
         route, self.filter_res = self.byte2nib(2)
-        return ('filter res %.2x, route %s' % (self.filter_res, self.decodebits(route, {
+        return ('filter_res: %.2x %s' % (self.filter_res, self.decodebits(route, {
             0: 'filter_voice1', 1: 'filter_voice2', 2: 'filter_voice3',
             3: 'filter_external'})), None)
 
     def _filtermain(self, _):
         self.vol, filtcon = self.byte2nib(3)
-        return ('vol %.2x, filter type %s' % (self.vol, self.decodebits(filtcon, {
+        return ('main_vol: %.2x filter_type %s' % (self.vol, self.decodebits(filtcon, {
             0: 'filter_low', 1: 'filter_band', 2: 'filter_high', 3: 'mute_voice3'})), None)
 
     def __init__(self, instance=0):
@@ -212,11 +214,11 @@ class SidRegState:
         handler = self.reghandlers[reg]
         if isinstance(handler, SidVoiceRegState):
             voicenum = handler.voicenum
-        regevent, otherreg = handler.set(reg, val)
+        descr, otherreg = handler.set(reg, val)
         if self.regstate[reg] == val:
             return None
         self.regstate[reg] = val
-        return SidRegEvent(reg, regevent, voicenum=voicenum, otherreg=otherreg)
+        return SidRegEvent(reg, descr, voicenum=voicenum, otherreg=otherreg)
 
     def hashreg(self):
         return hash(frozenset(self.regstate.items()))
