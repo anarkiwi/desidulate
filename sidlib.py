@@ -164,9 +164,10 @@ class SidFilterMainRegState(SidRegHandler):
 
     def _filterresonanceroute(self, _):
         route, self.filter_res = self.byte2nib(2)
-        return ('filter_res: %.2x %s' % (self.filter_res, self.decodebits(route, {
-            0: 'filter_voice1', 1: 'filter_voice2', 2: 'filter_voice3',
-            3: 'filter_external'})), None)
+        descr = {'filter_res': '%.2x' % self.filter_res}
+        descr.update(self.decodebits(route, {
+            0: 'filter_voice1', 1: 'filter_voice2', 2: 'filter_voice3', 3: 'filter_external'}))
+        return (descr, None)
 
     def _filtermain(self, _):
         self.vol, filtcon = self.byte2nib(3)
