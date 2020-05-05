@@ -28,7 +28,22 @@ class SidRegEvent:
         return self.__str__()
 
 
-class SidRegHandler:
+class SidRegStateBase:
+
+    def __init__(self):
+        self.regstate = {}
+
+    def hashreg(self):
+        return ''.join(('%2.2x' % int(j) for _, j in sorted(self.regstate.items())))
+
+    def __eq__(self, other):
+        return self.hashreg() == other.hashreg()
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+
+class SidRegHandler(SidRegStateBase):
 
     REGBASE = 0
     NAME = 'unknown'
@@ -180,7 +195,7 @@ class SidFilterMainRegState(SidRegHandler):
         super(SidFilterMainRegState, self).__init__(instance)
 
 
-class SidRegState:
+class SidRegState(SidRegStateBase):
 
     def __init__(self):
         self.reghandlers = {}
@@ -227,18 +242,10 @@ class SidRegState:
     def hashreg(self):
         return hash(frozenset(self.regstate.items()))
 
-    def __eq__(self, other):
-        return self.hashreg() == other.hashreg()
-
-    def __ne__(self, other):
-        return not self.__eq__(other)
-
-
 
 # http://www.sidmusic.org/sid/sidtech2.html
 def real_sid_freq(sid, freq_reg):
     return freq_reg * sid.clock_frequency / 16777216
-
 
 def clock_to_s(sid, clock):
     return clock / sid.clock_frequency
@@ -300,15 +307,17 @@ def get_reg_changes(reg_writes, voicemask=VOICES, minclock=0, maxclock=0):
     return change_only_writes
 
 
-def debug_reg_writes(reg_writes, consolidate_mb_clock=10):
+def debug_reg_writes(sid, reg_writes, consolidate_mb_clock=10):
     state = SidRegState()
     raw_regevents = []
     for clock, reg, val in reg_writes:
         regevent = state.set(reg, val)
-        raw_regevents.append((clock, reg, val, regevent))
+        regs = [state.mainreghandler] + [state.voices[i] for i in state.voices]
+        hashregs = tuple([reg.hashreg() for reg in regs])
+        raw_regevents.append((clock, reg, val) + hashregs + (regevent,))
     lines = []
     for i, regevents in enumerate(raw_regevents):
-        clock, reg, val, regevent = regevents
+        clock, reg, val, main_hashreg, voice1_hashreg, voice2_hashreg, voice3_hashreg, regevent = regevents
         try:
             next_regevents = raw_regevents[i + 1]
         except IndexError:
@@ -321,8 +330,13 @@ def debug_reg_writes(reg_writes, consolidate_mb_clock=10):
                 descr = ''
         line_items = (
             '%9u' % clock,
+            '%6.2f' % clock_to_s(sid, clock),
             '%2u' % reg,
             '%3u' % val,
+            '%s' % main_hashreg,
+            '%s' % voice1_hashreg,
+            '%s' % voice2_hashreg,
+            '%s' % voice3_hashreg,
             descr,
         )
         lines.append('\t'.join([str(i) for i in line_items]))

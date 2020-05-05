@@ -31,7 +31,7 @@ voicemask = set((int(v) for v in args.voicemask.split(',')))
 sid = get_sid(pal=args.pal)
 reg_writes = get_reg_changes(get_reg_writes(args.logfile), voicemask=voicemask, minclock=args.minclock, maxclock=args.maxclock)
 
-for line in debug_reg_writes(reg_writes):
+for line in debug_reg_writes(sid, reg_writes):
     print(line)
 
 if args.logoutfile:
