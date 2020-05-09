@@ -21,6 +21,7 @@ parser.add_argument('--logoutfile', default='', help='if defined, output only re
 parser.add_argument('--voicemask', default=','.join((str(v) for v in VOICES)), help='command separated list of SID voices to use')
 parser.add_argument('--minclock', default=0, type=int, help='start rendering from this clock value')
 parser.add_argument('--maxclock', default=0, type=int, help='if > 0, stop rendering at this clock value')
+parser.add_argument('--maxsilentclocks', default=int(5 * 1e6), type=int, help='if > 0, then stop rendering after this many clocks of no voice gated on')
 pal_parser = parser.add_mutually_exclusive_group(required=False)
 pal_parser.add_argument('--pal', dest='pal', action='store_true', help='Use PAL clock')
 pal_parser.add_argument('--ntsc', dest='pal', action='store_false', help='Use NTSC clock')
@@ -29,7 +30,7 @@ args = parser.parse_args()
 voicemask = set((int(v) for v in args.voicemask.split(',')))
 
 sid = get_sid(pal=args.pal)
-reg_writes = get_reg_changes(get_reg_writes(args.logfile), voicemask=voicemask, minclock=args.minclock, maxclock=args.maxclock)
+reg_writes = get_reg_changes(get_reg_writes(args.logfile), voicemask=voicemask, minclock=args.minclock, maxclock=args.maxclock, maxsilentclocks=args.maxsilentclocks)
 
 for line in debug_reg_writes(sid, reg_writes):
     print(line)

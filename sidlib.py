@@ -283,10 +283,15 @@ def write_reg_writes(snd_log_name, reg_writes):
             snd_log_f.write(' '.join((str(i) for i in (rel_clock, reg, val))) + '\n')
 
 
-def get_reg_changes(reg_writes, voicemask=VOICES, minclock=0, maxclock=0):
+def gates_on(state):
+    return {voicenum for voicenum in state.voices if state.voices[voicenum].gate}
+
+
+def get_reg_changes(reg_writes, voicemask=VOICES, minclock=0, maxclock=0, maxsilentclocks=0):
     change_only_writes = []
     state = SidRegState()
     relative_clock = 0
+    last_any_gate_on = None
     for clock, reg, val in reg_writes:
         regevent = state.set(reg, val)
         if clock < minclock:
@@ -297,6 +302,12 @@ def get_reg_changes(reg_writes, voicemask=VOICES, minclock=0, maxclock=0):
             continue
         if regevent.voicenum and regevent.voicenum not in voicemask:
             continue
+        gates_on_now = gates_on(state)
+        if maxsilentclocks and not gates_on_now:
+            if last_any_gate_on and clock - last_any_gate_on > maxsilentclocks:
+                break
+        if gates_on_now:
+            last_any_gate_on = clock
         if not change_only_writes and minclock:
             relative_clock = clock
             for reg_pre, val_pre in state.regstate.items():
@@ -314,10 +325,11 @@ def debug_reg_writes(sid, reg_writes, consolidate_mb_clock=10):
         regevent = state.set(reg, val)
         regs = [state.mainreghandler] + [state.voices[i] for i in state.voices]
         hashregs = tuple([reg.hashreg() for reg in regs])
-        raw_regevents.append((clock, reg, val) + hashregs + (regevent,))
+        active_voices = ','.join((str(voicenum) for voicenum in sorted(gates_on(state))))
+        raw_regevents.append((clock, reg, val) + (active_voices,) + hashregs + (regevent,))
     lines = []
     for i, regevents in enumerate(raw_regevents):
-        clock, reg, val, main_hashreg, voice1_hashreg, voice2_hashreg, voice3_hashreg, regevent = regevents
+        clock, reg, val, active_voices, main_hashreg, voice1_hashreg, voice2_hashreg, voice3_hashreg, regevent = regevents
         try:
             next_regevents = raw_regevents[i + 1]
         except IndexError:
@@ -333,6 +345,7 @@ def debug_reg_writes(sid, reg_writes, consolidate_mb_clock=10):
             '%6.2f' % clock_to_s(sid, clock),
             '%2u' % reg,
             '%3u' % val,
+            '%6s' % active_voices,
             '%s' % main_hashreg,
             '%s' % voice1_hashreg,
             '%s' % voice2_hashreg,
