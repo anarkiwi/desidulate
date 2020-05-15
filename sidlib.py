@@ -220,7 +220,7 @@ class SidRegState(SidRegStateBase):
             return handler.voicenum
         return None
 
-    def descr_diff(self, reg, last_descr, descr):
+    def descr_diff(self, _reg, last_descr, descr):
         descr_diff = {}
         descr_diff = {k: v for k, v in descr.items() if v != last_descr.get(k, None)}
         descr_txt = ' '.join(('%s: %s' % (k, v) for k, v in sorted(descr_diff.items())))
@@ -334,11 +334,13 @@ def debug_reg_writes(sid, reg_writes, consolidate_mb_clock=10):
             next_regevents = raw_regevents[i + 1]
         except IndexError:
             next_regevents = None
-        descr = regevent.descr
+        descr = ''
+        if regevent:
+            descr = regevent.descr
         if next_regevents:
             next_clock = next_regevents[0]
             next_regevent = next_regevents[-1]
-            if next_regevent.reg == regevent.otherreg and next_clock - clock < consolidate_mb_clock:
+            if next_regevent and regevent and next_regevent.reg == regevent.otherreg and next_clock - clock < consolidate_mb_clock:
                 descr = ''
         line_items = (
             '%9u' % clock,
@@ -381,7 +383,7 @@ def get_consolidated_changes(writes, voicemask=VOICES, reg_write_clock_timeout=6
         clock, _, _, regevent, state = event
         event = (clock, regevent, state)
         if pendingevent:
-            pendingclock, pendingregevent, pendingstate = pendingevent
+            pendingclock, pendingregevent, _pendingstate = pendingevent
             age = clock - pendingclock
             if age > reg_write_clock_timeout:
                 consolidated.append(pendingevent)
@@ -419,7 +421,7 @@ def get_gate_events(reg_writes, voicemask):
         voiceeventstack[voicenum].append(event)
 
     for event in reg_writes:
-        clock, regevent, state = event
+        _clock, regevent, state = event
         voicenum = regevent.voicenum
         if voicenum is None:
             mainevents.append(event)
