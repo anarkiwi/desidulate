@@ -132,3 +132,4 @@ logs/
 *.mid
 *.wav
 *~
+.pytype/

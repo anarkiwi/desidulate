@@ -11,7 +11,7 @@
 
 import argparse
 from sidlib import clock_to_qn, get_consolidated_changes, get_gate_events, get_reg_changes, get_reg_writes, VOICES
-from sidmidi import get_midi_file, get_midi_notes_from_events
+from sidmidi import get_midi_file, get_midi_notes_from_events, DRUM_TRACK, DRUM_CHANNEL
 from sidwav import get_sid
 
 
@@ -34,17 +34,33 @@ reg_writes = get_reg_changes(get_reg_writes(args.logfile), voicemask=voicemask, 
 reg_writes_changes = get_consolidated_changes(reg_writes, voicemask)
 mainevents, voiceevents = get_gate_events(reg_writes_changes, voicemask)
 
-smf = get_midi_file(args.bpm, max(voicemask))
+smf = get_midi_file(args.bpm)
+
 
 for voicenum, gated_voice_events in voiceevents.items():
     for event_start, events in gated_voice_events:
         midi_notes = get_midi_notes_from_events(sid, events)
-        max_midi_note = max(midi_note[1] for midi_note in midi_notes)
-        for clock, pitch, duration, _ in midi_notes:
-            qn_clock = clock_to_qn(sid, clock, args.bpm)
-            qn_duration = clock_to_qn(sid, duration, args.bpm)
-            if qn_duration > 0.1:
-                smf.addNote(voicenum-1, voicenum, pitch, qn_clock, qn_duration, 127)
+        if not midi_notes:
+            continue
+        midi_pitches = [midi_note[1] for midi_note in midi_notes]
+        max_midi_note = max(midi_pitches)
+        min_midi_note = min(midi_pitches)
+        total_duration = sum(duration for _, _, duration, _ in midi_notes[:-1])
+        voicestates = [state.voices[voicenum] for _, _, state in events]
+        waveforms = set()
+        for voicestate in voicestates:
+            for waveform in ('noise', 'pulse', 'triangle', 'sawtooth'):
+                if getattr(voicestate, waveform, None):
+                    waveforms.add(waveform)
+        noises = 'noise' in waveforms
+        if noises:
+            continue
+        else:
+            for clock, pitch, duration, _ in midi_notes:
+                qn_clock = clock_to_qn(sid, clock, args.bpm)
+                qn_duration = clock_to_qn(sid, duration, args.bpm)
+                if qn_duration > 0.1:
+                    smf.addNote(voicenum-1, voicenum, pitch, qn_clock, qn_duration, 127)
 
 with open(args.midifile, 'wb') as midi_f:
     smf.writeFile(midi_f)
