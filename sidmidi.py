@@ -11,6 +11,8 @@ from sidlib import real_sid_freq
 A = 440
 MIDI_N_TO_F = {n: (A / 32) * (2 ** ((n - 9) / 12)) for n in range(128)}
 MIDI_F_TO_N = {f: n for n, f in MIDI_N_TO_F.items()}
+DRUM_TRACK = 3
+DRUM_CHANNEL = 9
 
 
 def get_midi_file(bpm):
