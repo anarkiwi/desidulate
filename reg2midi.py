@@ -53,14 +53,26 @@ for voicenum, gated_voice_events in voiceevents.items():
                 if getattr(voicestate, waveform, None):
                     waveforms.add(waveform)
         noises = 'noise' in waveforms
+
+        def add_pitch(clock, pitch, duration, track, channel):
+            duration = round(duration / 1e3) * 1e3
+            qn_clock = clock_to_qn(sid, clock, args.bpm)
+            qn_duration = max(clock_to_qn(sid, duration, args.bpm), 0.2)
+            smf.addNote(track, channel, pitch, qn_clock, qn_duration, 127)
+
+        def add_noise(clock, duration, track, channel):
+            # https://en.wikipedia.org/wiki/General_MIDI#Percussion
+            pitch = 44
+            add_pitch(clock, pitch, duration, track, channel)
+
         if noises:
-            continue
+            if waveforms == {'noise'}:
+                for clock, pitch, duration, _ in midi_notes:
+                    add_noise(clock, total_duration, DRUM_TRACK, DRUM_CHANNEL)
         else:
             for clock, pitch, duration, _ in midi_notes:
-                qn_clock = clock_to_qn(sid, clock, args.bpm)
-                qn_duration = clock_to_qn(sid, duration, args.bpm)
-                if qn_duration > 0.1:
-                    smf.addNote(voicenum-1, voicenum, pitch, qn_clock, qn_duration, 127)
+                add_pitch(clock, pitch, duration, voicenum-1, voicenum)
+
 
 with open(args.midifile, 'wb') as midi_f:
     smf.writeFile(midi_f)
