@@ -13,10 +13,11 @@ MIDI_N_TO_F = {n: (A / 32) * (2 ** ((n - 9) / 12)) for n in range(128)}
 MIDI_F_TO_N = {f: n for n, f in MIDI_N_TO_F.items()}
 
 
-def get_midi_file(bpm, voices):
-    midi_file = MIDIFile(voices)
-    for voice in range(1, voices+1):
-        midi_file.addTempo(track=voice, time=0, tempo=bpm)
+def get_midi_file(bpm):
+    tracks = 3 + 1 # voices plus percussion.
+    midi_file = MIDIFile(tracks)
+    for i in range(tracks):
+        midi_file.addTempo(i, time=0, tempo=bpm)
     return midi_file
 
 
