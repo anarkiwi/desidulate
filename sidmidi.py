@@ -51,5 +51,7 @@ def get_midi_notes_from_events(sid, events):
             next_clock = notes_starts[n + 1][1]
         except IndexError:
             next_clock = last_clock
-        notes.append((clock, note, next_clock - clock, sid_f))
+        duration = next_clock - clock
+        if duration:
+            notes.append((clock, note, duration, sid_f))
     return notes
