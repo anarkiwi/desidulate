@@ -10,6 +10,7 @@
 # http://www.ucapps.de/howto_sid_wavetables_1.html
 
 import argparse
+from collections import Counter
 from sidlib import clock_to_qn, get_consolidated_changes, get_gate_events, get_reg_changes, get_reg_writes, VOICES
 from sidmidi import get_midi_file, get_midi_notes_from_events, DRUM_TRACK_OFFSET, DRUM_CHANNEL
 from sidwav import get_sid
@@ -40,7 +41,10 @@ BASS_DRUM = 36
 PEDAL_HIHAT = 44
 CLOSED_HIHAT = 42
 OPEN_HIHAT = 46
+HI_TOM = 50
+LOW_TOM = 45
 ACCOUSTIC_SNARE = 38
+ELECTRIC_SNARE = 40
 CRASH_CYMBAL1 = 49
 
 for voicenum, gated_voice_events in voiceevents.items():
@@ -52,20 +56,31 @@ for voicenum, gated_voice_events in voiceevents.items():
         max_midi_note = max(midi_pitches)
         min_midi_note = min(midi_pitches)
         total_duration = sum(duration for _, _, duration, _ in midi_notes)
-        voicestates = [state.voices[voicenum] for _, _, state in events]
-        waveforms = set()
-        for voicestate in voicestates:
+        voicestates = [(clock, state.voices[voicenum]) for clock, _, state in events]
+        waveforms = Counter()
+        waveform_order = []
+        last_clock = None
+        for clock, voicestate in voicestates:
+            if last_clock is None:
+                last_clock = clock
+            curr_waveform = []
             for waveform in ('noise', 'pulse', 'triangle', 'sawtooth'):
                 if getattr(voicestate, waveform, None):
-                    waveforms.add(waveform)
-        noises = 'noise' in waveforms
+                    waveforms[waveform] += (clock - last_clock)
+                    curr_waveform.append(waveform)
+            curr_waveform = tuple(curr_waveform)
+            if not waveform_order or waveform_order[-1] != curr_waveform:
+                waveform_order.append(curr_waveform)
+            last_clock = clock
+        noisephases = len([curr_waveform for curr_waveform in waveform_order if 'noise' in curr_waveform])
+        noises = noisephases > 0
 
         def add_pitch(clock, pitch, duration, track, channel, velocity=100):
             qn_clock = clock_to_qn(sid, clock, args.bpm)
             qn_duration = clock_to_qn(sid, duration, args.bpm)
             smf.addNote(track, channel, pitch, qn_clock, qn_duration, velocity)
 
-        def add_noise_duration(clock, pitch, duration, track, channel, velocity=100):
+        def add_noise_duration(clock, duration, track, channel, velocity=100):
             max_duration = clockq
             noise_pitch = None
             for noise_pitch in (PEDAL_HIHAT, CLOSED_HIHAT, OPEN_HIHAT, ACCOUSTIC_SNARE, CRASH_CYMBAL1):
@@ -74,21 +89,22 @@ for voicenum, gated_voice_events in voiceevents.items():
                 max_duration *= 2
             add_pitch(clock, noise_pitch, duration, track, channel, velocity=velocity)
 
+        def descending(pitches):
+            return pitches[0] > pitches[-1]
+
         if noises:
             # https://en.wikipedia.org/wiki/General_MIDI#Percussion
-            if waveforms == {'noise'}:
+            if set(waveforms.keys()) == {'noise'}:
                 for clock, _pitch, duration, _ in midi_notes:
-                    add_noise_duration(clock, _pitch, duration, DRUM_TRACK_OFFSET + voicenum, DRUM_CHANNEL)
+                    add_noise_duration(clock, duration, DRUM_TRACK_OFFSET + voicenum, DRUM_CHANNEL)
             else:
                 for clock, _pitch, _duration, _ in midi_notes:
-                    # if max_midi_note == 102 and min_midi_note == 53:
-                    #     add_pitch(clock, 38, total_duration, DRUM_TRACK_OFFSET + voicenum, DRUM_CHANNEL)
-                    # elif max_midi_note == 102 and min_midi_note == 56:
-                    #     add_pitch(clock, 50, total_duration, DRUM_TRACK_OFFSET + voicenum, DRUM_CHANNEL)
-                    # elif max_midi_note == 102 and min_midi_note == 42:
-                    #     add_pitch(clock, 45, total_duration, DRUM_TRACK_OFFSET + voicenum, DRUM_CHANNEL)
-                    add_pitch(clock, BASS_DRUM, total_duration, DRUM_TRACK_OFFSET + voicenum, DRUM_CHANNEL)
-                    break
+                    if noisephases > 1:
+                        add_pitch(clock, ELECTRIC_SNARE, total_duration, DRUM_TRACK_OFFSET + voicenum, DRUM_CHANNEL)
+                    elif descending(midi_pitches) and len(midi_pitches) > 2:
+                        add_pitch(clock, BASS_DRUM, total_duration, DRUM_TRACK_OFFSET + voicenum, DRUM_CHANNEL)
+                    else:
+                        add_pitch(clock, LOW_TOM, total_duration, DRUM_TRACK_OFFSET + voicenum, DRUM_CHANNEL)
         else:
             for clock, pitch, duration, _ in midi_notes:
                 add_pitch(clock, pitch, duration, voicenum-1, voicenum)
