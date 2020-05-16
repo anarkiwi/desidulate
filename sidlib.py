@@ -420,6 +420,13 @@ def get_gate_events(reg_writes, voicemask):
     def append_event(voicenum, event):
         voiceeventstack[voicenum].append(event)
 
+    def gate_on(voice_state):
+        if voice_state.test:
+            return False
+        if not voice_state.gate:
+            return False
+        return True
+
     for event in reg_writes:
         _clock, regevent, state = event
         voicenum = regevent.voicenum
@@ -431,9 +438,9 @@ def get_gate_events(reg_writes, voicemask):
             if voiceeventstack[voicenum]:
                 last_voiceevent = voiceeventstack[voicenum][-1]
                 _, _, last_state = last_voiceevent
-                last_gate = last_state.voices[voicenum].gate
+                last_gate = gate_on(last_state.voices[voicenum])
             voice_state = state.voices[voicenum]
-            gate = voice_state.gate
+            gate = gate_on(voice_state)
             if last_gate is not None and last_gate != gate:
                 if gate:
                     despool_events(voicenum)
@@ -441,7 +448,7 @@ def get_gate_events(reg_writes, voicemask):
                 else:
                     append_event(voicenum, event)
                 continue
-            if gate or voice_state.release > 0:
+            if gate or (voice_state.release > 0 and not voice_state.test):
                 append_event(voicenum, event)
 
     for voicenum in voicemask:
