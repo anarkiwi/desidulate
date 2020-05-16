@@ -36,12 +36,12 @@ reg_writes = get_reg_changes(get_reg_writes(args.logfile), voicemask=voicemask, 
 reg_writes_changes = get_consolidated_changes(reg_writes, voicemask)
 mainevents, voiceevents = get_gate_events(reg_writes_changes, voicemask)
 
+BASS_DRUM = 36
 PEDAL_HIHAT = 44
 CLOSED_HIHAT = 42
 OPEN_HIHAT = 46
 ACCOUSTIC_SNARE = 38
 CRASH_CYMBAL1 = 49
-
 
 for voicenum, gated_voice_events in voiceevents.items():
     for event_start, events in gated_voice_events:
@@ -78,11 +78,16 @@ for voicenum, gated_voice_events in voiceevents.items():
             # https://en.wikipedia.org/wiki/General_MIDI#Percussion
             if waveforms == {'noise'}:
                 for clock, _pitch, duration, _ in midi_notes:
-                    add_noise_duration(clock, pitch, duration, DRUM_TRACK_OFFSET + voicenum, DRUM_CHANNEL)
+                    add_noise_duration(clock, _pitch, duration, DRUM_TRACK_OFFSET + voicenum, DRUM_CHANNEL)
             else:
                 for clock, _pitch, _duration, _ in midi_notes:
-                    pitch = 36
-                    add_pitch(clock, pitch, total_duration, DRUM_TRACK_OFFSET + voicenum, DRUM_CHANNEL)
+                    # if max_midi_note == 102 and min_midi_note == 53:
+                    #     add_pitch(clock, 38, total_duration, DRUM_TRACK_OFFSET + voicenum, DRUM_CHANNEL)
+                    # elif max_midi_note == 102 and min_midi_note == 56:
+                    #     add_pitch(clock, 50, total_duration, DRUM_TRACK_OFFSET + voicenum, DRUM_CHANNEL)
+                    # elif max_midi_note == 102 and min_midi_note == 42:
+                    #     add_pitch(clock, 45, total_duration, DRUM_TRACK_OFFSET + voicenum, DRUM_CHANNEL)
+                    add_pitch(clock, BASS_DRUM, total_duration, DRUM_TRACK_OFFSET + voicenum, DRUM_CHANNEL)
                     break
         else:
             for clock, pitch, duration, _ in midi_notes:
