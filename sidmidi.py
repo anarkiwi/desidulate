@@ -32,7 +32,6 @@ def closest_midi(sid_f):
 
 # Convert gated voice events into possibly many MIDI notes
 def get_midi_notes_from_events(sid, events, clockq):
-    last_sid_f = None
     last_midi_n = None
     notes_starts = []
     for clock, regevent, state in events:
@@ -40,18 +39,16 @@ def get_midi_notes_from_events(sid, events, clockq):
         voicenum = regevent.voicenum
         voice_state = state.voices[voicenum]
         sid_f = real_sid_freq(sid, voice_state.frequency)
-        closest_midi_f, closest_midi_n = closest_midi(sid_f)
+        _closest_midi_f, closest_midi_n = closest_midi(sid_f)
         # TODO: add pitch bend if significantly different to canonical note.
         if closest_midi_n != last_midi_n and voice_state.any_waveform():
             notes_starts.append((closest_midi_n, clock, sid_f))
-            last_midi_n = closest_midi_n
-            last_sid_f = sid_f
-    last_clock = clock
+        last_clock = clock
     notes = []
-    for n, note_clocks in enumerate(notes_starts):
+    for i, note_clocks in enumerate(notes_starts):
         note, clock, sid_f = note_clocks
         try:
-            next_clock = notes_starts[n + 1][1]
+            next_clock = notes_starts[i + 1][1]
         except IndexError:
             next_clock = last_clock
         duration = next_clock - clock

@@ -382,7 +382,7 @@ def get_consolidated_changes(writes, voicemask=VOICES, reg_write_clock_timeout=6
     for event in get_events(writes, voicemask=voicemask):
         clock, _, _, regevent, state = event
         event = (clock, regevent, state)
-        if pendingevent:
+        if pendingevent is not None:
             pendingclock, pendingregevent, _pendingstate = pendingevent
             age = clock - pendingclock
             if age > reg_write_clock_timeout:
