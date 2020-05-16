@@ -36,6 +36,12 @@ reg_writes = get_reg_changes(get_reg_writes(args.logfile), voicemask=voicemask, 
 reg_writes_changes = get_consolidated_changes(reg_writes, voicemask)
 mainevents, voiceevents = get_gate_events(reg_writes_changes, voicemask)
 
+PEDAL_HIHAT = 44
+CLOSED_HIHAT = 42
+OPEN_HIHAT = 46
+ACCOUSTIC_SNARE = 38
+CRASH_CYMBAL1 = 49
+
 
 for voicenum, gated_voice_events in voiceevents.items():
     for event_start, events in gated_voice_events:
@@ -59,12 +65,20 @@ for voicenum, gated_voice_events in voiceevents.items():
             qn_duration = clock_to_qn(sid, duration, args.bpm)
             smf.addNote(track, channel, pitch, qn_clock, qn_duration, velocity)
 
+        def add_noise_duration(clock, pitch, duration, track, channel, velocity=100):
+            max_duration = clockq
+            noise_pitch = None
+            for noise_pitch in (PEDAL_HIHAT, CLOSED_HIHAT, OPEN_HIHAT, ACCOUSTIC_SNARE, CRASH_CYMBAL1):
+                if duration <= max_duration:
+                    break
+                max_duration *= 2
+            add_pitch(clock, noise_pitch, duration, track, channel, velocity=velocity)
+
         if noises:
             # https://en.wikipedia.org/wiki/General_MIDI#Percussion
             if waveforms == {'noise'}:
                 for clock, _pitch, duration, _ in midi_notes:
-                    pitch = 44
-                    add_pitch(clock, pitch, duration, DRUM_TRACK_OFFSET + voicenum, DRUM_CHANNEL)
+                    add_noise_duration(clock, pitch, duration, DRUM_TRACK_OFFSET + voicenum, DRUM_CHANNEL)
             else:
                 for clock, _pitch, _duration, _ in midi_notes:
                     pitch = 36
