@@ -43,6 +43,7 @@ def get_midi_notes_from_events(sid, events, clockq):
         # TODO: add pitch bend if significantly different to canonical note.
         if closest_midi_n != last_midi_n and voice_state.any_waveform():
             notes_starts.append((closest_midi_n, clock, sid_f))
+            last_midi_n = closest_midi_n
         last_clock = clock
     notes = []
     for i, note_clocks in enumerate(notes_starts):
