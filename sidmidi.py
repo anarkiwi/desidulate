@@ -13,13 +13,15 @@ MIDI_N_TO_F = {n: (A / 32) * (2 ** ((n - 9) / 12)) for n in range(128)}
 MIDI_F_TO_N = {f: n for n, f in MIDI_N_TO_F.items()}
 DRUM_TRACK_OFFSET = 2
 DRUM_CHANNEL = 9
+VOICES = 3
 
 
-def get_midi_file(bpm):
-    tracks = 3 * 2 # voices plus percussion channel for each.
-    midi_file = MIDIFile(tracks)
-    for i in range(tracks):
+def get_midi_file(bpm, program=81):
+    midi_file = MIDIFile(VOICES * 2)
+    for i in range(1, VOICES + 1):
         midi_file.addTempo(i, time=0, tempo=bpm)
+        midi_file.addProgramChange(i-1, i, time=0, program=program)
+        midi_file.addTempo(i + DRUM_TRACK_OFFSET, time=0, tempo=bpm)
     return midi_file
 
 

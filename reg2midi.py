@@ -59,15 +59,17 @@ for voicenum, gated_voice_events in voiceevents.items():
             qn_duration = clock_to_qn(sid, duration, args.bpm)
             smf.addNote(track, channel, pitch, qn_clock, qn_duration, velocity)
 
-        def add_noise(clock, duration, track, channel):
-            # https://en.wikipedia.org/wiki/General_MIDI#Percussion
-            pitch = 44
-            add_pitch(clock, pitch, duration, track, channel)
-
         if noises:
+            # https://en.wikipedia.org/wiki/General_MIDI#Percussion
             if waveforms == {'noise'}:
-                for clock, pitch, duration, _ in midi_notes:
-                    add_noise(clock, total_duration, DRUM_TRACK_OFFSET + voicenum, DRUM_CHANNEL)
+                for clock, _pitch, duration, _ in midi_notes:
+                    pitch = 44
+                    add_pitch(clock, pitch, duration, DRUM_TRACK_OFFSET + voicenum, DRUM_CHANNEL)
+            else:
+                for clock, _pitch, _duration, _ in midi_notes:
+                    pitch = 36
+                    add_pitch(clock, pitch, total_duration, DRUM_TRACK_OFFSET + voicenum, DRUM_CHANNEL)
+                    break
         else:
             for clock, pitch, duration, _ in midi_notes:
                 add_pitch(clock, pitch, duration, voicenum-1, voicenum)
