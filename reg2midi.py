@@ -11,7 +11,7 @@
 
 import argparse
 from sidlib import clock_to_qn, get_consolidated_changes, get_gate_events, get_reg_changes, get_reg_writes, VOICES
-from sidmidi import get_midi_file, get_midi_notes_from_events, DRUM_TRACK, DRUM_CHANNEL
+from sidmidi import get_midi_file, get_midi_notes_from_events, DRUM_TRACK_OFFSET, DRUM_CHANNEL
 from sidwav import get_sid
 
 
@@ -29,23 +29,23 @@ parser.set_defaults(pal=True)
 args = parser.parse_args()
 voicemask = set((int(v) for v in args.voicemask.split(',')))
 
+smf = get_midi_file(args.bpm)
 sid = get_sid(pal=args.pal)
+clockq = sid.clock_frequency / 50
 reg_writes = get_reg_changes(get_reg_writes(args.logfile), voicemask=voicemask, minclock=args.minclock, maxclock=args.maxclock)
 reg_writes_changes = get_consolidated_changes(reg_writes, voicemask)
 mainevents, voiceevents = get_gate_events(reg_writes_changes, voicemask)
 
-smf = get_midi_file(args.bpm)
-
 
 for voicenum, gated_voice_events in voiceevents.items():
     for event_start, events in gated_voice_events:
-        midi_notes = get_midi_notes_from_events(sid, events)
+        midi_notes = get_midi_notes_from_events(sid, events, clockq)
         if not midi_notes:
             continue
         midi_pitches = [midi_note[1] for midi_note in midi_notes]
         max_midi_note = max(midi_pitches)
         min_midi_note = min(midi_pitches)
-        total_duration = sum(duration for _, _, duration, _ in midi_notes[:-1])
+        total_duration = sum(duration for _, _, duration, _ in midi_notes)
         voicestates = [state.voices[voicenum] for _, _, state in events]
         waveforms = set()
         for voicestate in voicestates:
@@ -54,11 +54,10 @@ for voicenum, gated_voice_events in voiceevents.items():
                     waveforms.add(waveform)
         noises = 'noise' in waveforms
 
-        def add_pitch(clock, pitch, duration, track, channel):
-            duration = round(duration / 1e3) * 1e3
+        def add_pitch(clock, pitch, duration, track, channel, velocity=100):
             qn_clock = clock_to_qn(sid, clock, args.bpm)
-            qn_duration = max(clock_to_qn(sid, duration, args.bpm), 0.2)
-            smf.addNote(track, channel, pitch, qn_clock, qn_duration, 127)
+            qn_duration = clock_to_qn(sid, duration, args.bpm)
+            smf.addNote(track, channel, pitch, qn_clock, qn_duration, velocity)
 
         def add_noise(clock, duration, track, channel):
             # https://en.wikipedia.org/wiki/General_MIDI#Percussion
@@ -68,7 +67,7 @@ for voicenum, gated_voice_events in voiceevents.items():
         if noises:
             if waveforms == {'noise'}:
                 for clock, pitch, duration, _ in midi_notes:
-                    add_noise(clock, total_duration, DRUM_TRACK, DRUM_CHANNEL)
+                    add_noise(clock, total_duration, DRUM_TRACK_OFFSET + voicenum, DRUM_CHANNEL)
         else:
             for clock, pitch, duration, _ in midi_notes:
                 add_pitch(clock, pitch, duration, voicenum-1, voicenum)

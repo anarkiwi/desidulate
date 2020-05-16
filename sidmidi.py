@@ -11,12 +11,12 @@ from sidlib import real_sid_freq
 A = 440
 MIDI_N_TO_F = {n: (A / 32) * (2 ** ((n - 9) / 12)) for n in range(128)}
 MIDI_F_TO_N = {f: n for n, f in MIDI_N_TO_F.items()}
-DRUM_TRACK = 3
+DRUM_TRACK_OFFSET = 2
 DRUM_CHANNEL = 9
 
 
 def get_midi_file(bpm):
-    tracks = 3 + 1 # voices plus percussion.
+    tracks = 3 * 2 # voices plus percussion channel for each.
     midi_file = MIDIFile(tracks)
     for i in range(tracks):
         midi_file.addTempo(i, time=0, tempo=bpm)
@@ -29,11 +29,12 @@ def closest_midi(sid_f):
 
 
 # Convert gated voice events into possibly many MIDI notes
-def get_midi_notes_from_events(sid, events):
+def get_midi_notes_from_events(sid, events, clockq):
     last_sid_f = None
     last_midi_n = None
     notes_starts = []
     for clock, regevent, state in events:
+        clock = round(clock / clockq) * clockq
         voicenum = regevent.voicenum
         voice_state = state.voices[voicenum]
         sid_f = real_sid_freq(sid, voice_state.frequency)
@@ -52,6 +53,8 @@ def get_midi_notes_from_events(sid, events):
         except IndexError:
             next_clock = last_clock
         duration = next_clock - clock
-        if duration:
-            notes.append((clock, note, duration, sid_f))
+        if not duration:
+            continue
+        duration = round(duration / clockq) * clockq
+        notes.append((clock, note, duration, sid_f))
     return notes
