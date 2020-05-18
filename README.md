@@ -41,8 +41,9 @@ desidulate can parse a log file and parse SID state, automatically discarding re
 * Better transcription of noise waveform only percussion events.
 * Pitchbending for following small pitch changes.
 * Reduce state requirements for complex SID demos.
-* Support for ring/sync modulation
-* Support for SID-based sample playback
+* Support for ring/sync modulation.
+* Support for SID-based sample playback.
+* Export to defMON.
 
 ## References
 
