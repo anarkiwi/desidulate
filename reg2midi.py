@@ -37,6 +37,7 @@ reg_writes = get_reg_changes(get_reg_writes(args.logfile), voicemask=voicemask, 
 reg_writes_changes = get_consolidated_changes(reg_writes, voicemask)
 mainevents, voiceevents = get_gate_events(reg_writes_changes, voicemask)
 
+# https://en.wikipedia.org/wiki/General_MIDI#Percussion
 BASS_DRUM = 36
 PEDAL_HIHAT = 44
 CLOSED_HIHAT = 42
@@ -93,7 +94,6 @@ for voicenum, gated_voice_events in voiceevents.items():
             return pitches[0] > pitches[-1]
 
         if noises:
-            # https://en.wikipedia.org/wiki/General_MIDI#Percussion
             if set(waveforms.keys()) == {'noise'}:
                 for clock, _pitch, duration, _ in midi_notes:
                     add_noise_duration(clock, duration, DRUM_TRACK_OFFSET + voicenum, DRUM_CHANNEL)
@@ -102,6 +102,7 @@ for voicenum, gated_voice_events in voiceevents.items():
                     if noisephases > 1:
                         add_pitch(clock, ELECTRIC_SNARE, total_duration, DRUM_TRACK_OFFSET + voicenum, DRUM_CHANNEL)
                     elif descending(midi_pitches) and len(midi_pitches) > 2:
+                        # http://www.ucapps.de/howto_sid_wavetables_1.html
                         add_pitch(clock, BASS_DRUM, total_duration, DRUM_TRACK_OFFSET + voicenum, DRUM_CHANNEL)
                     else:
                         add_pitch(clock, LOW_TOM, total_duration, DRUM_TRACK_OFFSET + voicenum, DRUM_CHANNEL)

@@ -421,6 +421,7 @@ def get_gate_events(reg_writes, voicemask):
         voiceeventstack[voicenum].append(event)
 
     def gate_on(voice_state):
+        # https://codebase64.org/doku.php?id=base:classic_hard-restart_and_about_adsr_in_generally
         if voice_state.test:
             return False
         if not voice_state.gate:
