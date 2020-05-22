@@ -11,8 +11,8 @@
 
 import argparse
 from collections import Counter
-from sidlib import clock_to_qn, get_consolidated_changes, get_gate_events, get_reg_changes, get_reg_writes, VOICES
-from sidmidi import get_midi_file, get_midi_notes_from_events, DRUM_TRACK_OFFSET, DRUM_CHANNEL
+from sidlib import get_consolidated_changes, get_gate_events, get_reg_changes, get_reg_writes, VOICES
+from sidmidi import SidMidiFile, DRUM_TRACK_OFFSET, DRUM_CHANNEL, ELECTRIC_SNARE, BASS_DRUM, LOW_TOM
 from sidwav import get_sid
 
 
@@ -30,27 +30,16 @@ parser.set_defaults(pal=True)
 args = parser.parse_args()
 voicemask = set((int(v) for v in args.voicemask.split(',')))
 
-smf = get_midi_file(args.bpm)
 sid = get_sid(pal=args.pal)
 clockq = sid.clock_frequency / 50
+smf = SidMidiFile(sid, args.bpm, clockq)
 reg_writes = get_reg_changes(get_reg_writes(args.logfile), voicemask=voicemask, minclock=args.minclock, maxclock=args.maxclock)
 reg_writes_changes = get_consolidated_changes(reg_writes, voicemask)
 mainevents, voiceevents = get_gate_events(reg_writes_changes, voicemask)
 
-# https://en.wikipedia.org/wiki/General_MIDI#Percussion
-BASS_DRUM = 36
-PEDAL_HIHAT = 44
-CLOSED_HIHAT = 42
-OPEN_HIHAT = 46
-HI_TOM = 50
-LOW_TOM = 45
-ACCOUSTIC_SNARE = 38
-ELECTRIC_SNARE = 40
-CRASH_CYMBAL1 = 49
-
 for voicenum, gated_voice_events in voiceevents.items():
     for event_start, events in gated_voice_events:
-        midi_notes = get_midi_notes_from_events(sid, events, clockq)
+        midi_notes = smf.get_midi_notes_from_events(sid, events, clockq)
         if not midi_notes:
             continue
         midi_pitches = [midi_note[1] for midi_note in midi_notes]
@@ -76,41 +65,24 @@ for voicenum, gated_voice_events in voiceevents.items():
         noisephases = len([curr_waveform for curr_waveform in waveform_order if 'noise' in curr_waveform])
         noises = noisephases > 0
 
-        def add_pitch(clock, pitch, sustain, duration, track, channel):
-            qn_clock = clock_to_qn(sid, clock, args.bpm)
-            qn_duration = clock_to_qn(sid, duration, args.bpm)
-            velocity = int(sustain / 15 * 127)
-            smf.addNote(track, channel, pitch, qn_clock, qn_duration, velocity)
-
-        def add_noise_duration(clock, sustain, duration, track, channel):
-            max_duration = clockq
-            noise_pitch = None
-            for noise_pitch in (PEDAL_HIHAT, CLOSED_HIHAT, OPEN_HIHAT, ACCOUSTIC_SNARE, CRASH_CYMBAL1):
-                if duration <= max_duration:
-                    break
-                max_duration *= 2
-            add_pitch(clock, noise_pitch, sustain, duration, track, channel)
-
         def descending(pitches):
             return pitches[0] > pitches[-1]
 
         if noises:
             if set(waveforms.keys()) == {'noise'}:
-                for clock, _pitch, duration, sustain, _ in midi_notes:
-                    add_noise_duration(clock, sustain, duration, DRUM_TRACK_OFFSET + voicenum, DRUM_CHANNEL)
+                for clock, _pitch, duration, velocity, _ in midi_notes:
+                    smf.add_noise_duration(clock, velocity, duration, DRUM_TRACK_OFFSET + voicenum, DRUM_CHANNEL)
             else:
-                for clock, _pitch, _duration, sustain, _ in midi_notes:
+                for clock, _pitch, _duration, velocity, _ in midi_notes:
                     if noisephases > 1:
-                        add_pitch(clock, ELECTRIC_SNARE, sustain, total_duration, DRUM_TRACK_OFFSET + voicenum, DRUM_CHANNEL)
+                        smf.add_pitch(clock, ELECTRIC_SNARE, velocity, total_duration, DRUM_TRACK_OFFSET + voicenum, DRUM_CHANNEL)
                     elif descending(midi_pitches) and len(midi_pitches) > 2:
                         # http://www.ucapps.de/howto_sid_wavetables_1.html
-                        add_pitch(clock, BASS_DRUM, sustain, total_duration, DRUM_TRACK_OFFSET + voicenum, DRUM_CHANNEL)
+                        smf.add_pitch(clock, BASS_DRUM, velocity, total_duration, DRUM_TRACK_OFFSET + voicenum, DRUM_CHANNEL)
                     else:
-                        add_pitch(clock, LOW_TOM, sustain, total_duration, DRUM_TRACK_OFFSET + voicenum, DRUM_CHANNEL)
+                        smf.add_pitch(clock, LOW_TOM, velocity, total_duration, DRUM_TRACK_OFFSET + voicenum, DRUM_CHANNEL)
         else:
-            for clock, pitch, duration, sustain, _ in midi_notes:
-                add_pitch(clock, pitch, sustain, duration, voicenum-1, voicenum)
+            for clock, pitch, duration, velocity, _ in midi_notes:
+                smf.add_pitch(clock, pitch, velocity, duration, voicenum-1, voicenum)
 
-
-with open(args.midifile, 'wb') as midi_f:
-    smf.writeFile(midi_f)
+smf.write(args.midifile)
