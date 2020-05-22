@@ -41,13 +41,13 @@ def get_midi_notes_from_events(sid, events, clockq):
         sid_f = real_sid_freq(sid, voice_state.frequency)
         _closest_midi_f, closest_midi_n = closest_midi(sid_f)
         # TODO: add pitch bend if significantly different to canonical note.
-        if closest_midi_n != last_midi_n and voice_state.any_waveform():
-            notes_starts.append((closest_midi_n, clock, sid_f))
+        if closest_midi_n != last_midi_n and voice_state.any_waveform() and voice_state.sustain:
+            notes_starts.append((closest_midi_n, clock, sid_f, voice_state.sustain))
             last_midi_n = closest_midi_n
         last_clock = clock
     notes = []
     for i, note_clocks in enumerate(notes_starts):
-        note, clock, sid_f = note_clocks
+        note, clock, sid_f, sustain = note_clocks
         try:
             next_clock = notes_starts[i + 1][1]
         except IndexError:
@@ -56,5 +56,5 @@ def get_midi_notes_from_events(sid, events, clockq):
         if not duration:
             continue
         duration = round(duration / clockq) * clockq
-        notes.append((clock, note, duration, sid_f))
+        notes.append((clock, note, duration, sustain, sid_f))
     return notes
