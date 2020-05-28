@@ -1,0 +1,4 @@
+numpy
+scipy
+git+https://github.com/packet23/pyresidfp
+midiutil
