@@ -54,33 +54,34 @@ for voicenum, gated_voice_events in voiceevents.items():
             if last_clock is None:
                 last_clock = clock
             curr_waveform = []
-            for waveform in ('noise', 'pulse', 'triangle', 'sawtooth'):
-                if getattr(voicestate, waveform, None):
-                    waveforms[waveform] += (clock - last_clock)
-                    curr_waveform.append(waveform)
+            for waveform in voicestate.waveforms():
+                waveforms[waveform] += (clock - last_clock)
+                curr_waveform.append(waveform)
             curr_waveform = tuple(curr_waveform)
             if not waveform_order or waveform_order[-1] != curr_waveform:
                 waveform_order.append(curr_waveform)
             last_clock = clock
         noisephases = len([curr_waveform for curr_waveform in waveform_order if 'noise' in curr_waveform])
         noises = noisephases > 0
+        all_noise = set(waveforms.keys()) == {'noise'}
 
         def descending(pitches):
             return pitches[0] > pitches[-1]
 
         if noises:
-            if set(waveforms.keys()) == {'noise'}:
+            if all_noise:
                 for clock, _pitch, duration, velocity, _ in midi_notes:
                     smf.add_noise_duration(clock, velocity, duration, DRUM_TRACK_OFFSET + voicenum, DRUM_CHANNEL)
-            else:
+            elif noisephases > 1:
                 for clock, _pitch, _duration, velocity, _ in midi_notes:
-                    if noisephases > 1:
-                        smf.add_pitch(clock, ELECTRIC_SNARE, velocity, total_duration, DRUM_TRACK_OFFSET + voicenum, DRUM_CHANNEL)
-                    elif descending(midi_pitches) and len(midi_pitches) > 2:
-                        # http://www.ucapps.de/howto_sid_wavetables_1.html
-                        smf.add_pitch(clock, BASS_DRUM, velocity, total_duration, DRUM_TRACK_OFFSET + voicenum, DRUM_CHANNEL)
-                    else:
-                        smf.add_pitch(clock, LOW_TOM, velocity, total_duration, DRUM_TRACK_OFFSET + voicenum, DRUM_CHANNEL)
+                    smf.add_pitch(clock, ELECTRIC_SNARE, velocity, total_duration, DRUM_TRACK_OFFSET + voicenum, DRUM_CHANNEL)
+            else:
+                clock, _pitch, _dutation, velocity, _ = midi_notes[0]
+                if descending(midi_pitches) and len(midi_pitches) > 2:
+                    # http://www.ucapps.de/howto_sid_wavetables_1.html
+                    smf.add_pitch(clock, BASS_DRUM, velocity, total_duration, DRUM_TRACK_OFFSET + voicenum, DRUM_CHANNEL)
+                else:
+                    smf.add_pitch(clock, LOW_TOM, velocity, total_duration, DRUM_TRACK_OFFSET + voicenum, DRUM_CHANNEL)
         else:
             for clock, pitch, duration, velocity, _ in midi_notes:
                 smf.add_pitch(clock, pitch, velocity, duration, voicenum-1, voicenum)

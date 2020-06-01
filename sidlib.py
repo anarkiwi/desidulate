@@ -153,8 +153,11 @@ class SidVoiceRegState(SidRegHandler):
         super(SidVoiceRegState, self).__init__(instance)
         self.voicenum = instance
 
+    def waveforms(self):
+        return {waveform for waveform in ('triangle', 'sawtooth', 'pulse', 'noise') if getattr(self, waveform, None)}
+
     def any_waveform(self):
-        return self.triangle or self.sawtooth or self.pulse or self.noise
+        return bool(self.waveforms())
 
 
 
