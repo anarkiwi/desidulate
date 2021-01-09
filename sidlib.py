@@ -7,6 +7,8 @@
 ## THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABL E FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 import copy
+import gzip
+import os
 
 VOICES = {1, 2, 3}
 
@@ -256,6 +258,12 @@ def clock_to_s(sid, clock):
 def clock_to_qn(sid, clock, bpm):
     return clock_to_s(sid, clock) * bpm / 60
 
+def file_reader(snd_log_name):
+    snd_log_name = os.path.expanduser(snd_log_name)
+    if snd_log_name.endswith('.gz'):
+        return gzip.open(snd_log_name, 'rb')
+    return open(snd_log_name)
+
 
 # Read a VICE "-sounddev dump" register dump (emulator or vsid)
 def get_reg_writes(snd_log_name, skipsilence=1e6):
@@ -264,7 +272,7 @@ def get_reg_writes(snd_log_name, skipsilence=1e6):
     writes = []
     clock = 0
     silenceskipped = False
-    with open(snd_log_name) as snd_log:
+    with file_reader(snd_log_name) as snd_log:
         for line in snd_log:
             ts_offset, reg, val = (int(i) for i in line.strip().split())
             assert reg >= 0 and reg <= maxreg, reg
