@@ -12,13 +12,13 @@
 import argparse
 from collections import Counter
 from sidlib import get_consolidated_changes, get_gate_events, get_reg_changes, get_reg_writes, VOICES
-from sidmidi import SidMidiFile, ELECTRIC_SNARE, BASS_DRUM, LOW_TOM
+from sidmidi import midi_path, SidMidiFile, ELECTRIC_SNARE, BASS_DRUM, LOW_TOM
 from sidwav import get_sid
 
 
 parser = argparse.ArgumentParser(description='Convert vicesnd.sid log into a MIDI file')
 parser.add_argument('--logfile', default='vicesnd.sid', help='log file to read')
-parser.add_argument('--midifile', default='reg2midi.mid', help='MIDI file to write')
+parser.add_argument('--midifile', default='', help='MIDI file to write')
 parser.add_argument('--voicemask', default=','.join((str(v) for v in VOICES)), help='command separated list of SID voices to use')
 parser.add_argument('--minclock', default=0, type=int, help='start rendering from this clock value')
 parser.add_argument('--maxclock', default=0, type=int, help='if > 0, stop rendering at this clock value')
@@ -89,4 +89,9 @@ for voicenum, gated_voice_events in voiceevents.items():
             for clock, pitch, duration, velocity, _ in midi_notes:
                 smf.add_pitch(clock, pitch, velocity, duration, voicenum)
 
-smf.write(args.midifile)
+
+midifile = args.midifile
+if not midifile:
+    midifile = midi_path(args.logfile)
+
+smf.write(midifile)
