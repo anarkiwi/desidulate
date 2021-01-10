@@ -12,7 +12,7 @@
 import argparse
 from collections import Counter
 from sidlib import get_consolidated_changes, get_gate_events, get_reg_changes, get_reg_writes, VOICES
-from sidmidi import SidMidiFile, DRUM_TRACK_OFFSET, DRUM_CHANNEL, ELECTRIC_SNARE, BASS_DRUM, LOW_TOM
+from sidmidi import SidMidiFile, ELECTRIC_SNARE, BASS_DRUM, LOW_TOM
 from sidwav import get_sid
 
 
@@ -23,10 +23,12 @@ parser.add_argument('--voicemask', default=','.join((str(v) for v in VOICES)), h
 parser.add_argument('--minclock', default=0, type=int, help='start rendering from this clock value')
 parser.add_argument('--maxclock', default=0, type=int, help='if > 0, stop rendering at this clock value')
 parser.add_argument('--bpm', default=125, type=int, help='MIDI BPM')
+parser.add_argument('--percussion', dest='percussion', action='store_true')
+parser.add_argument('--no-percussion', dest='percussion', action='store_false')
 pal_parser = parser.add_mutually_exclusive_group(required=False)
 pal_parser.add_argument('--pal', dest='pal', action='store_true', help='Use PAL clock')
 pal_parser.add_argument('--ntsc', dest='pal', action='store_false', help='Use NTSC clock')
-parser.set_defaults(pal=True)
+parser.set_defaults(pal=True, percussion=True)
 args = parser.parse_args()
 voicemask = set((int(v) for v in args.voicemask.split(',')))
 
@@ -69,21 +71,22 @@ for voicenum, gated_voice_events in voiceevents.items():
             return pitches[0] > pitches[-1]
 
         if noises:
-            if all_noise:
-                for clock, _pitch, duration, velocity, _ in midi_notes:
-                    smf.add_noise_duration(clock, velocity, duration, DRUM_TRACK_OFFSET + voicenum, DRUM_CHANNEL)
-            elif noisephases > 1:
-                for clock, _pitch, _duration, velocity, _ in midi_notes:
-                    smf.add_pitch(clock, ELECTRIC_SNARE, velocity, total_duration, DRUM_TRACK_OFFSET + voicenum, DRUM_CHANNEL)
-            else:
-                clock, _pitch, _dutation, velocity, _ = midi_notes[0]
-                if descending(midi_pitches) and len(midi_pitches) > 2:
-                    # http://www.ucapps.de/howto_sid_wavetables_1.html
-                    smf.add_pitch(clock, BASS_DRUM, velocity, total_duration, DRUM_TRACK_OFFSET + voicenum, DRUM_CHANNEL)
+            if args.percussion:
+                if all_noise:
+                    for clock, _pitch, duration, velocity, _ in midi_notes:
+                        smf.add_drum_noise_duration(clock, velocity, duration, voicenum)
+                elif noisephases > 1:
+                    for clock, _pitch, _duration, velocity, _ in midi_notes:
+                        smf.add_drum_pitch(clock, ELECTRIC_SNARE, velocity, total_duration, voicenum)
                 else:
-                    smf.add_pitch(clock, LOW_TOM, velocity, total_duration, DRUM_TRACK_OFFSET + voicenum, DRUM_CHANNEL)
+                    clock, _pitch, _dutation, velocity, _ = midi_notes[0]
+                    if descending(midi_pitches) and len(midi_pitches) > 2:
+                        # http://www.ucapps.de/howto_sid_wavetables_1.html
+                        smf.add_drum_pitch(clock, BASS_DRUM, velocity, total_duration, voicenum)
+                    else:
+                        smf.add_drum_pitch(clock, LOW_TOM, velocity, total_duration, voicenum)
         else:
             for clock, pitch, duration, velocity, _ in midi_notes:
-                smf.add_pitch(clock, pitch, velocity, duration, voicenum-1, voicenum)
+                smf.add_pitch(clock, pitch, velocity, duration, voicenum)
 
 smf.write(args.midifile)
