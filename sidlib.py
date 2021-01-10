@@ -14,6 +14,18 @@ VOICES = {1, 2, 3}
 
 # https://www.c64-wiki.com/wiki/SID
 
+class SidWrap:
+
+    def __init__(self, pal):
+        if pal:
+            self.clock_frequency = 985248.0 # SoundInterfaceDevice.PAL_CLOCK_FREQUENCY
+        else:
+            self.clock_frequency = 1022730.0 # SoundInterfaceDevice.NTSC_CLOCK_FREQUENCY
+
+
+def get_sid(pal):
+    return SidWrap(pal)
+
 
 class SidRegEvent:
 
