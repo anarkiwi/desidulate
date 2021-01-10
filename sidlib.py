@@ -287,13 +287,14 @@ def get_reg_writes(snd_log_name, skipsilence=1e6):
     with file_reader(snd_log_name) as snd_log:
         for line in snd_log:
             ts_offset, reg, val = (int(i) for i in line.strip().split())
-            assert reg >= 0 and reg <= maxreg, reg
             assert val >= 0 and reg <= 255, val
             # skip first pause of > 1e6
             if ts_offset > skipsilence and not silenceskipped:
                 continue
             clock += ts_offset
-            writes.append((clock, reg, val))
+            if reg <= maxreg:
+                assert reg >= 0 and reg <= maxreg, reg
+                writes.append((clock, reg, val))
     return writes
 
 
