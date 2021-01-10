@@ -5,6 +5,7 @@
 ## The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 
 
+import os
 from collections import defaultdict
 from midiutil import MIDIFile
 from sidlib import real_sid_freq, clock_to_qn
@@ -26,6 +27,23 @@ LOW_TOM = 45
 ACCOUSTIC_SNARE = 38
 ELECTRIC_SNARE = 40
 CRASH_CYMBAL1 = 49
+
+
+def midi_path(snd_log_name):
+    snd_log_name = os.path.expanduser(snd_log_name)
+    base = os.path.basename(snd_log_name)
+    recogized_exts = {'gz', 'dump', 'log', 'sid'}
+    while True:
+        dot = base.rfind('.')
+        if dot <= 0:
+            break
+        ext = base[dot+1:]
+        if not ext:
+            break
+        if ext not in recogized_exts:
+            break
+        base = base[:dot]
+    return os.path.join(os.path.dirname(snd_log_name), '.'.join((base, 'mid')))
 
 
 class SidMidiFile:
