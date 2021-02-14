@@ -8,6 +8,7 @@
 
 # https://www.c64-wiki.com/wiki/SID
 
+import copy
 from functools import lru_cache, cached_property
 
 VOICES = {1, 2, 3}
@@ -273,45 +274,6 @@ class SidRegStateMiddle(SidRegStateBase):
         return {voicenum for voicenum in self.voices if self.voices[voicenum].gate_on()}
 
 
-class FrozenSidRegState(SidRegStateMiddle):
-
-    __slots__ = [
-        'voices',
-        'reg_voicenum',
-        'regstate',
-    ]
-
-    def __init__(self, regstate, instance=0):
-        super(FrozenSidRegState, self).__init__(instance)
-        self.voices = {}
-        self.reg_voicenum = {}
-        reghandlers = {}
-        for voicenum in VOICES:
-            voice = SidVoiceRegState(voicenum)
-            regbase = voice.regbase()
-            for voicereg in voice._REGMAP:
-                reg = regbase + voicereg
-                reghandlers[reg] = voice
-                self.reg_voicenum[reg] = voicenum
-            self.voices[voicenum] = voice
-        mainreghandler = SidFilterMainRegState()
-        regbase = mainreghandler.regbase()
-        for i in mainreghandler._REGMAP:
-            reghandlers[regbase + i] = mainreghandler
-        self.regstate = {i: 0 for i in reghandlers}
-        for reg, val in regstate.items():
-            handler = reghandlers[reg]
-            handler.set(reg, val)
-            self.regstate[reg] = val
-
-    def set(self, reg, val):
-        raise NotImplementedError
-
-    @cached_property
-    def regdump(self):
-        return super(FrozenSidRegState, self).regdump()
-
-
 class SidRegState(SidRegStateMiddle):
 
     __slots__ = [
@@ -363,10 +325,50 @@ class SidRegState(SidRegStateMiddle):
         return event
 
 
+class FrozenSidRegState(SidRegStateMiddle):
+
+    __slots__ = [
+        'voices',
+        'reg_voicenum',
+        'regstate',
+    ]
+
+    def __init__(self, state):
+        regstate = state.regstate
+        instance = state.instance
+        super(FrozenSidRegState, self).__init__(instance)
+        self.voices = {}
+        self.reg_voicenum = {}
+        reghandlers = {}
+        for voicenum in VOICES:
+            voice = SidVoiceRegState(voicenum)
+            regbase = voice.regbase()
+            for voicereg in voice._REGMAP:
+                reg = regbase + voicereg
+                reghandlers[reg] = voice
+                self.reg_voicenum[reg] = voicenum
+            self.voices[voicenum] = voice
+        mainreghandler = SidFilterMainRegState()
+        regbase = mainreghandler.regbase()
+        for i in mainreghandler._REGMAP:
+            reghandlers[regbase + i] = mainreghandler
+        self.regstate = copy.copy(regstate)
+        for reg, val in regstate.items():
+            handler = reghandlers[reg]
+            handler.set(reg, val)
+
+    def set(self, reg, val):
+        raise NotImplementedError
+
+    @cached_property
+    def regdump(self):
+        return super(FrozenSidRegState, self).regdump()
+
+
 frozen_sid_state = {}
 
 def frozen_sid_state_factory(state):
     statehash = state.__hash__()
     if statehash not in frozen_sid_state:
-        frozen_sid_state[statehash] = FrozenSidRegState(regstate=state.regstate)
+        frozen_sid_state[statehash] = FrozenSidRegState(state=state)
     return frozen_sid_state[statehash]
