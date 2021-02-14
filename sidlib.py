@@ -244,8 +244,7 @@ class SidRegState(SidRegStateBase):
             return handler.voicenum
         return None
 
-    def descr_diff(self, _reg, last_descr, descr):
-        descr_diff = {}
+    def descr_diff(self, last_descr, descr):
         descr_diff = {k: v for k, v in descr.items() if v != last_descr.get(k, None)}
         descr_txt = ' '.join(('%s: %s' % (k, v) for k, v in sorted(descr_diff.items())))
         return descr_txt
@@ -258,10 +257,11 @@ class SidRegState(SidRegStateBase):
         preamble, descr, otherreg = handler.set(reg, val)
         if self.regstate[reg] == val:
             return None
-        descr_txt = self.descr_diff(reg, self.last_descr[reg], descr)
+        descr_txt = self.descr_diff(self.last_descr[reg], descr)
+        event = SidRegEvent(reg, ' '.join((preamble, descr_txt)), voicenum=voicenum, otherreg=otherreg)
         self.regstate[reg] = val
         self.last_descr[reg] = descr
-        return SidRegEvent(reg, ' '.join((preamble, descr_txt)), voicenum=voicenum, otherreg=otherreg)
+        return event
 
     def gates_on(self):
         return {voicenum for voicenum in self.voices if self.voices[voicenum].gate_on()}
