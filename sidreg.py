@@ -46,6 +46,8 @@ class SidRegStateBase:
         'instance',
     ]
 
+    _REGMAP = {}
+
     def __init__(self, instance=0):
         self.instance = instance
         self.regstate = {}
@@ -62,19 +64,19 @@ class SidRegHandler(SidRegStateBase):
     __slots__ = [
         'regstate',
         'instance',
+        '_REGMAP',
     ]
 
     REGBASE = 0
     NAME = 'unknown'
-    REGMAP = {}
 
     def __init__(self, instance=0):
         super(SidRegHandler, self).__init__(instance)
-        for reg in self.REGMAP:
+        for reg in self._REGMAP:
             self._set(reg, 0)
 
     def regbase(self):
-        return self.REGBASE + (self.instance - 1) * len(self.REGMAP)
+        return self.REGBASE + (self.instance - 1) * len(self._REGMAP)
 
     def lohi(self, lo, hi):
         return (self.regstate.get(hi, 0) << 8) + self.regstate.get(lo, 0)
@@ -108,7 +110,7 @@ class SidRegHandler(SidRegStateBase):
 
     def _set(self, reg, val):
         self.regstate[reg] = val
-        descr, otherreg = self.REGMAP[reg](reg)
+        descr, otherreg = self._REGMAP[reg](reg)
         preamble = '%s %u %.2x -> %.2x' % (self.NAME, self.instance, val, reg)
         if otherreg is not None:
             otherreg = list(otherreg)[0] + self.regbase()
@@ -137,14 +139,14 @@ class SidVoiceRegState(SidRegHandler):
        'pulse',
        'noise',
        'voicenum',
-       'REGMAP',
+       '_REGMAP',
     ]
 
     REGBASE = 0
     NAME = 'voice'
 
     def __init__(self, voicenum):
-        self.REGMAP = {
+        self._REGMAP = {
             0: self._freq,
             1: self._freq,
             2: self._pwduty,
@@ -210,7 +212,7 @@ class SidVoiceRegState(SidRegHandler):
 class SidFilterMainRegState(SidRegHandler):
 
     __slots__ = [
-        'REGMAP',
+        '_REGMAP',
         'vol',
         'filter_res',
         'filter_voice1',
@@ -228,7 +230,7 @@ class SidFilterMainRegState(SidRegHandler):
     NAME = 'main'
 
     def __init__(self, instance=0):
-        self.REGMAP = {
+        self._REGMAP = {
             0: self._filtercutoff,
             1: self._filtercutoff,
             2: self._filterresonanceroute,
@@ -287,14 +289,14 @@ class FrozenSidRegState(SidRegStateMiddle):
         for voicenum in VOICES:
             voice = SidVoiceRegState(voicenum)
             regbase = voice.regbase()
-            for voicereg in voice.REGMAP:
+            for voicereg in voice._REGMAP:
                 reg = regbase + voicereg
                 reghandlers[reg] = voice
                 self.reg_voicenum[reg] = voicenum
             self.voices[voicenum] = voice
         mainreghandler = SidFilterMainRegState()
         regbase = mainreghandler.regbase()
-        for i in mainreghandler.REGMAP:
+        for i in mainreghandler._REGMAP:
             reghandlers[regbase + i] = mainreghandler
         self.regstate = {i: 0 for i in reghandlers}
         for reg, val in regstate.items():
@@ -328,14 +330,14 @@ class SidRegState(SidRegStateMiddle):
         for voicenum in VOICES:
             voice = SidVoiceRegState(voicenum)
             regbase = voice.regbase()
-            for voicereg in voice.REGMAP:
+            for voicereg in voice._REGMAP:
                 reg = regbase + voicereg
                 self.reghandlers[reg] = voice
                 self.reg_voicenum[reg] = voicenum
             self.voices[voicenum] = voice
         self.mainreghandler = SidFilterMainRegState()
         regbase = self.mainreghandler.regbase()
-        for i in self.mainreghandler.REGMAP:
+        for i in self.mainreghandler._REGMAP:
             self.reghandlers[regbase + i] = self.mainreghandler
         self.regstate = {i: 0 for i in self.reghandlers}
         self.last_descr = {i: {} for i in self.reghandlers}
