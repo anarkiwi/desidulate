@@ -43,9 +43,11 @@ class SidRegStateBase:
 
     __slots__ = [
         'regstate',
+        'instance',
     ]
 
-    def __init__(self):
+    def __init__(self, instance=0):
+        self.instance = instance
         self.regstate = {}
 
     def hashreg(self):
@@ -70,8 +72,7 @@ class SidRegHandler(SidRegStateBase):
     REGMAP = {}
 
     def __init__(self, instance=0):
-        self.instance = instance
-        self.regstate = {}
+        super(SidRegHandler, self).__init__(instance)
         for reg in self.REGMAP:
             self._set(reg, 0)
 
@@ -229,6 +230,17 @@ class SidFilterMainRegState(SidRegHandler):
     REGBASE = 21
     NAME = 'main'
 
+    def __init__(self, instance=0):
+        self.REGMAP = {
+            0: self._filtercutoff,
+            1: self._filtercutoff,
+            2: self._filterresonanceroute,
+            3: self._filtermain,
+        }
+        self.vol = 0
+        self.filter_res = 0
+        super(SidFilterMainRegState, self).__init__(instance)
+
     def regbase(self):
         return self.REGBASE
 
@@ -248,17 +260,6 @@ class SidFilterMainRegState(SidRegHandler):
         descr.update(self.decodebits(filtcon, {
             0: 'filter_low', 1: 'filter_band', 2: 'filter_high', 3: 'mute_voice3'}))
         return(descr, None)
-
-    def __init__(self, instance=0):
-        self.REGMAP = {
-            0: self._filtercutoff,
-            1: self._filtercutoff,
-            2: self._filterresonanceroute,
-            3: self._filtermain,
-        }
-        self.vol = 0
-        self.filter_res = 0
-        super(SidFilterMainRegState, self).__init__(instance)
 
 
 class SidRegStateMiddle(SidRegStateBase):
@@ -281,7 +282,8 @@ class FrozenSidRegState(SidRegStateMiddle):
         'regstate',
     ]
 
-    def __init__(self, regstate):
+    def __init__(self, regstate, instance=0):
+        super(FrozenSidRegState, self).__init__(instance)
         self.voices = {}
         self.reg_voicenum = {}
         reghandlers = {}
@@ -321,7 +323,8 @@ class SidRegState(SidRegStateMiddle):
        'last_descr',
     ]
 
-    def __init__(self):
+    def __init__(self, instance=0):
+        super(SidRegState, self).__init__(instance)
         self.reghandlers = {}
         self.voices = {}
         self.reg_voicenum = {}
@@ -366,5 +369,5 @@ frozen_sid_state = {}
 def frozen_sid_state_factory(state):
     hashreg = state.hashreg()
     if hashreg not in frozen_sid_state:
-        frozen_sid_state[hashreg] = FrozenSidRegState(state.regstate)
+        frozen_sid_state[hashreg] = FrozenSidRegState(regstate=state.regstate)
     return frozen_sid_state[hashreg]
