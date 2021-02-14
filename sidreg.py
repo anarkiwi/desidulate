@@ -50,14 +50,11 @@ class SidRegStateBase:
         self.instance = instance
         self.regstate = {}
 
-    def hashreg(self):
+    def regdump(self):
         return ''.join(('%2.2x' % int(j) for _, j in sorted(self.regstate.items())))
 
-    def __eq__(self, other):
-        return self.hashreg() == other.hashreg()
-
-    def __ne__(self, other):
-        return not self.__eq__(other)
+    def __hash__(self):
+        return '%2.2x%s' % (self.instance, self.regdump())
 
 
 class SidRegHandler(SidRegStateBase):
@@ -309,8 +306,8 @@ class FrozenSidRegState(SidRegStateMiddle):
         raise NotImplementedError
 
     @cached_property
-    def hashreg(self):
-        return super(FrozenSidRegState, self).hashreg()
+    def regdump(self):
+        return super(FrozenSidRegState, self).regdump()
 
 
 class SidRegState(SidRegStateMiddle):
@@ -367,7 +364,7 @@ class SidRegState(SidRegStateMiddle):
 frozen_sid_state = {}
 
 def frozen_sid_state_factory(state):
-    hashreg = state.hashreg()
-    if hashreg not in frozen_sid_state:
-        frozen_sid_state[hashreg] = FrozenSidRegState(regstate=state.regstate)
-    return frozen_sid_state[hashreg]
+    statehash = state.__hash__()
+    if statehash not in frozen_sid_state:
+        frozen_sid_state[statehash] = FrozenSidRegState(regstate=state.regstate)
+    return frozen_sid_state[statehash]

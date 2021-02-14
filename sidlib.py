@@ -107,12 +107,12 @@ def debug_reg_writes(sid, reg_writes, consolidate_mb_clock=10):
     for clock, reg, val in reg_writes:
         regevent = state.set(reg, val)
         regs = [state.mainreghandler] + [state.voices[i] for i in state.voices]
-        hashregs = tuple([reg.hashreg() for reg in regs])
+        regdumps = tuple([reg.regdump() for reg in regs])
         active_voices = ','.join((str(voicenum) for voicenum in sorted(state.gates_on())))
-        raw_regevents.append((clock, reg, val) + (active_voices,) + hashregs + (regevent,))
+        raw_regevents.append((clock, reg, val) + (active_voices,) + regdumps + (regevent,))
     lines = []
     for i, regevents in enumerate(raw_regevents):
-        clock, reg, val, active_voices, main_hashreg, voice1_hashreg, voice2_hashreg, voice3_hashreg, regevent = regevents
+        clock, reg, val, active_voices, main_regdump, voice1_regdump, voice2_regdump, voice3_regdump, regevent = regevents
         try:
             next_regevents = raw_regevents[i + 1]
         except IndexError:
@@ -131,10 +131,10 @@ def debug_reg_writes(sid, reg_writes, consolidate_mb_clock=10):
             '%2u' % reg,
             '%3u' % val,
             '%6s' % active_voices,
-            '%s' % main_hashreg,
-            '%s' % voice1_hashreg,
-            '%s' % voice2_hashreg,
-            '%s' % voice3_hashreg,
+            '%s' % main_regdump,
+            '%s' % voice1_regdump,
+            '%s' % voice2_regdump,
+            '%s' % voice3_regdump,
             descr,
         )
         lines.append('\t'.join([str(i) for i in line_items]))
