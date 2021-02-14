@@ -6,7 +6,6 @@
 
 ## THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABL E FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-import copy
 import gzip
 import os
 
@@ -120,6 +119,18 @@ class SidVoiceRegState(SidRegHandler):
     REGBASE = 0
     NAME = 'voice'
 
+    def __init__(self, instance):
+        self.REGMAP = {
+            0: self._freq,
+            1: self._freq,
+            2: self._pwduty,
+            3: self._pwduty,
+            4: self._control,
+            5: self._attack_decay,
+            6: self._sustain_release,
+        }
+        super(SidVoiceRegState, self).__init__(instance)
+        self.voicenum = instance
 
     def _freq_descr(self):
         return self.lohi_attr(0, 1, 'frequency')
@@ -153,19 +164,6 @@ class SidVoiceRegState(SidRegHandler):
 
     def _control(self, _):
         return (self._control_descr(), None)
-
-    def __init__(self, instance):
-        self.REGMAP = {
-            0: self._freq,
-            1: self._freq,
-            2: self._pwduty,
-            3: self._pwduty,
-            4: self._control,
-            5: self._attack_decay,
-            6: self._sustain_release,
-        }
-        super(SidVoiceRegState, self).__init__(instance)
-        self.voicenum = instance
 
     def waveforms(self):
         return {waveform for waveform in ('triangle', 'sawtooth', 'pulse', 'noise') if getattr(self, waveform, None)}
@@ -219,7 +217,42 @@ class SidFilterMainRegState(SidRegHandler):
         super(SidFilterMainRegState, self).__init__(instance)
 
 
-class SidRegState(SidRegStateBase):
+class FrozenSidRegState(SidRegStateBase):
+
+    def __init__(self, regstate):
+        self.voices = {}
+        self.voicereg = {}
+        reghandlers = {}
+        for voicenum in VOICES:
+            voice = SidVoiceRegState(voicenum)
+            regbase = voice.regbase()
+            for reg in voice.REGMAP:
+                reghandlers[regbase + reg] = voice
+            self.voices[voicenum] = voice
+        mainreghandler = SidFilterMainRegState()
+        regbase = mainreghandler.regbase()
+        for i in mainreghandler.REGMAP:
+            reghandlers[regbase + i] = mainreghandler
+        self.regstate = {i: 0 for i in reghandlers}
+        for reg, val in regstate.items():
+            handler = reghandlers[reg]
+            handler.set(reg, val)
+            self.regstate[reg] = val
+
+    def reg_voicenum(self, reg):
+        handler = self.reghandlers[reg]
+        if isinstance(handler, SidVoiceRegState):
+            return handler.voicenum
+        return None
+
+    def gates_on(self):
+        return {voicenum for voicenum in self.voices if self.voices[voicenum].gate_on()}
+
+    def set(self, reg, val):
+        raise NotImplementedError
+
+
+class SidRegState(FrozenSidRegState):
 
     def __init__(self):
         self.reghandlers = {}
@@ -237,12 +270,6 @@ class SidRegState(SidRegStateBase):
             self.reghandlers[regbase + i] = self.mainreghandler
         self.regstate = {i: 0 for i in self.reghandlers}
         self.last_descr = {i: {} for i in self.reghandlers}
-
-    def reg_voicenum(self, reg):
-        handler = self.reghandlers[reg]
-        if isinstance(handler, SidVoiceRegState):
-            return handler.voicenum
-        return None
 
     def descr_diff(self, last_descr, descr):
         descr_diff = {k: v for k, v in descr.items() if v != last_descr.get(k, None)}
@@ -263,16 +290,13 @@ class SidRegState(SidRegStateBase):
         self.last_descr[reg] = descr
         return event
 
-    def gates_on(self):
-        return {voicenum for voicenum in self.voices if self.voices[voicenum].gate_on()}
-
 
 frozen_sid_state = {}
 
 def frozen_sid_state_factory(state):
     hashreg = state.hashreg()
     if hashreg not in frozen_sid_state:
-        frozen_sid_state[hashreg] = copy.deepcopy(state)
+        frozen_sid_state[hashreg] = FrozenSidRegState(state.regstate)
     return frozen_sid_state[hashreg]
 
 
