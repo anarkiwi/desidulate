@@ -53,15 +53,13 @@ for voicenum, gated_voice_events in voiceevents.items():
         for clock, voicestate in voicestates:
             if last_clock is None:
                 last_clock = clock
-            curr_waveform = []
-            for waveform in voicestate.waveforms():
+            curr_waveforms = voicestate.flat_waveforms()
+            for waveform in curr_waveforms:
                 waveforms[waveform] += (clock - last_clock)
-                curr_waveform.append(waveform)
-            curr_waveform = tuple(curr_waveform)
-            if not waveform_order or waveform_order[-1] != curr_waveform:
-                waveform_order.append(curr_waveform)
+            if not waveform_order or waveform_order[-1] != curr_waveforms:
+                waveform_order.append(curr_waveforms)
             last_clock = clock
-        noisephases = len([curr_waveform for curr_waveform in waveform_order if 'noise' in curr_waveform])
+        noisephases = len([waveforms for waveforms in waveform_order if 'noise' in waveforms])
         noises = noisephases > 0
         all_noise = set(waveforms.keys()) == {'noise'}
 
