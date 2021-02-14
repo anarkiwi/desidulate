@@ -205,7 +205,6 @@ class FrozenSidRegState(SidRegStateBase):
 
     def __init__(self, regstate):
         self.voices = {}
-        self.voicereg = {}
         reghandlers = {}
         for voicenum in VOICES:
             voice = SidVoiceRegState(voicenum)
@@ -241,7 +240,6 @@ class SidRegState(FrozenSidRegState):
     def __init__(self):
         self.reghandlers = {}
         self.voices = {}
-        self.voicereg = {}
         for voicenum in VOICES:
             voice = SidVoiceRegState(voicenum)
             regbase = voice.regbase()
