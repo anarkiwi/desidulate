@@ -250,13 +250,13 @@ class SidRegState(SidRegStateBase):
         return descr_txt
 
     def set(self, reg, val):
-        voicenum = None
         handler = self.reghandlers[reg]
-        if isinstance(handler, SidVoiceRegState):
-            voicenum = handler.voicenum
         preamble, descr, otherreg = handler.set(reg, val)
         if self.regstate[reg] == val:
             return None
+        voicenum = None
+        if isinstance(handler, SidVoiceRegState):
+            voicenum = handler.voicenum
         descr_txt = self.descr_diff(self.last_descr[reg], descr)
         event = SidRegEvent(reg, ' '.join((preamble, descr_txt)), voicenum=voicenum, otherreg=otherreg)
         self.regstate[reg] = val
@@ -265,6 +265,15 @@ class SidRegState(SidRegStateBase):
 
     def gates_on(self):
         return {voicenum for voicenum in self.voices if self.voices[voicenum].gate_on()}
+
+
+frozen_sid_state = {}
+
+def frozen_sid_state_factory(state):
+    hashreg = state.hashreg()
+    if hashreg not in frozen_sid_state:
+        frozen_sid_state[hashreg] = copy.deepcopy(state)
+    return frozen_sid_state[hashreg]
 
 
 # http://www.sidmusic.org/sid/sidtech2.html
@@ -286,8 +295,7 @@ def file_reader(snd_log_name):
 
 # Read a VICE "-sounddev dump" register dump (emulator or vsid)
 def get_reg_writes(snd_log_name, skipsilence=1e6):
-    state = SidRegState()
-    maxreg = max(state.regstate)
+    maxreg = max(SidRegState().regstate)
     writes = []
     clock = 0
     silenceskipped = False
@@ -388,17 +396,14 @@ def debug_reg_writes(sid, reg_writes, consolidate_mb_clock=10):
 def get_events(writes, voicemask=VOICES):
     events = []
     state = SidRegState()
-    statecache = {}
     for clock, reg, val in writes:
         regevent = state.set(reg, val)
         if not regevent:
             continue
         if regevent.voicenum and regevent.voicenum not in voicemask:
             continue
-        hashedreg = state.hashreg()
-        if hashedreg not in statecache:
-            statecache[hashedreg] = copy.deepcopy(state)
-        events.append((clock, reg, val, regevent, statecache[hashedreg]))
+        frozen_state = frozen_sid_state_factory(state)
+        events.append((clock, reg, val, regevent, frozen_state))
     return events
 
 
