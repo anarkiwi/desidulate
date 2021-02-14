@@ -271,7 +271,7 @@ class SidRegState(FrozenSidRegState):
         self.regstate = {i: 0 for i in self.reghandlers}
         self.last_descr = {i: {} for i in self.reghandlers}
 
-    def descr_diff(self, last_descr, descr):
+    def _descr_diff(self, last_descr, descr):
         descr_diff = {k: v for k, v in descr.items() if v != last_descr.get(k, None)}
         descr_txt = ' '.join(('%s: %s' % (k, v) for k, v in sorted(descr_diff.items())))
         return descr_txt
@@ -284,7 +284,7 @@ class SidRegState(FrozenSidRegState):
         voicenum = None
         if isinstance(handler, SidVoiceRegState):
             voicenum = handler.voicenum
-        descr_txt = self.descr_diff(self.last_descr[reg], descr)
+        descr_txt = self._descr_diff(self.last_descr[reg], descr)
         event = SidRegEvent(reg, ' '.join((preamble, descr_txt)), voicenum=voicenum, otherreg=otherreg)
         self.regstate[reg] = val
         self.last_descr[reg] = descr
