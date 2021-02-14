@@ -280,7 +280,7 @@ class SidRegState(SidRegStateMiddle):
        'reghandlers',
        'voices',
        'reg_voicenum',
-       'mainreghandler',
+       'mainreg',
        'last_descr',
     ]
 
@@ -297,10 +297,10 @@ class SidRegState(SidRegStateMiddle):
                 self.reghandlers[reg] = voice
                 self.reg_voicenum[reg] = voicenum
             self.voices[voicenum] = voice
-        self.mainreghandler = SidFilterMainRegState()
-        regbase = self.mainreghandler.regbase()
-        for i in self.mainreghandler._REGMAP:
-            self.reghandlers[regbase + i] = self.mainreghandler
+        self.mainreg = SidFilterMainRegState()
+        regbase = self.mainreg.regbase()
+        for i in self.mainreg._REGMAP:
+            self.reghandlers[regbase + i] = self.mainreg
         self.regstate = {i: 0 for i in self.reghandlers}
         self.last_descr = {i: {} for i in self.reghandlers}
 
@@ -325,37 +325,78 @@ class SidRegState(SidRegStateMiddle):
         return event
 
 
+class FrozenSidVoiceRegState(SidVoiceRegState):
+
+    __slots__ = [
+       'frequency',
+       'pw_duty',
+       'decay',
+       'attack',
+       'sustain',
+       'release',
+       'gate',
+       'sync',
+       'ring',
+       'test',
+       'triangle',
+       'sawtooth',
+       'pulse',
+       'noise',
+       'voicenum',
+       'instance',
+       'regstate',
+    ]
+
+    def __init__(self, voicestate):
+        for slot in self.__slots__:
+            setattr(self, slot, getattr(voicestate, slot))
+
+    def set(self, reg, val):
+        raise NotImplementedError
+
+
+class FrozenSidFilterMainRegState(SidFilterMainRegState):
+
+    __slots__ = [
+        'instance',
+        'vol',
+        'filter_res',
+        'filter_voice1',
+        'filter_voice2',
+        'filter_voice3',
+        'filter_external',
+        'filter_cutoff',
+        'filter_low',
+        'filter_band',
+        'filter_high',
+        'mute_voice3',
+        'regstate',
+   ]
+
+    def __init__(self, mainstate):
+        for slot in self.__slots__:
+            setattr(self, slot, getattr(mainstate, slot))
+
+    def set(self, reg, val):
+        raise NotImplementedError
+
+
 class FrozenSidRegState(SidRegStateMiddle):
 
     __slots__ = [
         'voices',
+        'mainreg',
         'reg_voicenum',
         'regstate',
     ]
 
     def __init__(self, state):
-        regstate = state.regstate
-        instance = state.instance
-        super(FrozenSidRegState, self).__init__(instance)
-        self.voices = {}
-        self.reg_voicenum = {}
-        reghandlers = {}
-        for voicenum in VOICES:
-            voice = SidVoiceRegState(voicenum)
-            regbase = voice.regbase()
-            for voicereg in voice._REGMAP:
-                reg = regbase + voicereg
-                reghandlers[reg] = voice
-                self.reg_voicenum[reg] = voicenum
-            self.voices[voicenum] = voice
-        mainreghandler = SidFilterMainRegState()
-        regbase = mainreghandler.regbase()
-        for i in mainreghandler._REGMAP:
-            reghandlers[regbase + i] = mainreghandler
-        self.regstate = copy.copy(regstate)
-        for reg, val in regstate.items():
-            handler = reghandlers[reg]
-            handler.set(reg, val)
+        super(FrozenSidRegState, self).__init__(state.instance)
+        self.voices = {
+            voicenum: FrozenSidVoiceRegState(voicestate) for voicenum, voicestate in state.voices.items()}
+        self.mainreg = FrozenSidFilterMainRegState(state.mainreg)
+        self.regstate = copy.copy(state.regstate)
+        self.reg_voicenum = copy.copy(state.reg_voicenum)
 
     def set(self, reg, val):
         raise NotImplementedError
