@@ -263,6 +263,9 @@ class SidRegState(SidRegStateBase):
         self.last_descr[reg] = descr
         return SidRegEvent(reg, ' '.join((preamble, descr_txt)), voicenum=voicenum, otherreg=otherreg)
 
+    def gates_on(self):
+        return {voicenum for voicenum in self.voices if self.voices[voicenum].gate}
+
 
 # http://www.sidmusic.org/sid/sidtech2.html
 def real_sid_freq(sid, freq_reg):
@@ -311,10 +314,6 @@ def write_reg_writes(snd_log_name, reg_writes):
             snd_log_f.write(' '.join((str(i) for i in (rel_clock, reg, val))) + '\n')
 
 
-def gates_on(state):
-    return {voicenum for voicenum in state.voices if state.voices[voicenum].gate}
-
-
 def get_reg_changes(reg_writes, voicemask=VOICES, minclock=0, maxclock=0, maxsilentclocks=0):
     change_only_writes = []
     state = SidRegState()
@@ -330,7 +329,7 @@ def get_reg_changes(reg_writes, voicemask=VOICES, minclock=0, maxclock=0, maxsil
             continue
         if regevent.voicenum and regevent.voicenum not in voicemask:
             continue
-        gates_on_now = gates_on(state)
+        gates_on_now = state.gates_on()
         if maxsilentclocks and not gates_on_now:
             if last_any_gate_on and clock - last_any_gate_on > maxsilentclocks:
                 break
@@ -353,7 +352,7 @@ def debug_reg_writes(sid, reg_writes, consolidate_mb_clock=10):
         regevent = state.set(reg, val)
         regs = [state.mainreghandler] + [state.voices[i] for i in state.voices]
         hashregs = tuple([reg.hashreg() for reg in regs])
-        active_voices = ','.join((str(voicenum) for voicenum in sorted(gates_on(state))))
+        active_voices = ','.join((str(voicenum) for voicenum in sorted(state.gates.on())))
         raw_regevents.append((clock, reg, val) + (active_voices,) + hashregs + (regevent,))
     lines = []
     for i, regevents in enumerate(raw_regevents):
