@@ -8,9 +8,18 @@
 
 # https://www.c64-wiki.com/wiki/SID
 
+from functools import lru_cache, cached_property
+
 VOICES = {1, 2, 3}
 
 class SidRegEvent:
+
+    __slots__ = [
+        'reg',
+        'descr',
+        'voicenum',
+        'otherreg',
+    ]
 
     def __init__(self, reg, descr, voicenum=None, otherreg=None):
         self.reg = reg
@@ -25,7 +34,16 @@ class SidRegEvent:
         return self.__str__()
 
 
+@lru_cache
+def sid_reg_event_factory(reg, descr, voicenum=None, otherreg=None):
+    return SidRegEvent(reg, descr, voicenum=voicenum, otherreg=otherreg)
+
+
 class SidRegStateBase:
+
+    __slots__ = [
+        'regstate',
+    ]
 
     def __init__(self):
         self.regstate = {}
@@ -41,6 +59,11 @@ class SidRegStateBase:
 
 
 class SidRegHandler(SidRegStateBase):
+
+    __slots__ = [
+        'regstate',
+        'instance',
+    ]
 
     REGBASE = 0
     NAME = 'unknown'
@@ -100,10 +123,29 @@ class SidRegHandler(SidRegStateBase):
 
 class SidVoiceRegState(SidRegHandler):
 
+    __slots__ = [
+       'frequency',
+       'pw_duty',
+       'decay',
+       'attack',
+       'sustain',
+       'release',
+       'gate',
+       'sync',
+       'ring',
+       'test',
+       'triangle',
+       'sawtooth',
+       'pulse',
+       'noise',
+       'voicenum',
+       'REGMAP',
+    ]
+
     REGBASE = 0
     NAME = 'voice'
 
-    def __init__(self, instance):
+    def __init__(self, voicenum):
         self.REGMAP = {
             0: self._freq,
             1: self._freq,
@@ -113,8 +155,8 @@ class SidVoiceRegState(SidRegHandler):
             5: self._attack_decay,
             6: self._sustain_release,
         }
-        super(SidVoiceRegState, self).__init__(instance)
-        self.voicenum = instance
+        super(SidVoiceRegState, self).__init__(voicenum)
+        self.voicenum = voicenum
 
     def _freq_descr(self):
         return self.lohi_attr(0, 1, 'frequency')
@@ -169,6 +211,21 @@ class SidVoiceRegState(SidRegHandler):
 
 class SidFilterMainRegState(SidRegHandler):
 
+    __slots__ = [
+        'REGMAP',
+        'vol',
+        'filter_res',
+        'filter_voice1',
+        'filter_voice2',
+        'filter_voice3',
+        'filter_external',
+        'filter_cutoff',
+        'filter_low',
+        'filter_band',
+        'filter_high',
+        'mute_voice3'
+   ]
+
     REGBASE = 21
     NAME = 'main'
 
@@ -204,7 +261,25 @@ class SidFilterMainRegState(SidRegHandler):
         super(SidFilterMainRegState, self).__init__(instance)
 
 
-class FrozenSidRegState(SidRegStateBase):
+class SidRegStateMiddle(SidRegStateBase):
+
+    __slots__ = [
+        'voices',
+        'reg_voicenum',
+        'regstate',
+    ]
+
+    def gates_on(self):
+        return {voicenum for voicenum in self.voices if self.voices[voicenum].gate_on()}
+
+
+class FrozenSidRegState(SidRegStateMiddle):
+
+    __slots__ = [
+        'voices',
+        'reg_voicenum',
+        'regstate',
+    ]
 
     def __init__(self, regstate):
         self.voices = {}
@@ -228,14 +303,23 @@ class FrozenSidRegState(SidRegStateBase):
             handler.set(reg, val)
             self.regstate[reg] = val
 
-    def gates_on(self):
-        return {voicenum for voicenum in self.voices if self.voices[voicenum].gate_on()}
-
     def set(self, reg, val):
         raise NotImplementedError
 
+    cached_property
+    def hashreg(self):
+        return super(FrozenSidRegState, self).hashreg()
 
-class SidRegState(FrozenSidRegState):
+
+class SidRegState(SidRegStateMiddle):
+
+    __slots__ = [
+       'reghandlers',
+       'voices',
+       'reg_voicenum',
+       'mainreghandler',
+       'last_descr',
+    ]
 
     def __init__(self):
         self.reghandlers = {}
@@ -266,11 +350,12 @@ class SidRegState(FrozenSidRegState):
         preamble, descr, otherreg = handler.set(reg, val)
         if self.regstate[reg] == val:
             return None
-        voicenum = None
-        if isinstance(handler, SidVoiceRegState):
-            voicenum = handler.voicenum
         descr_txt = self._descr_diff(self.last_descr[reg], descr)
-        event = SidRegEvent(reg, ' '.join((preamble, descr_txt)), voicenum=voicenum, otherreg=otherreg)
+        event = sid_reg_event_factory(
+            reg,
+            ' '.join((preamble, descr_txt)),
+            voicenum=self.reg_voicenum.get(reg, None),
+            otherreg=otherreg)
         self.regstate[reg] = val
         self.last_descr[reg] = descr
         return event
