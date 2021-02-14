@@ -277,16 +277,16 @@ class SidRegStateMiddle(SidRegStateBase):
 class SidRegState(SidRegStateMiddle):
 
     __slots__ = [
-       'reghandlers',
+       '_reghandlers',
+       '_last_descr',
        'voices',
        'reg_voicenum',
        'mainreg',
-       'last_descr',
     ]
 
     def __init__(self, instance=0):
         super(SidRegState, self).__init__(instance)
-        self.reghandlers = {}
+        self._reghandlers = {}
         self.voices = {}
         self.reg_voicenum = {}
         for voicenum in VOICES:
@@ -294,15 +294,15 @@ class SidRegState(SidRegStateMiddle):
             regbase = voice.regbase()
             for voicereg in voice._REGMAP:
                 reg = regbase + voicereg
-                self.reghandlers[reg] = voice
+                self._reghandlers[reg] = voice
                 self.reg_voicenum[reg] = voicenum
             self.voices[voicenum] = voice
         self.mainreg = SidFilterMainRegState()
         regbase = self.mainreg.regbase()
         for i in self.mainreg._REGMAP:
-            self.reghandlers[regbase + i] = self.mainreg
-        self.regstate = {i: 0 for i in self.reghandlers}
-        self.last_descr = {i: {} for i in self.reghandlers}
+            self._reghandlers[regbase + i] = self.mainreg
+        self.regstate = {i: 0 for i in self._reghandlers}
+        self._last_descr = {i: {} for i in self._reghandlers}
 
     def _descr_diff(self, last_descr, descr):
         descr_diff = {k: v for k, v in descr.items() if v != last_descr.get(k, None)}
@@ -310,18 +310,18 @@ class SidRegState(SidRegStateMiddle):
         return descr_txt
 
     def set(self, reg, val):
-        handler = self.reghandlers[reg]
+        handler = self._reghandlers[reg]
         preamble, descr, otherreg = handler.set(reg, val)
         if self.regstate[reg] == val:
             return None
-        descr_txt = self._descr_diff(self.last_descr[reg], descr)
+        descr_txt = self._descr_diff(self._last_descr[reg], descr)
         event = sid_reg_event_factory(
             reg,
             ' '.join((preamble, descr_txt)),
             voicenum=self.reg_voicenum.get(reg, None),
             otherreg=otherreg)
         self.regstate[reg] = val
-        self.last_descr[reg] = descr
+        self._last_descr[reg] = descr
         return event
 
 
@@ -381,6 +381,15 @@ class FrozenSidFilterMainRegState(SidFilterMainRegState):
         raise NotImplementedError
 
 
+def frozen_factory(state, statecache, stateclass):
+   statehash = state.__hash__()
+   if statehash not in statecache:
+       statecache[statehash] = stateclass(state)
+   return statecache[statehash]
+
+frozen_voice_state = {}
+frozen_main_state = {}
+
 class FrozenSidRegState(SidRegStateMiddle):
 
     __slots__ = [
@@ -393,23 +402,17 @@ class FrozenSidRegState(SidRegStateMiddle):
     def __init__(self, state):
         super(FrozenSidRegState, self).__init__(state.instance)
         self.voices = {
-            voicenum: FrozenSidVoiceRegState(voicestate) for voicenum, voicestate in state.voices.items()}
-        self.mainreg = FrozenSidFilterMainRegState(state.mainreg)
+            voicenum: frozen_factory(voicestate, frozen_voice_state, FrozenSidVoiceRegState)
+            for voicenum, voicestate in state.voices.items()}
+        self.mainreg = frozen_factory(state.mainreg, frozen_main_state, FrozenSidFilterMainRegState)
         self.regstate = copy.copy(state.regstate)
         self.reg_voicenum = copy.copy(state.reg_voicenum)
 
     def set(self, reg, val):
         raise NotImplementedError
 
-    @cached_property
-    def regdump(self):
-        return super(FrozenSidRegState, self).regdump()
-
 
 frozen_sid_state = {}
 
 def frozen_sid_state_factory(state):
-    statehash = state.__hash__()
-    if statehash not in frozen_sid_state:
-        frozen_sid_state[statehash] = FrozenSidRegState(state=state)
-    return frozen_sid_state[statehash]
+    return frozen_factory(state, frozen_sid_state, FrozenSidRegState)
