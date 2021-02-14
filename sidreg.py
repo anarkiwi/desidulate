@@ -59,6 +59,9 @@ class SidRegStateBase:
     def __hash__(self):
         return '%2.2x%s' % (self.instance, self.regdump())
 
+    def __str__(self):
+        return self.regdump()
+
 
 class SidRegHandler(SidRegStateBase):
 
@@ -126,6 +129,9 @@ class SidVoiceRegStateMiddle(SidRegHandler):
 
     def waveforms(self):
         return {waveform for waveform in ('triangle', 'sawtooth', 'pulse', 'noise') if getattr(self, waveform, None)}
+
+    def flat_waveforms(self):
+        return tuple(sorted(self.waveforms()))
 
     def any_waveform(self):
         return bool(self.waveforms())
@@ -329,6 +335,9 @@ class SidRegState(SidRegStateMiddle):
         self.regstate[reg] = val
         self._last_descr[reg] = descr
         return event
+
+    def __str__(self):
+        return ' '.join((voicereg[voicenum].regdump() for voicenum in sorted(VOICES)) + (self.mainreg.regdump(),))
 
 
 class FrozenSidVoiceRegState(SidVoiceRegStateMiddle):
