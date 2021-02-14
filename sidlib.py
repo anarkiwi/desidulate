@@ -173,6 +173,13 @@ class SidVoiceRegState(SidRegHandler):
     def any_waveform(self):
         return bool(self.waveforms())
 
+    def gate_on(self):
+        # https://codebase64.org/doku.php?id=base:classic_hard-restart_and_about_adsr_in_generally
+        if self.test:
+            return False
+        if not self.gate:
+            return False
+        return True
 
 
 class SidFilterMainRegState(SidRegHandler):
@@ -255,9 +262,6 @@ class SidRegState(SidRegStateBase):
         self.regstate[reg] = val
         self.last_descr[reg] = descr
         return SidRegEvent(reg, ' '.join((preamble, descr_txt)), voicenum=voicenum, otherreg=otherreg)
-
-    def hashreg(self):
-        return hash(frozenset(self.regstate.items()))
 
 
 # http://www.sidmusic.org/sid/sidtech2.html
@@ -444,14 +448,6 @@ def get_gate_events(reg_writes, voicemask):
     def append_event(voicenum, event):
         voiceeventstack[voicenum].append(event)
 
-    def gate_on(voice_state):
-        # https://codebase64.org/doku.php?id=base:classic_hard-restart_and_about_adsr_in_generally
-        if voice_state.test:
-            return False
-        if not voice_state.gate:
-            return False
-        return True
-
     for event in reg_writes:
         _clock, regevent, state = event
         voicenum = regevent.voicenum
@@ -463,9 +459,9 @@ def get_gate_events(reg_writes, voicemask):
             if voiceeventstack[voicenum]:
                 last_voiceevent = voiceeventstack[voicenum][-1]
                 _, _, last_state = last_voiceevent
-                last_gate = gate_on(last_state.voices[voicenum])
+                last_gate = last_state.voices[voicenum].gate_on()
             voice_state = state.voices[voicenum]
-            gate = gate_on(voice_state)
+            gate = voice_state.gate_on()
             if last_gate is not None and last_gate != gate:
                 if gate:
                     despool_events(voicenum)
