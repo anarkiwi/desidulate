@@ -306,7 +306,7 @@ class FrozenSidRegState(SidRegStateMiddle):
     def set(self, reg, val):
         raise NotImplementedError
 
-    cached_property
+    @cached_property
     def hashreg(self):
         return super(FrozenSidRegState, self).hashreg()
 

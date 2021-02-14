@@ -108,7 +108,7 @@ def debug_reg_writes(sid, reg_writes, consolidate_mb_clock=10):
         regevent = state.set(reg, val)
         regs = [state.mainreghandler] + [state.voices[i] for i in state.voices]
         hashregs = tuple([reg.hashreg() for reg in regs])
-        active_voices = ','.join((str(voicenum) for voicenum in sorted(state.gates.on())))
+        active_voices = ','.join((str(voicenum) for voicenum in sorted(state.gates_on())))
         raw_regevents.append((clock, reg, val) + (active_voices,) + hashregs + (regevent,))
     lines = []
     for i, regevents in enumerate(raw_regevents):
