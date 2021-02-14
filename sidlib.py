@@ -94,7 +94,7 @@ def get_reg_changes(reg_writes, voicemask=VOICES, minclock=0, maxclock=0, maxsil
         if not change_only_writes and minclock:
             relative_clock = clock
             for reg_pre, val_pre in state.regstate.items():
-                reg_pre_voicenum = state.reg_voicenum(reg_pre)
+                reg_pre_voicenum = state.reg_voicenum.get(reg_pre, None)
                 if reg_pre_voicenum is None or reg_pre_voicenum in voicemask:
                     change_only_writes.append((clock - relative_clock, reg_pre, val_pre))
         change_only_writes.append((clock - relative_clock, reg, val))

@@ -205,12 +205,15 @@ class FrozenSidRegState(SidRegStateBase):
 
     def __init__(self, regstate):
         self.voices = {}
+        self.reg_voicenum = {}
         reghandlers = {}
         for voicenum in VOICES:
             voice = SidVoiceRegState(voicenum)
             regbase = voice.regbase()
-            for reg in voice.REGMAP:
-                reghandlers[regbase + reg] = voice
+            for voicereg in voice.REGMAP:
+                reg = regbase + voicereg
+                reghandlers[reg] = voice
+                self.reg_voicenum[reg] = voicenum
             self.voices[voicenum] = voice
         mainreghandler = SidFilterMainRegState()
         regbase = mainreghandler.regbase()
@@ -221,12 +224,6 @@ class FrozenSidRegState(SidRegStateBase):
             handler = reghandlers[reg]
             handler.set(reg, val)
             self.regstate[reg] = val
-
-    def reg_voicenum(self, reg):
-        handler = self.reghandlers[reg]
-        if isinstance(handler, SidVoiceRegState):
-            return handler.voicenum
-        return None
 
     def gates_on(self):
         return {voicenum for voicenum in self.voices if self.voices[voicenum].gate_on()}
@@ -240,11 +237,14 @@ class SidRegState(FrozenSidRegState):
     def __init__(self):
         self.reghandlers = {}
         self.voices = {}
+        self.reg_voicenum = {}
         for voicenum in VOICES:
             voice = SidVoiceRegState(voicenum)
             regbase = voice.regbase()
-            for reg in voice.REGMAP:
-                self.reghandlers[regbase + reg] = voice
+            for voicereg in voice.REGMAP:
+                reg = regbase + voicereg
+                self.reghandlers[reg] = voice
+                self.reg_voicenum[reg] = voicenum
             self.voices[voicenum] = voice
         self.mainreghandler = SidFilterMainRegState()
         regbase = self.mainreghandler.regbase()
