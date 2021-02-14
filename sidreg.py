@@ -122,7 +122,27 @@ class SidRegHandler(SidRegStateBase):
         return self._set(reg, val)
 
 
-class SidVoiceRegState(SidRegHandler):
+class SidVoiceRegStateMiddle(SidRegHandler):
+
+    def waveforms(self):
+        return {waveform for waveform in ('triangle', 'sawtooth', 'pulse', 'noise') if getattr(self, waveform, None)}
+
+    def any_waveform(self):
+        return bool(self.waveforms())
+
+    def gate_on(self):
+        # https://codebase64.org/doku.php?id=base:classic_hard-restart_and_about_adsr_in_generally
+        if self.test:
+            return False
+        if not self.gate:
+            return False
+        return True
+
+    def in_release(self):
+        return self.release > 0 and not self.gate_on()
+
+
+class SidVoiceRegState(SidVoiceRegStateMiddle):
 
     __slots__ = [
        'frequency',
@@ -192,25 +212,14 @@ class SidVoiceRegState(SidRegHandler):
     def _control(self, _):
         return (self._control_descr(), None)
 
-    def waveforms(self):
-        return {waveform for waveform in ('triangle', 'sawtooth', 'pulse', 'noise') if getattr(self, waveform, None)}
 
-    def any_waveform(self):
-        return bool(self.waveforms())
+class SidFilterMainRegStateMiddle(SidRegHandler):
 
-    def gate_on(self):
-        # https://codebase64.org/doku.php?id=base:classic_hard-restart_and_about_adsr_in_generally
-        if self.test:
-            return False
-        if not self.gate:
-            return False
-        return True
-
-    def in_release(self):
-        return self.release > 0 and not self.gate_on()
+    REGBASE = 21
+    NAME = 'main'
 
 
-class SidFilterMainRegState(SidRegHandler):
+class SidFilterMainRegState(SidFilterMainRegStateMiddle):
 
     __slots__ = [
         '_REGMAP',
@@ -226,9 +235,6 @@ class SidFilterMainRegState(SidRegHandler):
         'filter_high',
         'mute_voice3'
    ]
-
-    REGBASE = 21
-    NAME = 'main'
 
     def __init__(self, instance=0):
         self._REGMAP = {
@@ -325,7 +331,7 @@ class SidRegState(SidRegStateMiddle):
         return event
 
 
-class FrozenSidVoiceRegState(SidVoiceRegState):
+class FrozenSidVoiceRegState(SidVoiceRegStateMiddle):
 
     __slots__ = [
        'frequency',
@@ -355,7 +361,7 @@ class FrozenSidVoiceRegState(SidVoiceRegState):
         raise NotImplementedError
 
 
-class FrozenSidFilterMainRegState(SidFilterMainRegState):
+class FrozenSidFilterMainRegState(SidFilterMainRegStateMiddle):
 
     __slots__ = [
         'instance',
