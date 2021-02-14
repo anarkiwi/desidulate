@@ -264,7 +264,7 @@ class SidRegState(SidRegStateBase):
         return SidRegEvent(reg, ' '.join((preamble, descr_txt)), voicenum=voicenum, otherreg=otherreg)
 
     def gates_on(self):
-        return {voicenum for voicenum in self.voices if self.voices[voicenum].gate}
+        return {voicenum for voicenum in self.voices if self.voices[voicenum].gate_on()}
 
 
 # http://www.sidmusic.org/sid/sidtech2.html
