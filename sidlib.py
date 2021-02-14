@@ -193,7 +193,7 @@ def get_gate_events(reg_writes, voicemask):
         if voiceeventstack[voicenum]:
             first_event = voiceeventstack[voicenum][0]
             first_clock, _, first_state = first_event
-            if first_state.voices[voicenum].gate:
+            if first_state.voices[voicenum].gate_on():
                 voiceevents[voicenum].append((first_clock, voiceeventstack[voicenum]))
             voiceeventstack[voicenum] = []
 
@@ -221,7 +221,7 @@ def get_gate_events(reg_writes, voicemask):
                 else:
                     append_event(voicenum, event)
                 continue
-            if gate or (voice_state.release > 0 and not voice_state.test):
+            if gate or voice_state.in_release():
                 append_event(voicenum, event)
 
     for voicenum in voicemask:

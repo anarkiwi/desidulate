@@ -163,6 +163,9 @@ class SidVoiceRegState(SidRegHandler):
             return False
         return True
 
+    def in_release(self):
+        return self.release > 0 and not self.gate_on()
+
 
 class SidFilterMainRegState(SidRegHandler):
 
