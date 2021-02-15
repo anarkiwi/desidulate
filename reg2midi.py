@@ -47,6 +47,19 @@ class SidSoundEvent:
         self.all_noise = False
         self.midi_notes = []
         self.midi_pitches = []
+        self.voicestates = []
+
+    def trim_gateoff(self):
+        for i, clock_voicestate in enumerate(self.voicestates):
+            clock, voicestate = clock_voicestate
+            if not voicestate.gate and not voicestate.release:
+                self.voicestates = self.voicestates[:i+1]
+                break
+        i = len(self.voicestates) - 1
+        while i > 0 and self.voicestates[i][1].test:
+            i -= 1
+        if i:
+            self.voicestates = self.voicestates[:i+2]
 
     def parse(self):
         self.midi_notes = tuple(self.smf.get_midi_notes_from_events(self.sid, self.events, self.clockq))
@@ -56,10 +69,12 @@ class SidSoundEvent:
             return
         self.max_midi_note = max(self.midi_pitches)
         self.min_midi_note = min(self.midi_pitches)
-        voicestates = ((clock, state.voices[voicenum]) for clock, _, state in self.events)
+        self.voicestates = [(clock, state.voices[self.voicenum]) for clock, _, state in self.events]
+        self.trim_gateoff()
         last_clock = None
         rel_clock = 0
-        for clock, voicestate in voicestates:
+        assert self.voicestates[0][1].gate_on()
+        for clock, voicestate in self.voicestates:
             if last_clock is not None:
                 rel_clock = clock - last_clock
             curr_waveforms = voicestate.flat_waveforms()
@@ -92,7 +107,7 @@ class SidSoundEvent:
                         self.smf.add_drum_pitch(clock, LOW_TOM, velocity, self.total_duration, self.voicenum)
         else:
             for clock, pitch, duration, velocity, _ in self.midi_notes:
-                self.smf.add_pitch(clock, pitch, velocity, duration, voicenum)
+                self.smf.add_pitch(clock, pitch, velocity, duration, self.voicenum)
 
 
 voicemask = set((int(v) for v in args.voicemask.split(',')))
