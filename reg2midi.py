@@ -29,19 +29,15 @@ pal_parser.add_argument('--pal', dest='pal', action='store_true', help='Use PAL 
 pal_parser.add_argument('--ntsc', dest='pal', action='store_false', help='Use NTSC clock')
 parser.set_defaults(pal=True, percussion=True)
 args = parser.parse_args()
-voicemask = set((int(v) for v in args.voicemask.split(',')))
-sid = get_sid(args.pal)
-clockq = sid.clock_frequency / 50
-smf = SidMidiFile(sid, args.bpm, clockq)
-reg_writes = get_reg_changes(get_reg_writes(args.logfile), voicemask=voicemask, minclock=args.minclock, maxclock=args.maxclock)
-reg_writes_changes = get_consolidated_changes(reg_writes, voicemask)
-mainevents, voiceevents = get_gate_events(reg_writes_changes, voicemask)
-
 
 
 class SidSoundEvent:
 
-    def __init__(self, smf, event_start, events):
+    def __init__(self, percussion, sid, clockq, smf, voicenum, event_start, events):
+        self.percussion = percussion
+        self.voicenum = voicenum
+        self.sid = sid
+        self.clockq = clockq
         self.smf = smf
         self.event_start = event_start
         self.events = events
@@ -53,7 +49,7 @@ class SidSoundEvent:
         self.midi_pitches = []
 
     def parse(self):
-        self.midi_notes = tuple(self.smf.get_midi_notes_from_events(sid, self.events, clockq))
+        self.midi_notes = tuple(self.smf.get_midi_notes_from_events(self.sid, self.events, self.clockq))
         self.midi_pitches = tuple([midi_note[1] for midi_note in self.midi_notes])
         self.total_duration = sum(duration for _, _, duration, _, _ in self.midi_notes)
         if not self.midi_notes:
@@ -78,31 +74,40 @@ class SidSoundEvent:
     def descending_pitches(self):
         return len(self.midi_pitches) > 2 and self.midi_pitches[0] > self.midi_pitches[-1]
 
+    def smf_transcribe(self):
+        if self.noisephases:
+            if self.percussion:
+                if self.all_noise:
+                    for clock, _pitch, duration, velocity, _ in self.midi_notes:
+                        self.smf.add_drum_noise_duration(clock, velocity, duration, self.voicenum)
+                elif self.noisephases > 1:
+                    for clock, _pitch, _duration, velocity, _ in self.midi_notes:
+                        self.smf.add_drum_pitch(clock, ELECTRIC_SNARE, velocity, self.total_duration, self.voicenum)
+                else:
+                    clock, _pitch, _dutation, velocity, _ = self.midi_notes[0]
+                    if self.descending_pitches():
+                        # http://www.ucapps.de/howto_sid_wavetables_1.html
+                        self.smf.add_drum_pitch(clock, BASS_DRUM, velocity, self.total_duration, self.voicenum)
+                    else:
+                        self.smf.add_drum_pitch(clock, LOW_TOM, velocity, self.total_duration, self.voicenum)
+        else:
+            for clock, pitch, duration, velocity, _ in self.midi_notes:
+                self.smf.add_pitch(clock, pitch, velocity, duration, voicenum)
+
+
+voicemask = set((int(v) for v in args.voicemask.split(',')))
+sid = get_sid(args.pal)
+clockq = sid.clock_frequency / 50
+smf = SidMidiFile(sid, args.bpm, clockq)
+reg_writes = get_reg_changes(get_reg_writes(args.logfile), voicemask=voicemask, minclock=args.minclock, maxclock=args.maxclock)
+reg_writes_changes = get_consolidated_changes(reg_writes, voicemask)
+mainevents, voiceevents = get_gate_events(reg_writes_changes, voicemask)
 
 for voicenum, gated_voice_events in voiceevents.items():
     for event_start, events in gated_voice_events:
-        sse = SidSoundEvent(smf, event_start, events)
+        sse = SidSoundEvent(args.percussion, sid, clockq, smf, voicenum, event_start, events)
         sse.parse()
-
-        if sse.noisephases:
-            if args.percussion:
-                if sse.all_noise:
-                    for clock, _pitch, duration, velocity, _ in sse.midi_notes:
-                        smf.add_drum_noise_duration(clock, velocity, duration, voicenum)
-                elif sse.noisephases > 1:
-                    for clock, _pitch, _duration, velocity, _ in sse.midi_notes:
-                        smf.add_drum_pitch(clock, ELECTRIC_SNARE, velocity, sse.total_duration, voicenum)
-                else:
-                    clock, _pitch, _dutation, velocity, _ = sse.midi_notes[0]
-                    if sse.descending_pitches():
-                        # http://www.ucapps.de/howto_sid_wavetables_1.html
-                        smf.add_drum_pitch(clock, BASS_DRUM, velocity, sse.total_duration, voicenum)
-                    else:
-                        smf.add_drum_pitch(clock, LOW_TOM, velocity, sse.total_duration, voicenum)
-        else:
-            for clock, pitch, duration, velocity, _ in sse.midi_notes:
-                smf.add_pitch(clock, pitch, velocity, duration, voicenum)
-
+        sse.smf_transcribe()
 
 midifile = args.midifile
 if not midifile:
