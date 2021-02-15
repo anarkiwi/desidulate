@@ -62,6 +62,15 @@ class SidRegStateBase:
     def __str__(self):
         return self.regdump()
 
+    def diff_attr(self, attrs, other):
+        diff_attrs = {}
+        for attr in attrs:
+            mine = getattr(self, attr)
+            others = getattr(other, attr)
+            if mine != others:
+                diff_attrs[attr] = mine - others
+        return diff_attrs
+
 
 class SidRegHandler(SidRegStateBase):
 
@@ -368,6 +377,9 @@ class FrozenSidVoiceRegState(SidVoiceRegStateMiddle):
 
     def set(self, reg, val):
         raise NotImplementedError
+
+    def diff(self, other):
+        return self.diff_attr([slot for slot in self.__slots__ if not slot.startswith('reg')], other)
 
 
 class FrozenSidFilterMainRegState(SidFilterMainRegStateMiddle):
