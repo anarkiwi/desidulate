@@ -227,7 +227,7 @@ for (ext, patches) in (('single_patches.txt', single_patches), ('multi_patches.t
     fieldnames = reader.fieldnames
 
     with open(out_filename, 'w') as f:
-        writer = csv.DictWriter(f, fieldnames=['hashid', 'count'] + fieldnames)
+        writer = csv.DictWriter(f, fieldnames=['hashid', 'count'] + fieldnames, dialect='unix', quoting=csv.QUOTE_NONE)
         writer.writeheader()
         for hashid, count in sorted(patch_count.items(), key=lambda x: x[1], reverse=True):
             if hashid in patches:
