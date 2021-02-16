@@ -220,6 +220,8 @@ if not midifile:
 smf.write(midifile)
 
 for (ext, patches) in (('single_patches.txt', single_patches), ('multi_patches.txt', multi_patches)):
+    if not patches:
+        continue
     out_filename = out_path(args.logfile, ext)
     first_csv_txt = list(patches.values())[0]
     reader = csv.DictReader(io.StringIO(first_csv_txt))
