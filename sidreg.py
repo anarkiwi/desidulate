@@ -158,10 +158,11 @@ class SidVoiceRegStateMiddle(SidRegHandler):
 
     def synced_voicenums(self):
         voicenums = set()
-        if self.sync:
-            voicenums.add((self.voicenum + 2) % len(VOICES) + 1)
-        if self.ring:
-            voicenums = voicenums.union(VOICES - {self.voicenum})
+        sync_voicenum = self.voicenum + 2
+        if sync_voicenum > len(VOICES):
+            sync_voicenum -= len(VOICES)
+        if self.sync or self.ring:
+            voicenums.add(sync_voicenum)
         return voicenums
 
 
@@ -314,11 +315,12 @@ class SidRegStateMiddle(SidRegStateBase):
         audible = copy.copy(VOICES)
         for voicenum in VOICES:
             voicestate = self.voices[voicenum]
-            if voicestate.test or self.mainreg.voice_muted(voicenum):
+            if not voicestate.gate or voicestate.test or self.mainreg.voice_muted(voicenum):
                 audible -= {voicenum}
                 continue
-            #if voicestate.gate or not voicestate.release:
-            #    audible -= voicestate.synced_voicenums()
+            synced_voicenums = voicestate.synced_voicenums()
+            if synced_voicenums:
+                audible -= synced_voicenums
         return audible
 
 
