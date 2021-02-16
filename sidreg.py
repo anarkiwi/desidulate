@@ -136,6 +136,23 @@ class SidRegHandler(SidRegStateBase):
 
 class SidVoiceRegStateMiddle(SidRegHandler):
 
+    voice_regs = [
+       'frequency',
+       'pw_duty',
+       'attack',
+       'decay',
+       'sustain',
+       'release',
+       'gate',
+       'sync',
+       'ring',
+       'test',
+       'triangle',
+       'sawtooth',
+       'pulse',
+       'noise',
+    ]
+
     def waveforms(self):
         return {waveform for waveform in ('triangle', 'sawtooth', 'pulse', 'noise') if getattr(self, waveform, None)}
 
@@ -242,13 +259,24 @@ class SidFilterMainRegStateMiddle(SidRegHandler):
     REGBASE = 21
     NAME = 'main'
 
+    filter_common = [
+        'filter_res',
+        'filter_cutoff',
+        'filter_low',
+        'filter_band',
+        'filter_high',
+    ]
+
     def voice_filtered(self, voicenum):
         filter_attr = 'filter_voice%u' % voicenum
-        return bool(getattr(self, filter_attr))
+        return getattr(self, filter_attr)
 
     def voice_muted(self, voicenum):
         mute_attr = 'mute_voice%u' % voicenum
         return bool(getattr(self, mute_attr, False))
+
+    def diff_filter(self, voicenum, other):
+        return self.diff_attr(self.filter_common + ['filter_voice%u' % voicenum], other)
 
 
 class SidFilterMainRegState(SidFilterMainRegStateMiddle):
@@ -266,7 +294,7 @@ class SidFilterMainRegState(SidFilterMainRegStateMiddle):
         'filter_band',
         'filter_high',
         'mute_voice3'
-   ]
+    ]
 
     def __init__(self, instance=0):
         self._REGMAP = {

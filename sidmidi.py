@@ -29,7 +29,8 @@ ELECTRIC_SNARE = 40
 CRASH_CYMBAL1 = 49
 
 
-def midi_path(snd_log_name):
+
+def out_path(snd_log_name, new_ext):
     snd_log_name = os.path.expanduser(snd_log_name)
     base = os.path.basename(snd_log_name)
     recogized_exts = {'gz', 'dump', 'log', 'sid'}
@@ -43,7 +44,11 @@ def midi_path(snd_log_name):
         if ext not in recogized_exts:
             break
         base = base[:dot]
-    return os.path.join(os.path.dirname(snd_log_name), '.'.join((base, 'mid')))
+    return os.path.join(os.path.dirname(snd_log_name), '.'.join((base, new_ext)))
+
+
+def midi_path(snd_log_name):
+    return out_path(snd_log_name, 'mid')
 
 
 class SidMidiFile:
