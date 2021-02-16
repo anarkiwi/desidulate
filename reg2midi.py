@@ -62,15 +62,19 @@ class SidSoundEvent:
             self.voicestates = self.voicestates[:i+2]
 
     def parse(self):
-        self.midi_notes = tuple(self.smf.get_midi_notes_from_events(self.sid, self.events, self.clockq))
-        self.midi_pitches = tuple([midi_note[1] for midi_note in self.midi_notes])
-        self.total_duration = sum(duration for _, _, duration, _, _ in self.midi_notes)
+        audible_voicenums = set()
+        for clock, _, state in self.events:
+            self.voicestates.append((clock, state.voices[self.voicenum]))
+            audible_voicenums = audible_voicenums.union(state.audible_voicenums())
+        self.trim_gateoff()
+        if self.voicenum in audible_voicenums:
+            self.midi_notes = tuple(self.smf.get_midi_notes_from_events(self.sid, self.events, self.clockq))
+            self.midi_pitches = tuple([midi_note[1] for midi_note in self.midi_notes])
+            self.total_duration = sum(duration for _, _, duration, _, _ in self.midi_notes)
         if not self.midi_notes:
             return
         self.max_midi_note = max(self.midi_pitches)
         self.min_midi_note = min(self.midi_pitches)
-        self.voicestates = [(clock, state.voices[self.voicenum]) for clock, _, state in self.events]
-        self.trim_gateoff()
         last_clock = None
         rel_clock = 0
         assert self.voicestates[0][1].gate_on()

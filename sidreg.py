@@ -156,6 +156,14 @@ class SidVoiceRegStateMiddle(SidRegHandler):
     def in_release(self):
         return self.release > 0 and not self.gate_on()
 
+    def synced_voicenums(self):
+        voicenums = set()
+        if self.sync:
+            voicenums.add((self.voicenum + 2) % len(VOICES) + 1)
+        if self.ring:
+            voicenums = voicenums.union(VOICES - {self.voicenum})
+        return voicenums
+
 
 class SidVoiceRegState(SidVoiceRegStateMiddle):
 
@@ -233,6 +241,14 @@ class SidFilterMainRegStateMiddle(SidRegHandler):
     REGBASE = 21
     NAME = 'main'
 
+    def voice_filtered(self, voicenum):
+        filter_attr = 'filter_voice%u' % voicenum
+        return bool(getattr(self, filter_attr))
+
+    def voice_muted(self, voicenum):
+        mute_attr = 'mute_voice%u' % voicenum
+        return bool(getattr(self, mute_attr, False))
+
 
 class SidFilterMainRegState(SidFilterMainRegStateMiddle):
 
@@ -293,6 +309,17 @@ class SidRegStateMiddle(SidRegStateBase):
 
     def gates_on(self):
         return {voicenum for voicenum in self.voices if self.voices[voicenum].gate_on()}
+
+    def audible_voicenums(self):
+        audible = copy.copy(VOICES)
+        for voicenum in VOICES:
+            voicestate = self.voices[voicenum]
+            if voicestate.test or self.mainreg.voice_muted(voicenum):
+                audible -= {voicenum}
+                continue
+            #if voicestate.gate or not voicestate.release:
+            #    audible -= voicestate.synced_voicenums()
+        return audible
 
 
 class SidRegState(SidRegStateMiddle):
