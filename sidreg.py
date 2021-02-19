@@ -9,7 +9,7 @@
 # https://www.c64-wiki.com/wiki/SID
 
 import copy
-from functools import lru_cache, cached_property
+from functools import lru_cache
 
 VOICES = {1, 2, 3}
 
@@ -35,7 +35,7 @@ class SidRegEvent:
         return self.__str__()
 
 
-@lru_cache
+@lru_cache(maxsize=None)
 def sid_reg_event_factory(reg, descr, voicenum=None, otherreg=None):
     return SidRegEvent(reg, descr, voicenum=voicenum, otherreg=otherreg)
 
@@ -152,6 +152,18 @@ class SidVoiceRegStateMiddle(SidRegHandler):
        'pulse',
        'noise',
     ]
+
+    def __init__(self, voicenum):
+        super(SidVoiceRegStateMiddle, self).__init__(voicenum)
+        self.voicenum = voicenum
+        self.gate = None
+        self.sync = None
+        self.ring = None
+        self.test = None
+        self.attack = None
+        self.decay = None
+        self.sustain = None
+        self.release = None
 
     def waveforms(self):
         return {waveform for waveform in ('triangle', 'sawtooth', 'pulse', 'noise') if getattr(self, waveform, None)}
@@ -334,7 +346,14 @@ class SidRegStateMiddle(SidRegStateBase):
         'voices',
         'reg_voicenum',
         'regstate',
+        'mainreg',
     ]
+
+    def __init__(self, instance=0):
+        super(SidRegStateMiddle, self).__init__(instance)
+        self.voices = {}
+        self.reg_voicenum = {}
+        self.mainreg = None
 
     def gates_on(self):
         return {voicenum for voicenum in self.voices if self.voices[voicenum].gate_on()}
@@ -365,8 +384,6 @@ class SidRegState(SidRegStateMiddle):
     def __init__(self, instance=0):
         super(SidRegState, self).__init__(instance)
         self._reghandlers = {}
-        self.voices = {}
-        self.reg_voicenum = {}
         for voicenum in VOICES:
             voice = SidVoiceRegState(voicenum)
             regbase = voice.regbase()
@@ -403,7 +420,7 @@ class SidRegState(SidRegStateMiddle):
         return event
 
     def __str__(self):
-        return ' '.join((voicereg[voicenum].regdump() for voicenum in sorted(VOICES)) + (self.mainreg.regdump(),))
+        return ' '.join([self.voices[voicenum].regdump() for voicenum in sorted(VOICES)] + [self.mainreg.regdump()])
 
 
 class FrozenSidVoiceRegState(SidVoiceRegStateMiddle):

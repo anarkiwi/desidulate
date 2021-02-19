@@ -9,7 +9,7 @@
 import gzip
 import os
 
-from sidreg import VOICES, SidRegState, frozen_sid_state_factory
+from sidreg import VOICES, SidRegState, SidRegEvent, frozen_sid_state_factory
 
 class SidWrap:
 
@@ -106,7 +106,7 @@ def debug_reg_writes(sid, reg_writes, consolidate_mb_clock=10):
     raw_regevents = []
     for clock, reg, val in reg_writes:
         regevent = state.set(reg, val)
-        regs = [state.mainreghandler] + [state.voices[i] for i in state.voices]
+        regs = [state.mainreg] + [state.voices[i] for i in state.voices]
         regdumps = tuple([reg.regdump() for reg in regs])
         active_voices = ','.join((str(voicenum) for voicenum in sorted(state.gates_on())))
         raw_regevents.append((clock, reg, val) + (active_voices,) + regdumps + (regevent,))
@@ -118,12 +118,12 @@ def debug_reg_writes(sid, reg_writes, consolidate_mb_clock=10):
         except IndexError:
             next_regevents = None
         descr = ''
-        if regevent:
+        if isinstance(regevent, SidRegEvent):
             descr = regevent.descr
         if next_regevents:
             next_clock = next_regevents[0]
             next_regevent = next_regevents[-1]
-            if next_regevent and regevent and next_regevent.reg == regevent.otherreg and next_clock - clock < consolidate_mb_clock:
+            if next_regevent and isinstance(regevent, SidRegEvent) and next_regevent.reg == regevent.otherreg and next_clock - clock < consolidate_mb_clock:
                 descr = ''
         line_items = (
             '%9u' % clock,
@@ -157,12 +157,12 @@ def get_events(writes, voicemask=VOICES):
 
 # consolidate events across multiple byte writes (e.g. collapse update of voice frequency to one event)
 def get_consolidated_changes(writes, voicemask=VOICES, reg_write_clock_timeout=64):
-    pendingevent = None
+    pendingevent = []
     consolidated = []
     for event in get_events(writes, voicemask=voicemask):
         clock, _, _, regevent, state = event
         event = (clock, regevent, state)
-        if pendingevent is not None:
+        if pendingevent:
             pendingclock, pendingregevent, _pendingstate = pendingevent
             age = clock - pendingclock
             if age > reg_write_clock_timeout:

@@ -137,20 +137,21 @@ class SidSoundEvent:
 
         first_row = {'clock': 0}
         fieldnames = ['clock']
-        for voicenum in voicenums:
-            voicestate = first_state.voices[voicenum]
-            for field in voicestate.voice_regs:
-                val = getattr(voicestate, field)
-                field = '%s%u' % (field, self.normalize_voicenum(voicenum))
+        if first_state:
+            for voicenum in voicenums:
+                voicestate = first_state.voices[voicenum]
+                for field in voicestate.voice_regs:
+                    val = getattr(voicestate, field)
+                    field = '%s%u' % (field, self.normalize_voicenum(voicenum))
+                    fieldnames.append(field)
+                    first_row[field] = val
+            for field in first_state.mainreg.filter_common:
+                val = getattr(first_state.mainreg, field)
                 fieldnames.append(field)
                 first_row[field] = val
-        for field in first_state.mainreg.filter_common:
-            val = getattr(first_state.mainreg, field)
-            fieldnames.append(field)
-            first_row[field] = val
-        filter_voice_key = 'filter_voice%u' % self.normalize_voicenum(self.voicenum)
-        fieldnames.append(filter_voice_key)
-        first_row[filter_voice_key] = getattr(first_state.mainreg, 'filter_voice%u' % self.voicenum)
+            filter_voice_key = 'filter_voice%u' % self.normalize_voicenum(self.voicenum)
+            fieldnames.append(filter_voice_key)
+            first_row[filter_voice_key] = getattr(first_state.mainreg, 'filter_voice%u' % self.voicenum)
 
         buffer = io.StringIO()
         writer = csv.DictWriter(buffer, fieldnames=fieldnames)
@@ -226,7 +227,7 @@ for (ext, patches) in (('single_patches.txt', single_patches), ('multi_patches.t
     first_csv_txt = list(patches.values())[0]
     reader = csv.DictReader(io.StringIO(first_csv_txt))
     first_row = next(reader)
-    fieldnames = reader.fieldnames
+    fieldnames = list(reader.fieldnames)
 
     with open(out_filename, 'w') as f:
         writer = csv.DictWriter(f, fieldnames=['hashid', 'count'] + fieldnames, dialect='unix', quoting=csv.QUOTE_NONE)

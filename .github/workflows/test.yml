@@ -1,0 +1,10 @@
+name: test
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: build 
+      run: |
+        ./build.sh && for s in ./reg2*py ; do $s --help ; done && sudo pip3 install -U attrs wheel pytype pylint && pylint -E *py && pytype -k *py
