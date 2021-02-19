@@ -35,7 +35,7 @@ class SidRegEvent:
         return self.__str__()
 
 
-@lru_cache
+@lru_cache(maxsize=None)
 def sid_reg_event_factory(reg, descr, voicenum=None, otherreg=None):
     return SidRegEvent(reg, descr, voicenum=voicenum, otherreg=otherreg)
 
