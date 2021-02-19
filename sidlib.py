@@ -157,12 +157,12 @@ def get_events(writes, voicemask=VOICES):
 
 # consolidate events across multiple byte writes (e.g. collapse update of voice frequency to one event)
 def get_consolidated_changes(writes, voicemask=VOICES, reg_write_clock_timeout=64):
-    pendingevent = None
+    pendingevent = []
     consolidated = []
     for event in get_events(writes, voicemask=voicemask):
         clock, _, _, regevent, state = event
         event = (clock, regevent, state)
-        if pendingevent is not None:
+        if pendingevent:
             pendingclock, pendingregevent, _pendingstate = pendingevent
             age = clock - pendingclock
             if age > reg_write_clock_timeout:
