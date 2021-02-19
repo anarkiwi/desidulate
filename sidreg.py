@@ -420,7 +420,7 @@ class SidRegState(SidRegStateMiddle):
         return event
 
     def __str__(self):
-        return ' '.join((self.voices[voicenum].regdump() for voicenum in sorted(VOICES)) + (self.mainreg.regdump(),))
+        return ' '.join([self.voices[voicenum].regdump() for voicenum in sorted(VOICES)] + [self.mainreg.regdump()])
 
 
 class FrozenSidVoiceRegState(SidVoiceRegStateMiddle):
