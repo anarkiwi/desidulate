@@ -9,7 +9,7 @@
 # https://www.c64-wiki.com/wiki/SID
 
 import copy
-from functools import lru_cache, cached_property
+from functools import lru_cache
 
 VOICES = {1, 2, 3}
 
@@ -403,7 +403,7 @@ class SidRegState(SidRegStateMiddle):
         return event
 
     def __str__(self):
-        return ' '.join((voicereg[voicenum].regdump() for voicenum in sorted(VOICES)) + (self.mainreg.regdump(),))
+        return ' '.join((self.voices[voicenum].regdump() for voicenum in sorted(VOICES)) + (self.mainreg.regdump(),))
 
 
 class FrozenSidVoiceRegState(SidVoiceRegStateMiddle):
