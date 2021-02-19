@@ -9,7 +9,7 @@
 import gzip
 import os
 
-from sidreg import VOICES, SidRegState, frozen_sid_state_factory
+from sidreg import VOICES, SidRegState, SidRegEvent, frozen_sid_state_factory
 
 class SidWrap:
 
@@ -118,12 +118,12 @@ def debug_reg_writes(sid, reg_writes, consolidate_mb_clock=10):
         except IndexError:
             next_regevents = None
         descr = ''
-        if regevent:
+        if isinstance(regevent, SidRegEvent):
             descr = regevent.descr
         if next_regevents:
             next_clock = next_regevents[0]
             next_regevent = next_regevents[-1]
-            if next_regevent and regevent and next_regevent.reg == regevent.otherreg and next_clock - clock < consolidate_mb_clock:
+            if next_regevent and isinstance(regevent, SidRegEvent) and next_regevent.reg == regevent.otherreg and next_clock - clock < consolidate_mb_clock:
                 descr = ''
         line_items = (
             '%9u' % clock,
