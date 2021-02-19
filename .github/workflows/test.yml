@@ -7,5 +7,4 @@ jobs:
     - uses: actions/checkout@v2
     - name: build 
       run: |
-        ./build.sh && for s in ./reg2*py ; do $s --help ; done && sudo pip3 install pytype pylint && pylint -E *py
-
+        ./build.sh && for s in ./reg2*py ; do $s --help ; done && sudo pip3 install pytype pylint && pylint -E *py && pytype -k *py
