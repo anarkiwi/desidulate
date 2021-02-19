@@ -8,7 +8,7 @@ desidulate is intended to help new SID composers understand the SID more quickly
 
 ## Installing
 
-$ pip3 install -r requirements.txt
+$ ./build.sh
 
 
 ## Transcribing to a MIDI file
