@@ -129,7 +129,7 @@ class SidSoundEvent:
                     diff.update(filter_diff)
                 clock_diff = clock - event_start
                 frame_clock = sid.nearest_frame_clock(clock_diff)
-                orig_diffs[frame_clock].append(diff)
+                orig_diffs[frame_clock].append((clock, diff))
             last_clock = clock
             last_state = state
         self.noisephases = len([waveforms for waveforms in self.waveform_order if 'noise' in waveforms])
@@ -157,10 +157,10 @@ class SidSoundEvent:
         writer = csv.DictWriter(buffer, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerow(first_row)
-        for frame_clock, diffs in orig_diffs.items():
+        for frame_clock, clock_diffs in orig_diffs.items():
             row = {'clock': frame_clock}
             full_diff = {}
-            for diff in diffs:
+            for clock, diff in clock_diffs:
                 for field, val in diff.items():
                     if field not in full_diff:
                         full_diff[field] = val
