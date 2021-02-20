@@ -32,7 +32,6 @@ pal_parser.add_argument('--ntsc', dest='pal', action='store_false', help='Use NT
 parser.set_defaults(pal=True, percussion=True)
 args = parser.parse_args()
 
-clock_consolidate = 256
 single_patches = {}
 multi_patches = {}
 patch_count = Counter()
@@ -128,8 +127,9 @@ class SidSoundEvent:
                         del filter_diff[filter_voice_key]
                         filter_diff['filter_voice%u' % self.normalize_voicenum(self.voicenum)] = val
                     diff.update(filter_diff)
-                clock_diff = round((clock - event_start) / clock_consolidate) * clock_consolidate
-                orig_diffs[clock_diff].append(diff)
+                clock_diff = clock - event_start
+                frame_clock = sid.nearest_frame_clock(clock_diff)
+                orig_diffs[frame_clock].append((clock, diff))
             last_clock = clock
             last_state = state
         self.noisephases = len([waveforms for waveforms in self.waveform_order if 'noise' in waveforms])
@@ -157,17 +157,15 @@ class SidSoundEvent:
         writer = csv.DictWriter(buffer, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerow(first_row)
-        for clock, diffs in orig_diffs.items():
-            row = {'clock': clock}
-            full_diff = {}
-            for diff in diffs:
-                for field, val in diff.items():
-                    if field not in full_diff:
-                        full_diff[field] = val
-                    else:
-                        full_diff[field] += val
-            row.update(full_diff)
-            writer.writerow(row)
+        for frame_clock, clock_diffs in orig_diffs.items():
+            first_clock = None
+            for clock, diff in clock_diffs:
+                if first_clock is None:
+                    diff['clock'] = frame_clock
+                    first_clock = clock
+                else:
+                    diff['clock'] = clock - first_clock
+                writer.writerow(diff)
         csv_txt = buffer.getvalue()
         hash_csv_txt = hash(csv_txt)
         if len(voicenums) == 1:
