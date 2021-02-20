@@ -23,19 +23,19 @@ $ x64sc -sounddev dump /path/to/sid/or/game.d64
 
 2. Generate MIDI file (by default, generates reg2mid.mid in current directory).
 
-$ ./reg2mid.py --logfile=vicesnd.sid
+$ ./reg2mid.py vicesnd.sid
 
 
 ## Transcribing to a WAV file
 
 desidulate can generate a WAV file from a ReSID based SID simulation directly from a VICE register dump. This allows the composer to write SID music by directly inputting SID registers (either manually or perhaps from a progressive algorithm) without having to deal with a C64 emulator or an intervening MIDI translation layer (like a SIDStation) that is convenient but also limits expression.
 
-$ ./reg2wav.py --logfile=vicesnd.sid
+$ ./reg2wav.py vicesnd.sid
 
 
 ## Analyzing a VICE register dump
 
-$ ./reg2log.py --logfile=vicesnd.sid
+$ ./reg2log.py vicesnd.sid
 
 desidulate can parse a log file and parse SID state, automatically discarding register writes that do not change the SID state, and provide detailed text output of how the SID is being programmed.
 

@@ -154,8 +154,6 @@ class SidVoiceRegStateMiddle(SidRegHandler):
     ]
 
     def __init__(self, voicenum):
-        super(SidVoiceRegStateMiddle, self).__init__(voicenum)
-        self.voicenum = voicenum
         self.gate = None
         self.sync = None
         self.ring = None
@@ -164,6 +162,8 @@ class SidVoiceRegStateMiddle(SidRegHandler):
         self.decay = None
         self.sustain = None
         self.release = None
+        super(SidVoiceRegStateMiddle, self).__init__(voicenum)
+        self.voicenum = voicenum
 
     def waveforms(self):
         return {waveform for waveform in ('triangle', 'sawtooth', 'pulse', 'noise') if getattr(self, waveform, None)}
