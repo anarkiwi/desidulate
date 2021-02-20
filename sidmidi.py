@@ -108,7 +108,7 @@ class SidMidiFile:
     def write_pitches(self, smf_track, channel, program, voice_pitch_data):
         track = midi.MidiTrack(smf_track)
         self.add_program_change(track, channel, program)
-        last_pitch_data = None
+        last_pitch_data = tuple()
         deoverlapped = []
         for pitch_data in voice_pitch_data:
             if last_pitch_data:
