@@ -164,7 +164,7 @@ class SidSoundEvent:
                     diff['clock'] = frame_clock
                     first_clock = clock
                 else:
-                    diff['clock'] = clock - first_clock
+                    diff['clock'] = frame_clock + (clock - first_clock)
                 writer.writerow(diff)
         csv_txt = buffer.getvalue()
         hash_csv_txt = hash(csv_txt)
