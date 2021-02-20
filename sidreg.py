@@ -174,16 +174,8 @@ class SidVoiceRegStateMiddle(SidRegHandler):
     def any_waveform(self):
         return bool(self.waveforms())
 
-    def gate_on(self):
-        # https://codebase64.org/doku.php?id=base:classic_hard-restart_and_about_adsr_in_generally
-        if self.test:
-            return False
-        if not self.gate:
-            return False
-        return True
-
     def in_release(self):
-        return self.release > 0 and not self.gate_on()
+        return self.release > 0 and not self.gate
 
     def synced_voicenums(self):
         voicenums = set()
@@ -356,7 +348,7 @@ class SidRegStateMiddle(SidRegStateBase):
         self.mainreg = None
 
     def gates_on(self):
-        return {voicenum for voicenum in self.voices if self.voices[voicenum].gate_on()}
+        return {voicenum for voicenum in self.voices if self.voices[voicenum].gate}
 
     def audible_voicenums(self):
         audible = copy.copy(VOICES)
