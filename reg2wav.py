@@ -12,7 +12,7 @@ from sidwav import get_sid, make_wav_from_reg
 
 
 parser = argparse.ArgumentParser(description='Convert vicesnd.sid log into a WAV file')
-parser.add_argument('--logfile', default='vicesnd.sid', help='log file to read')
+parser.add_argument('logfile', default='vicesnd.sid', help='log file to read')
 parser.add_argument('--wavfile', default='reg2wav.wav', help='WAV file to write')
 parser.add_argument('--voicemask', default=','.join((str(v) for v in VOICES)), help='command separated list of SID voices to use')
 parser.add_argument('--minclock', default=0, type=int, help='start rendering from this clock value')

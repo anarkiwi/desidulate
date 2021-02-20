@@ -15,7 +15,7 @@ from sidlib import debug_reg_writes, get_consolidated_changes, get_reg_changes, 
 
 
 parser = argparse.ArgumentParser(description='Debug a vicesnd.sid log file')
-parser.add_argument('--logfile', default='vicesnd.sid', help='log file to read')
+parser.add_argument('logfile', default='vicesnd.sid', help='log file to read')
 parser.add_argument('--logoutfile', default='', help='if defined, output only register changes to this file in vicesnd.sid format')
 parser.add_argument('--voicemask', default=','.join((str(v) for v in VOICES)), help='command separated list of SID voices to use')
 parser.add_argument('--minclock', default=0, type=int, help='start rendering from this clock value')

@@ -18,7 +18,7 @@ from sidmidi import midi_path, out_path, SidMidiFile, ELECTRIC_SNARE, BASS_DRUM,
 
 
 parser = argparse.ArgumentParser(description='Convert vicesnd.sid log into a MIDI file')
-parser.add_argument('--logfile', default='vicesnd.sid', help='log file to read')
+parser.add_argument('logfile', default='vicesnd.sid', help='log file to read')
 parser.add_argument('--midifile', default='', help='MIDI file to write')
 parser.add_argument('--voicemask', default=','.join((str(v) for v in VOICES)), help='command separated list of SID voices to use')
 parser.add_argument('--minclock', default=0, type=int, help='start rendering from this clock value')
