@@ -32,7 +32,6 @@ pal_parser.add_argument('--ntsc', dest='pal', action='store_false', help='Use NT
 parser.set_defaults(pal=True, percussion=True)
 args = parser.parse_args()
 
-clock_consolidate = 256
 single_patches = {}
 multi_patches = {}
 patch_count = Counter()
@@ -128,8 +127,7 @@ class SidSoundEvent:
                         del filter_diff[filter_voice_key]
                         filter_diff['filter_voice%u' % self.normalize_voicenum(self.voicenum)] = val
                     diff.update(filter_diff)
-                clock_diff = round((clock - event_start) / clock_consolidate) * clock_consolidate
-                # new_clock_diff = round((985248.0 / 50) / clock_diff) * (985248.0 / 50)
+                clock_diff = sid.nearest_frame_clock(clock - event_start)
                 orig_diffs[clock_diff].append(diff)
             last_clock = clock
             last_state = state
