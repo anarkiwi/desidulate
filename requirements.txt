@@ -1,4 +1,4 @@
-midiutil
+music21
 numpy
 pyresidfp
 scipy

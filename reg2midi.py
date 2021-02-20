@@ -180,24 +180,25 @@ class SidSoundEvent:
         return len(self.midi_pitches) > 2 and self.midi_pitches[0] > self.midi_pitches[-1]
 
     def smf_transcribe(self):
+        # voicenum, clock, duration, pitch, velocity
         if self.noisephases:
             if self.percussion:
                 if self.all_noise:
                     for clock, _pitch, duration, velocity, _ in self.midi_notes:
-                        self.smf.add_drum_noise_duration(clock, velocity, duration, self.voicenum)
+                        self.smf.add_drum_noise_duration(self.voicenum, clock, duration, velocity)
                 elif self.noisephases > 1:
                     for clock, _pitch, _duration, velocity, _ in self.midi_notes:
-                        self.smf.add_drum_pitch(clock, ELECTRIC_SNARE, velocity, self.total_duration, self.voicenum)
+                        self.smf.add_drum_pitch(self.voicenum, clock, self.total_duration, ELECTRIC_SNARE, velocity)
                 else:
                     clock, _pitch, _dutation, velocity, _ = self.midi_notes[0]
                     if self.descending_pitches():
                         # http://www.ucapps.de/howto_sid_wavetables_1.html
-                        self.smf.add_drum_pitch(clock, BASS_DRUM, velocity, self.total_duration, self.voicenum)
+                        self.smf.add_drum_pitch(self.voicenum, clock, self.total_duration, BASS_DRUM, velocity)
                     else:
-                        self.smf.add_drum_pitch(clock, LOW_TOM, velocity, self.total_duration, self.voicenum)
+                        self.smf.add_drum_pitch(self.voicenum, clock, self.total_duration, LOW_TOM, velocity)
         else:
             for clock, pitch, duration, velocity, _ in self.midi_notes:
-                self.smf.add_pitch(clock, pitch, velocity, duration, self.voicenum)
+                self.smf.add_pitch(self.voicenum, clock, duration, pitch, velocity)
 
 
 voicemask = set((int(v) for v in args.voicemask.split(',')))
