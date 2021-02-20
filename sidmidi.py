@@ -66,8 +66,10 @@ class SidMidiFile:
         smf.addTempo(smf_track, time=0, tempo=self.bpm)
         smf.addProgramChange(smf_track, channel, time=0, program=program)
         for pitch_data in voice_pitch_data:
-            pitch, qn_clock, qn_duration, velocity = pitch_data
+            pitch, clock, duration, velocity = pitch_data
             assert velocity
+            qn_clock = clock_to_qn(self.sid, clock, self.bpm)
+            qn_duration = clock_to_qn(self.sid, duration, self.bpm)
             smf.addNote(smf_track, channel, pitch, qn_clock, qn_duration, velocity)
 
     def write(self, file_name):
@@ -100,14 +102,10 @@ class SidMidiFile:
         return (closest_midi_f, MIDI_F_TO_N[closest_midi_f])
 
     def add_pitch(self, clock, pitch, velocity, duration, voicenum):
-        qn_clock = clock_to_qn(self.sid, clock, self.bpm)
-        qn_duration = clock_to_qn(self.sid, duration, self.bpm)
-        self.pitches[voicenum].append((pitch, qn_clock, qn_duration, velocity))
+        self.pitches[voicenum].append((pitch, clock, duration, velocity))
 
     def add_drum_pitch(self, clock, pitch, velocity, duration, voicenum):
-        qn_clock = clock_to_qn(self.sid, clock, self.bpm)
-        qn_duration = clock_to_qn(self.sid, duration, self.bpm)
-        self.drum_pitches[voicenum].append((pitch, qn_clock, qn_duration, velocity))
+        self.drum_pitches[voicenum].append((pitch, clock, duration, velocity))
 
     def add_drum_noise_duration(self, clock, velocity, duration, voicenum):
         max_duration = self.clockq
@@ -121,6 +119,7 @@ class SidMidiFile:
     def sid_adsr_to_velocity(self, voice_state):
         vel_nib = voice_state.sustain
         # Sustain approximates velocity, but if it's 0, then go with decay.
+        # TODO: could use time in attack?
         if vel_nib == 0:
             # assert voice_state.attack == 0
             vel_nib = voice_state.decay
