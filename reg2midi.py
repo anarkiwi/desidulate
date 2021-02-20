@@ -98,7 +98,7 @@ class SidSoundEvent:
         self.min_midi_note = min(self.midi_pitches)
         last_clock = None
         rel_clock = 0
-        assert self.voicestates[0][1].gate_on()
+        assert self.voicestates[0][1].gate
         orig_diffs = defaultdict(list)
         last_state = None
         first_state = None
