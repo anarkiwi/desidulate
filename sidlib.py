@@ -8,6 +8,7 @@
 
 import gzip
 import os
+from functools import lru_cache
 
 from sidreg import VOICES, SidRegState, SidRegEvent, frozen_sid_state_factory
 
@@ -33,6 +34,16 @@ class SidWrap:
     def real_sid_freq(self, freq_reg):
         # http://www.sidmusic.org/sid/sidtech2.html
         return freq_reg * self.clock_frequency / 16777216
+
+    @lru_cache(maxsize=None)
+    def frame_length(self):
+        return self.clock_frequency / self.int_freq
+
+    def clock_frame(self, clock):
+        return round(clock / self.frame_length())
+
+    def nearest_frame_clock(self, clock):
+        return round(self.clock_frame(clock) * self.frame_length())
 
 
 def get_sid(pal):
