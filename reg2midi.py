@@ -127,8 +127,9 @@ class SidSoundEvent:
                         del filter_diff[filter_voice_key]
                         filter_diff['filter_voice%u' % self.normalize_voicenum(self.voicenum)] = val
                     diff.update(filter_diff)
-                clock_diff = sid.nearest_frame_clock(clock - event_start)
-                orig_diffs[clock_diff].append(diff)
+                clock_diff = clock - event_start
+                frame_clock = sid.nearest_frame_clock(clock_diff)
+                orig_diffs[frame_clock].append(diff)
             last_clock = clock
             last_state = state
         self.noisephases = len([waveforms for waveforms in self.waveform_order if 'noise' in waveforms])
@@ -156,8 +157,8 @@ class SidSoundEvent:
         writer = csv.DictWriter(buffer, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerow(first_row)
-        for clock, diffs in orig_diffs.items():
-            row = {'clock': clock}
+        for frame_clock, diffs in orig_diffs.items():
+            row = {'clock': frame_clock}
             full_diff = {}
             for diff in diffs:
                 for field, val in diff.items():
