@@ -158,16 +158,14 @@ class SidSoundEvent:
         writer.writeheader()
         writer.writerow(first_row)
         for frame_clock, clock_diffs in orig_diffs.items():
-            row = {'clock': frame_clock}
-            full_diff = {}
+            first_clock = None
             for clock, diff in clock_diffs:
-                for field, val in diff.items():
-                    if field not in full_diff:
-                        full_diff[field] = val
-                    else:
-                        full_diff[field] += val
-            row.update(full_diff)
-            writer.writerow(row)
+                if first_clock is None:
+                    diff['clock'] = frame_clock
+                    first_clock = clock
+                else:
+                    diff['clock'] = clock - first_clock
+                writer.writerow(diff)
         csv_txt = buffer.getvalue()
         hash_csv_txt = hash(csv_txt)
         if len(voicenums) == 1:
