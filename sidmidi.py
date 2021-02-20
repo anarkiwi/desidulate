@@ -8,7 +8,6 @@
 import os
 from collections import defaultdict
 from music21 import midi
-from sidlib import real_sid_freq, clock_to_ticks
 
 
 A = 440
@@ -87,7 +86,7 @@ class SidMidiFile:
         track.updateEvents()
 
     def clock_to_ticks(self, clock):
-        return clock_to_ticks(self.sid, clock, self.bpm, self.tpqn)
+        return self.sid.clock_to_ticks(clock, self.bpm, self.tpqn)
 
     def add_note(self, track, channel, pitch, velocity, last_clock, clock, duration):
         note_on = self.make_event(track, midi.ChannelVoiceMessages.NOTE_ON, channel)
@@ -191,7 +190,7 @@ class SidMidiFile:
             clock = int(clock / clockq) * clockq
             voicenum = regevent.voicenum
             voice_state = state.voices[voicenum]
-            sid_f = real_sid_freq(sid, voice_state.frequency)
+            sid_f = sid.real_sid_freq(voice_state.frequency)
             _closest_midi_f, closest_midi_n = self.closest_midi(sid_f)
             velocity = self.sid_adsr_to_velocity(voice_state)
             # TODO: add pitch bend if significantly different to canonical note.

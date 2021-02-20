@@ -129,6 +129,7 @@ class SidSoundEvent:
                         filter_diff['filter_voice%u' % self.normalize_voicenum(self.voicenum)] = val
                     diff.update(filter_diff)
                 clock_diff = round((clock - event_start) / clock_consolidate) * clock_consolidate
+                # new_clock_diff = round((985248.0 / 50) / clock_diff) * (985248.0 / 50)
                 orig_diffs[clock_diff].append(diff)
             last_clock = clock
             last_state = state

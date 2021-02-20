@@ -16,26 +16,28 @@ class SidWrap:
     def __init__(self, pal):
         if pal:
             self.clock_frequency = 985248.0 # SoundInterfaceDevice.PAL_CLOCK_FREQUENCY
+            self.int_freq = 50.0
         else:
             self.clock_frequency = 1022730.0 # SoundInterfaceDevice.NTSC_CLOCK_FREQUENCY
+            self.int_freq = 60.0
+
+    def clock_to_s(self, clock):
+        return clock / self.clock_frequency
+
+    def clock_to_qn(self, clock, bpm):
+        return self.clock_to_s(clock) * bpm / 60
+
+    def clock_to_ticks(self, clock, bpm, tpqn):
+        return self.clock_to_qn(clock, bpm) * tpqn
+
+    def real_sid_freq(self, freq_reg):
+        # http://www.sidmusic.org/sid/sidtech2.html
+        return freq_reg * self.clock_frequency / 16777216
 
 
 def get_sid(pal):
     return SidWrap(pal)
 
-
-# http://www.sidmusic.org/sid/sidtech2.html
-def real_sid_freq(sid, freq_reg):
-    return freq_reg * sid.clock_frequency / 16777216
-
-def clock_to_s(sid, clock):
-    return clock / sid.clock_frequency
-
-def clock_to_qn(sid, clock, bpm):
-    return clock_to_s(sid, clock) * bpm / 60
-
-def clock_to_ticks(sid, clock, bpm, tpqn):
-    return clock_to_qn(sid, clock, bpm) * tpqn
 
 def file_reader(snd_log_name):
     snd_log_name = os.path.expanduser(snd_log_name)
@@ -130,7 +132,7 @@ def debug_reg_writes(sid, reg_writes, consolidate_mb_clock=10):
                 descr = ''
         line_items = (
             '%9u' % clock,
-            '%6.2f' % clock_to_s(sid, clock),
+            '%6.2f' % sid.clock_to_s(clock),
             '%2u' % reg,
             '%3u' % val,
             '%6s' % active_voices,
