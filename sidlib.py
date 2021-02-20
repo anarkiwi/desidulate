@@ -34,6 +34,9 @@ def clock_to_s(sid, clock):
 def clock_to_qn(sid, clock, bpm):
     return clock_to_s(sid, clock) * bpm / 60
 
+def clock_to_ticks(sid, clock, bpm, tpqn):
+    return clock_to_qn(sid, clock, bpm) * tpqn
+
 def file_reader(snd_log_name):
     snd_log_name = os.path.expanduser(snd_log_name)
     if snd_log_name.endswith('.gz'):
