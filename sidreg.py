@@ -11,7 +11,8 @@
 import copy
 from functools import lru_cache
 
-VOICES = {1, 2, 3}
+VOICES = frozenset([1, 2, 3])
+
 
 class SidRegEvent:
 
@@ -137,18 +138,18 @@ class SidRegHandler(SidRegStateBase):
 class SidVoiceRegStateMiddle(SidRegHandler):
 
     voice_regs = [
-       'frequency',
+       'freq',
        'pw_duty',
-       'attack',
-       'decay',
-       'sustain',
-       'release',
+       'atk',
+       'dec',
+       'sus',
+       'rel',
        'gate',
        'sync',
        'ring',
        'test',
-       'triangle',
-       'sawtooth',
+       'tri',
+       'saw',
        'pulse',
        'noise',
     ]
@@ -158,15 +159,15 @@ class SidVoiceRegStateMiddle(SidRegHandler):
         self.sync = None
         self.ring = None
         self.test = None
-        self.attack = None
-        self.decay = None
-        self.sustain = None
-        self.release = None
+        self.atk = None
+        self.dec = None
+        self.sus = None
+        self.rel = None
         super(SidVoiceRegStateMiddle, self).__init__(voicenum)
         self.voicenum = voicenum
 
     def waveforms(self):
-        return {waveform for waveform in ('triangle', 'sawtooth', 'pulse', 'noise') if getattr(self, waveform, None)}
+        return {waveform for waveform in ('tri', 'saw', 'pulse', 'noise') if getattr(self, waveform, None)}
 
     def flat_waveforms(self):
         return tuple(sorted(self.waveforms()))
@@ -174,8 +175,8 @@ class SidVoiceRegStateMiddle(SidRegHandler):
     def any_waveform(self):
         return bool(self.waveforms())
 
-    def in_release(self):
-        return self.release > 0 and not self.gate
+    def in_rel(self):
+        return self.rel > 0 and not self.gate
 
     def synced_voicenums(self):
         voicenums = set()
@@ -190,18 +191,18 @@ class SidVoiceRegStateMiddle(SidRegHandler):
 class SidVoiceRegState(SidVoiceRegStateMiddle):
 
     __slots__ = [
-       'frequency',
+       'freq',
        'pw_duty',
-       'decay',
-       'attack',
-       'sustain',
-       'release',
+       'dec',
+       'atk',
+       'sus',
+       'rel',
        'gate',
        'sync',
        'ring',
        'test',
-       'triangle',
-       'sawtooth',
+       'tri',
+       'saw',
        'pulse',
        'noise',
        'voicenum',
@@ -218,14 +219,14 @@ class SidVoiceRegState(SidVoiceRegStateMiddle):
             2: self._pwduty,
             3: self._pwduty,
             4: self._control,
-            5: self._attack_decay,
-            6: self._sustain_release,
+            5: self._atk_dec,
+            6: self._sus_rel,
         }
         super(SidVoiceRegState, self).__init__(voicenum)
         self.voicenum = voicenum
 
     def _freq_descr(self):
-        return self.lohi_attr(0, 1, 'frequency')
+        return self.lohi_attr(0, 1, 'freq')
 
     def _freq(self, reg):
         return (self._freq_descr(), {0, 1} - {reg})
@@ -236,23 +237,23 @@ class SidVoiceRegState(SidVoiceRegStateMiddle):
     def _pwduty(self, reg):
         return (self._pwduty_descr(), {2, 3} - {reg})
 
-    def _attack_decay_descr(self):
-        return self.byte2nib_literal(5, 'decay', 'attack')
+    def _atk_dec_descr(self):
+        return self.byte2nib_literal(5, 'dec', 'atk')
 
-    def _attack_decay(self, _):
-        return (self._attack_decay_descr(), None)
+    def _atk_dec(self, _):
+        return (self._atk_dec_descr(), None)
 
-    def _sustain_release_descr(self):
-        return self.byte2nib_literal(6, 'release', 'sustain')
+    def _sus_rel_descr(self):
+        return self.byte2nib_literal(6, 'rel', 'sus')
 
-    def _sustain_release(self, _):
-        return (self._sustain_release_descr(), None)
+    def _sus_rel(self, _):
+        return (self._sus_rel_descr(), None)
 
     def _control_descr(self):
         val = self.regstate[4]
         return self.decodebits(val, {
             0: 'gate', 1: 'sync', 2: 'ring', 3: 'test',
-            4: 'triangle', 5: 'sawtooth', 6: 'pulse', 7: 'noise'})
+            4: 'tri', 5: 'saw', 6: 'pulse', 7: 'noise'})
 
     def _control(self, _):
         return (self._control_descr(), None)
@@ -264,23 +265,29 @@ class SidFilterMainRegStateMiddle(SidRegHandler):
     NAME = 'main'
 
     filter_common = [
-        'filter_res',
-        'filter_cutoff',
-        'filter_low',
-        'filter_band',
-        'filter_high',
+        'flt_res',
+        'flt_coff',
+        'flt_low',
+        'flt_band',
+        'flt_high',
     ]
 
     def voice_filtered(self, voicenum):
-        filter_attr = 'filter_voice%u' % voicenum
+        filter_attr = 'flt_v%u' % voicenum
         return getattr(self, filter_attr)
 
     def voice_muted(self, voicenum):
         mute_attr = 'mute_voice%u' % voicenum
         return bool(getattr(self, mute_attr, False))
 
+    def _voice_attrs(self, voicenum):
+        return ['flt_v%u' % voicenum] + self.filter_common
+
     def diff_filter(self, voicenum, other):
-        return self.diff_attr(self.filter_common + ['filter_voice%u' % voicenum], other)
+        return self.diff_attr(self._voice_attrs(voicenum), other)
+
+    def diff_filter_vol(self, voicenum, other):
+        return self.diff_attr(['vol'] + self._voice_attrs(voicenum), other)
 
 
 class SidFilterMainRegState(SidFilterMainRegStateMiddle):
@@ -288,16 +295,16 @@ class SidFilterMainRegState(SidFilterMainRegStateMiddle):
     __slots__ = [
         '_REGMAP',
         'vol',
-        'filter_res',
-        'filter_voice1',
-        'filter_voice2',
-        'filter_voice3',
-        'filter_external',
-        'filter_cutoff',
-        'filter_low',
-        'filter_band',
-        'filter_high',
-        'mute_voice3'
+        'flt_res',
+        'flt_v1',
+        'flt_v2',
+        'flt_v3',
+        'flt_ext',
+        'flt_coff',
+        'flt_low',
+        'flt_band',
+        'flt_high',
+        'mute3'
     ]
 
     def __init__(self, instance=0):
@@ -308,27 +315,27 @@ class SidFilterMainRegState(SidFilterMainRegStateMiddle):
             3: self._filtermain,
         }
         self.vol = 0
-        self.filter_res = 0
+        self.flt_res = 0
         super(SidFilterMainRegState, self).__init__(instance)
 
     def regbase(self):
         return self.REGBASE
 
     def _filtercutoff(self, reg):
-        return (self.lohi_attr(0, 1, 'filter_cutoff'), {0, 1} - {reg})
+        return (self.lohi_attr(0, 1, 'flt_coff'), {0, 1} - {reg})
 
     def _filterresonanceroute(self, _):
-        route, self.filter_res = self.byte2nib(2)
-        descr = {'filter_res': '%.2x' % self.filter_res}
+        route, self.flt_res = self.byte2nib(2)
+        descr = {'flt_res': '%.2x' % self.flt_res}
         descr.update(self.decodebits(route, {
-            0: 'filter_voice1', 1: 'filter_voice2', 2: 'filter_voice3', 3: 'filter_external'}))
+            0: 'flt_v1', 1: 'flt_v2', 2: 'flt_v3', 3: 'flt_ext'}))
         return (descr, None)
 
     def _filtermain(self, _):
         self.vol, filtcon = self.byte2nib(3)
         descr = {'main_vol': '%.2x' % self.vol}
         descr.update(self.decodebits(filtcon, {
-            0: 'filter_low', 1: 'filter_band', 2: 'filter_high', 3: 'mute_voice3'}))
+            0: 'flt_low', 1: 'flt_band', 2: 'flt_high', 3: 'mute3'}))
         return(descr, None)
 
 
@@ -418,18 +425,18 @@ class SidRegState(SidRegStateMiddle):
 class FrozenSidVoiceRegState(SidVoiceRegStateMiddle):
 
     __slots__ = [
-       'frequency',
+       'freq',
        'pw_duty',
-       'decay',
-       'attack',
-       'sustain',
-       'release',
+       'dec',
+       'atk',
+       'sus',
+       'rel',
        'gate',
        'sync',
        'ring',
        'test',
-       'triangle',
-       'sawtooth',
+       'tri',
+       'saw',
        'pulse',
        'noise',
        'voicenum',
@@ -453,16 +460,16 @@ class FrozenSidFilterMainRegState(SidFilterMainRegStateMiddle):
     __slots__ = [
         'instance',
         'vol',
-        'filter_res',
-        'filter_voice1',
-        'filter_voice2',
-        'filter_voice3',
-        'filter_external',
-        'filter_cutoff',
-        'filter_low',
-        'filter_band',
-        'filter_high',
-        'mute_voice3',
+        'flt_res',
+        'flt_v1',
+        'flt_v2',
+        'flt_v3',
+        'flt_ext',
+        'flt_coff',
+        'flt_low',
+        'flt_band',
+        'flt_high',
+        'mute3',
         'regstate',
    ]
 

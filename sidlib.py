@@ -16,14 +16,14 @@ class SidWrap:
 
     def __init__(self, pal):
         if pal:
-            self.clock_frequency = 985248.0 # SoundInterfaceDevice.PAL_CLOCK_FREQUENCY
+            self.clock_freq = 985248.0 # SoundInterfaceDevice.PAL_CLOCK_FREQUENCY
             self.int_freq = 50.0
         else:
-            self.clock_frequency = 1022730.0 # SoundInterfaceDevice.NTSC_CLOCK_FREQUENCY
+            self.clock_freq = 1022730.0 # SoundInterfaceDevice.NTSC_CLOCK_FREQUENCY
             self.int_freq = 60.0
 
     def clock_to_s(self, clock):
-        return clock / self.clock_frequency
+        return clock / self.clock_freq
 
     def clock_to_qn(self, clock, bpm):
         return self.clock_to_s(clock) * bpm / 60
@@ -33,11 +33,11 @@ class SidWrap:
 
     def real_sid_freq(self, freq_reg):
         # http://www.sidmusic.org/sid/sidtech2.html
-        return freq_reg * self.clock_frequency / 16777216
+        return freq_reg * self.clock_freq / 16777216
 
     @lru_cache(maxsize=None)
     def frame_length(self):
-        return self.clock_frequency / self.int_freq
+        return self.clock_freq / self.int_freq
 
     def clock_frame(self, clock):
         return round(clock / self.frame_length())
@@ -171,7 +171,7 @@ def get_events(writes, voicemask=VOICES):
     return events
 
 
-# consolidate events across multiple byte writes (e.g. collapse update of voice frequency to one event)
+# consolidate events across multiple byte writes (e.g. collapse update of voice freq to one event)
 def get_consolidated_changes(writes, voicemask=VOICES, reg_write_clock_timeout=64):
     pendingevent = []
     consolidated = []
@@ -237,7 +237,7 @@ def get_gate_events(reg_writes, voicemask):
                 else:
                     append_event(voicenum, event)
                 continue
-            if gate or voice_state.in_release():
+            if gate or voice_state.in_rel():
                 append_event(voicenum, event)
 
     for voicenum in voicemask:

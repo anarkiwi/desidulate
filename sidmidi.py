@@ -173,12 +173,12 @@ class SidMidiFile:
         self.add_drum_pitch(voicenum, clock, duration, noise_pitch, velocity)
 
     def sid_adsr_to_velocity(self, voice_state):
-        vel_nib = voice_state.sustain
-        # Sustain approximates velocity, but if it's 0, then go with decay.
-        # TODO: could use time in attack?
+        vel_nib = voice_state.sus
+        # Sustain approximates velocity, but if it's 0, then go with dec.
+        # TODO: could use time in atk?
         if vel_nib == 0:
-            # assert voice_state.attack == 0
-            vel_nib = voice_state.decay
+            # assert voice_state.atk == 0
+            vel_nib = voice_state.dec
         velocity = int(vel_nib / 15 * 127)
         return velocity
 
@@ -190,7 +190,7 @@ class SidMidiFile:
             clock = int(clock / clockq) * clockq
             voicenum = regevent.voicenum
             voice_state = state.voices[voicenum]
-            sid_f = sid.real_sid_freq(voice_state.frequency)
+            sid_f = sid.real_sid_freq(voice_state.freq)
             _closest_midi_f, closest_midi_n = self.closest_midi(sid_f)
             velocity = self.sid_adsr_to_velocity(voice_state)
             # TODO: add pitch bend if significantly different to canonical note.

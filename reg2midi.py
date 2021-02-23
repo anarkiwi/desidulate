@@ -37,7 +37,7 @@ multi_patches = {}
 patch_count = Counter()
 
 
-class SidSoundEvent:
+class SidSoundFragment:
 
     def __init__(self, percussion, sid, clockq, smf, voicenum, event_start, events):
         self.percussion = percussion
@@ -59,7 +59,7 @@ class SidSoundEvent:
     def trim_gateoff(self):
         for i, clock_voicestate_state in enumerate(self.voicestates):
             _, voicestate, state = clock_voicestate_state
-            if not voicestate.gate and not voicestate.release:
+            if not voicestate.gate and not voicestate.rel:
                 self.voicestates = self.voicestates[:i+1]
                 break
             if state.mainreg.voice_filtered(self.voicenum):
@@ -120,12 +120,12 @@ class SidSoundEvent:
                     voice_diff = {'%s%u' % (k, self.normalize_voicenum(voicenum)): v for k, v in voice_diff.items()}
                     diff.update(voice_diff)
                 if self.voice_filtered:
-                    filter_diff = state.mainreg.diff_filter(self.voicenum, last_state.mainreg)
-                    filter_voice_key = 'filter_voice%u' % self.voicenum
-                    val = filter_diff.get(filter_voice_key, None)
+                    filter_diff = state.mainreg.diff_filter_vol(self.voicenum, last_state.mainreg)
+                    flt_v_key = 'flt_v%u' % self.voicenum
+                    val = filter_diff.get(flt_v_key, None)
                     if val is not None:
-                        del filter_diff[filter_voice_key]
-                        filter_diff['filter_voice%u' % self.normalize_voicenum(self.voicenum)] = val
+                        del filter_diff[flt_v_key]
+                        filter_diff['flt_v%u' % self.normalize_voicenum(self.voicenum)] = val
                     diff.update(filter_diff)
                 clock_diff = clock - event_start
                 frame_clock = sid.nearest_frame_clock(clock_diff)
@@ -145,13 +145,13 @@ class SidSoundEvent:
                     field = '%s%u' % (field, self.normalize_voicenum(voicenum))
                     fieldnames.append(field)
                     first_row[field] = val
-            for field in first_state.mainreg.filter_common:
+            flt_v_key = 'flt_v%u' % self.normalize_voicenum(self.voicenum)
+            fieldnames.append(flt_v_key)
+            for field in first_state.mainreg.filter_common + ['vol']:
                 val = getattr(first_state.mainreg, field)
                 fieldnames.append(field)
                 first_row[field] = val
-            filter_voice_key = 'filter_voice%u' % self.normalize_voicenum(self.voicenum)
-            fieldnames.append(filter_voice_key)
-            first_row[filter_voice_key] = getattr(first_state.mainreg, 'filter_voice%u' % self.voicenum)
+            first_row[flt_v_key] = getattr(first_state.mainreg, 'flt_v%u' % self.voicenum)
 
         buffer = io.StringIO()
         writer = csv.DictWriter(buffer, fieldnames=fieldnames)
@@ -201,7 +201,7 @@ class SidSoundEvent:
 
 voicemask = set((int(v) for v in args.voicemask.split(',')))
 sid = get_sid(args.pal)
-clockq = sid.clock_frequency / 50
+clockq = sid.clock_freq / 50
 smf = SidMidiFile(sid, args.bpm, clockq)
 reg_writes = get_reg_changes(get_reg_writes(args.logfile), voicemask=voicemask, minclock=args.minclock, maxclock=args.maxclock)
 reg_writes_changes = get_consolidated_changes(reg_writes, voicemask)
@@ -209,7 +209,7 @@ mainevents, voiceevents = get_gate_events(reg_writes_changes, voicemask)
 
 for voicenum, gated_voice_events in voiceevents.items():
     for event_start, events in gated_voice_events:
-        sse = SidSoundEvent(args.percussion, sid, clockq, smf, voicenum, event_start, events)
+        sse = SidSoundFragment(args.percussion, sid, clockq, smf, voicenum, event_start, events)
         sse.parse()
         sse.smf_transcribe()
 

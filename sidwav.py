@@ -17,7 +17,7 @@ def get_sid(model=ChipModel.MOS8580, pal=True):
         freq = SoundInterfaceDevice.PAL_CLOCK_FREQUENCY
     else:
         freq = SoundInterfaceDevice.NTSC_CLOCK_FREQUENCY
-    return SoundInterfaceDevice(model=model, clock_frequency=freq)
+    return SoundInterfaceDevice(model=model, clock_freq=freq)
 
 
 def make_wav_from_reg(sid, writes, wav_file_name, padclock):
@@ -25,7 +25,7 @@ def make_wav_from_reg(sid, writes, wav_file_name, padclock):
     raw_samples = []
 
     def add_samples(offset):
-        timeoffset_seconds = offset / sid.clock_frequency
+        timeoffset_seconds = offset / sid.clock_freq
         raw_samples.extend(sid.clock(timedelta(seconds=timeoffset_seconds)))
 
     add_samples(padclock)
@@ -39,4 +39,4 @@ def make_wav_from_reg(sid, writes, wav_file_name, padclock):
     add_samples(padclock)
 
     scipy.io.wavfile.write(
-        wav_file_name, int(sid.sampling_frequency), np.array(raw_samples, dtype=np.float32) / 2**15)
+        wav_file_name, int(sid.sampling_freq), np.array(raw_samples, dtype=np.float32) / 2**15)
