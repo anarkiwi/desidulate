@@ -32,9 +32,30 @@ pal_parser.add_argument('--ntsc', dest='pal', action='store_false', help='Use NT
 parser.set_defaults(pal=True, percussion=True)
 args = parser.parse_args()
 
-single_patches = {}
-multi_patches = {}
-patch_count = Counter()
+
+def dump_patches(patch_output):
+    for (ext, patches) in patch_output:
+        if not patches:
+            continue
+        out_filename = out_path(args.logfile, ext)
+        first_csv_txt = list(patches.values())[0]
+        reader = csv.DictReader(io.StringIO(first_csv_txt))
+        first_row = next(reader)
+        fieldnames = list(reader.fieldnames)
+
+        with open(out_filename, 'w') as f:
+            writer = csv.DictWriter(f, fieldnames=['hashid', 'count'] + fieldnames, dialect='unix', quoting=csv.QUOTE_NONE)
+            writer.writeheader()
+            for hashid, count in sorted(patch_count.items(), key=lambda x: x[1], reverse=True):
+                if hashid in patches:
+                    csv_txt = patches[hashid]
+                    reader = csv.DictReader(io.StringIO(csv_txt))
+                    for row in reader:
+                        row.update({
+                            'hashid': hashid,
+                            'count': patch_count[hashid],
+                        })
+                        writer.writerow(row)
 
 
 class SidSoundFragment:
@@ -54,6 +75,9 @@ class SidSoundFragment:
         self.midi_pitches = []
         self.voicestates = []
         self.voice_filtered = False
+        self.total_duration = 0
+        self.max_midi_note = 0
+        self.min_midi_note = 0
 
     def trim_gateoff(self):
         for i, clock_voicestate_state in enumerate(self.voicestates):
@@ -126,7 +150,7 @@ class SidSoundFragment:
                         del filter_diff[flt_v_key]
                         filter_diff['flt_v%u' % self.normalize_voicenum(self.voicenum)] = val
                     diff.update(filter_diff)
-                clock_diff = clock - event_start
+                clock_diff = clock - self.event_start
                 frame_clock = sid.nearest_frame_clock(clock_diff)
                 orig_diffs[frame_clock].append((clock, diff))
             last_clock = clock
@@ -205,6 +229,10 @@ reg_writes = get_reg_changes(get_reg_writes(args.logfile), voicemask=voicemask, 
 reg_writes_changes = get_consolidated_changes(reg_writes, voicemask)
 mainevents, voiceevents = get_gate_events(reg_writes_changes, voicemask)
 
+single_patches = {}
+multi_patches = {}
+patch_count = Counter()
+
 for voicenum, gated_voice_events in voiceevents.items():
     for event_start, events in gated_voice_events:
         sse = SidSoundFragment(args.percussion, sid, smf, voicenum, event_start, events)
@@ -216,26 +244,4 @@ if not midifile:
     midifile = midi_path(args.logfile)
 
 smf.write(midifile)
-
-for (ext, patches) in (('single_patches.txt', single_patches), ('multi_patches.txt', multi_patches)):
-    if not patches:
-        continue
-    out_filename = out_path(args.logfile, ext)
-    first_csv_txt = list(patches.values())[0]
-    reader = csv.DictReader(io.StringIO(first_csv_txt))
-    first_row = next(reader)
-    fieldnames = list(reader.fieldnames)
-
-    with open(out_filename, 'w') as f:
-        writer = csv.DictWriter(f, fieldnames=['hashid', 'count'] + fieldnames, dialect='unix', quoting=csv.QUOTE_NONE)
-        writer.writeheader()
-        for hashid, count in sorted(patch_count.items(), key=lambda x: x[1], reverse=True):
-            if hashid in patches:
-                csv_txt = patches[hashid]
-                reader = csv.DictReader(io.StringIO(csv_txt))
-                for row in reader:
-                    row.update({
-                        'hashid': hashid,
-                        'count': patch_count[hashid],
-                    })
-                    writer.writerow(row)
+dump_patches((('single_patches.txt', single_patches), ('multi_patches.txt', multi_patches)))
