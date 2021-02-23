@@ -52,10 +52,9 @@ def midi_path(snd_log_name):
 
 class SidMidiFile:
 
-    def __init__(self, sid, bpm, clockq, program=81, drum_program=0):
+    def __init__(self, sid, bpm, program=81, drum_program=0):
         self.sid = sid
         self.bpm = bpm
-        self.clockq = clockq
         self.program = program
         self.drum_program = drum_program
         self.pitches = defaultdict(list)
@@ -164,7 +163,7 @@ class SidMidiFile:
         self.drum_pitches[voicenum].append((clock, duration, pitch, velocity))
 
     def add_drum_noise_duration(self, voicenum, clock, duration, velocity):
-        max_duration = self.clockq
+        max_duration = self.sid.clockq()
         noise_pitch = None
         for noise_pitch in (PEDAL_HIHAT, CLOSED_HIHAT, OPEN_HIHAT, ACCOUSTIC_SNARE, CRASH_CYMBAL1):
             if duration <= max_duration:
@@ -183,11 +182,11 @@ class SidMidiFile:
         return velocity
 
     # Convert gated voice events into possibly many MIDI notes
-    def get_midi_notes_from_events(self, sid, events, clockq):
+    def get_midi_notes_from_events(self, sid, events):
         last_midi_n = None
         notes_starts = []
         for clock, regevent, state in events:
-            clock = int(clock / clockq) * clockq
+            clock = int(clock / self.sid.clockq()) * self.sid.clockq()
             voicenum = regevent.voicenum
             voice_state = state.voices[voicenum]
             sid_f = sid.real_sid_freq(voice_state.freq)
@@ -208,6 +207,6 @@ class SidMidiFile:
             duration = next_clock - clock
             if not duration:
                 continue
-            duration = round(duration / clockq) * clockq
+            duration = round(duration / self.sid.clockq()) * self.sid.clockq()
             notes.append((clock, note, duration, velocity, sid_f))
         return notes

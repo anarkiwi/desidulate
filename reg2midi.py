@@ -39,11 +39,10 @@ patch_count = Counter()
 
 class SidSoundFragment:
 
-    def __init__(self, percussion, sid, clockq, smf, voicenum, event_start, events):
+    def __init__(self, percussion, sid, smf, voicenum, event_start, events):
         self.percussion = percussion
         self.voicenum = voicenum
         self.sid = sid
-        self.clockq = clockq
         self.smf = smf
         self.event_start = event_start
         self.events = events
@@ -85,7 +84,7 @@ class SidSoundFragment:
             self.voicestates.append((clock, voicestate, state))
         self.trim_gateoff()
         if self.voicenum in audible_voicenums:
-            self.midi_notes = tuple(self.smf.get_midi_notes_from_events(self.sid, self.events, self.clockq))
+            self.midi_notes = tuple(self.smf.get_midi_notes_from_events(self.sid, self.events))
             self.midi_pitches = tuple([midi_note[1] for midi_note in self.midi_notes])
             self.total_duration = sum(duration for _, _, duration, _, _ in self.midi_notes)
         if not self.midi_notes:
@@ -201,15 +200,14 @@ class SidSoundFragment:
 
 voicemask = set((int(v) for v in args.voicemask.split(',')))
 sid = get_sid(args.pal)
-clockq = sid.clock_freq / 50
-smf = SidMidiFile(sid, args.bpm, clockq)
+smf = SidMidiFile(sid, args.bpm)
 reg_writes = get_reg_changes(get_reg_writes(args.logfile), voicemask=voicemask, minclock=args.minclock, maxclock=args.maxclock)
 reg_writes_changes = get_consolidated_changes(reg_writes, voicemask)
 mainevents, voiceevents = get_gate_events(reg_writes_changes, voicemask)
 
 for voicenum, gated_voice_events in voiceevents.items():
     for event_start, events in gated_voice_events:
-        sse = SidSoundFragment(args.percussion, sid, clockq, smf, voicenum, event_start, events)
+        sse = SidSoundFragment(args.percussion, sid, smf, voicenum, event_start, events)
         sse.parse()
         sse.smf_transcribe()
 
