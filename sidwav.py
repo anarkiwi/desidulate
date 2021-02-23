@@ -17,7 +17,7 @@ def get_sid(model=ChipModel.MOS8580, pal=True):
         freq = SoundInterfaceDevice.PAL_CLOCK_FREQUENCY
     else:
         freq = SoundInterfaceDevice.NTSC_CLOCK_FREQUENCY
-    return SoundInterfaceDevice(model=model, clock_freq=freq)
+    return SoundInterfaceDevice(model=model, clock_frequency=freq)
 
 
 def make_wav_from_reg(sid, writes, wav_file_name, padclock):
