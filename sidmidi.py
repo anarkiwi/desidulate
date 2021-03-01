@@ -32,7 +32,7 @@ CRASH_CYMBAL1 = 49
 def out_path(snd_log_name, new_ext):
     snd_log_name = os.path.expanduser(snd_log_name)
     base = os.path.basename(snd_log_name)
-    recogized_exts = {'gz', 'dump', 'log', 'sid'}
+    recogized_exts = {'xz', 'gz', 'dump', 'log', 'sid'}
     while True:
         dot = base.rfind('.')
         if dot <= 0:
