@@ -6,12 +6,11 @@
 
 ## THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABL E FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-import gzip
-import lzma
-import os
 from functools import lru_cache
 
+from fileio import file_reader
 from sidreg import VOICES, SidRegState, SidRegEvent, frozen_sid_state_factory
+
 
 class SidWrap:
 
@@ -52,15 +51,6 @@ class SidWrap:
 
 def get_sid(pal):
     return SidWrap(pal)
-
-
-def file_reader(snd_log_name):
-    snd_log_name = os.path.expanduser(snd_log_name)
-    if snd_log_name.endswith('.gz'):
-        return gzip.open(snd_log_name, 'rb')
-    elif snd_log_name.endswith('.xz'):
-        return lzma.open(snd_log_name, 'rb')
-    return open(snd_log_name)
 
 
 # Read a VICE "-sounddev dump" register dump (emulator or vsid)
