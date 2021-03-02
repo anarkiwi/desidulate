@@ -85,7 +85,7 @@ class SidRegHandler(SidRegStateBase):
     NAME = 'unknown'
 
     def __init__(self, instance=0):
-        super(SidRegHandler, self).__init__(instance)
+        super().__init__(instance)
         for reg in self._REGMAP:
             self._set(reg, 0)
 
@@ -163,7 +163,7 @@ class SidVoiceRegStateMiddle(SidRegHandler):
         self.dec = None
         self.sus = None
         self.rel = None
-        super(SidVoiceRegStateMiddle, self).__init__(voicenum)
+        super().__init__(voicenum)
         self.voicenum = voicenum
 
     def waveforms(self):
@@ -222,7 +222,7 @@ class SidVoiceRegState(SidVoiceRegStateMiddle):
             5: self._atk_dec,
             6: self._sus_rel,
         }
-        super(SidVoiceRegState, self).__init__(voicenum)
+        super().__init__(voicenum)
         self.voicenum = voicenum
 
     def _freq_descr(self):
@@ -316,7 +316,7 @@ class SidFilterMainRegState(SidFilterMainRegStateMiddle):
         }
         self.vol = 0
         self.flt_res = 0
-        super(SidFilterMainRegState, self).__init__(instance)
+        super().__init__(instance)
 
     def regbase(self):
         return self.REGBASE
@@ -349,7 +349,7 @@ class SidRegStateMiddle(SidRegStateBase):
     ]
 
     def __init__(self, instance=0):
-        super(SidRegStateMiddle, self).__init__(instance)
+        super().__init__(instance)
         self.voices = {}
         self.reg_voicenum = {}
         self.mainreg = None
@@ -381,7 +381,7 @@ class SidRegState(SidRegStateMiddle):
     ]
 
     def __init__(self, instance=0):
-        super(SidRegState, self).__init__(instance)
+        super().__init__(instance)
         self._reghandlers = {}
         for voicenum in VOICES:
             voice = SidVoiceRegState(voicenum)
@@ -482,10 +482,10 @@ class FrozenSidFilterMainRegState(SidFilterMainRegStateMiddle):
 
 
 def frozen_factory(state, statecache, stateclass):
-   statehash = state.__hash__()
-   if statehash not in statecache:
-       statecache[statehash] = stateclass(state)
-   return statecache[statehash]
+    statehash = state.__hash__()
+    if statehash not in statecache:
+        statecache[statehash] = stateclass(state)
+    return statecache[statehash]
 
 frozen_voice_state = {}
 frozen_main_state = {}
@@ -500,7 +500,7 @@ class FrozenSidRegState(SidRegStateMiddle):
     ]
 
     def __init__(self, state):
-        super(FrozenSidRegState, self).__init__(state.instance)
+        super().__init__(state.instance)
         self.voices = {
             voicenum: frozen_factory(voicestate, frozen_voice_state, FrozenSidVoiceRegState)
             for voicenum, voicestate in state.voices.items()}
