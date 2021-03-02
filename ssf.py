@@ -12,7 +12,8 @@
 import csv
 import io
 from collections import Counter, defaultdict
-from sidmidi import out_path, ELECTRIC_SNARE, BASS_DRUM, LOW_TOM
+from fileio import out_path
+from sidmidi import ELECTRIC_SNARE, BASS_DRUM, LOW_TOM
 
 
 def dump_patches(logfile, patch_count, patch_output):

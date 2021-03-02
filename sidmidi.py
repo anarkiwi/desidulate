@@ -5,7 +5,6 @@
 ## The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 
 
-import os
 from collections import defaultdict
 from music21 import midi
 
@@ -26,28 +25,6 @@ LOW_TOM = 45
 ACCOUSTIC_SNARE = 38
 ELECTRIC_SNARE = 40
 CRASH_CYMBAL1 = 49
-
-
-
-def out_path(snd_log_name, new_ext):
-    snd_log_name = os.path.expanduser(snd_log_name)
-    base = os.path.basename(snd_log_name)
-    recogized_exts = {'xz', 'gz', 'dump', 'log', 'sid'}
-    while True:
-        dot = base.rfind('.')
-        if dot <= 0:
-            break
-        ext = base[dot+1:]
-        if not ext:
-            break
-        if ext not in recogized_exts:
-            break
-        base = base[:dot]
-    return os.path.join(os.path.dirname(snd_log_name), '.'.join((base, new_ext)))
-
-
-def midi_path(snd_log_name):
-    return out_path(snd_log_name, 'mid')
 
 
 class SidMidiFile:
@@ -144,11 +121,13 @@ class SidMidiFile:
             if voice_pitch_data:
                 channel = trackmap[voicenum]
                 smf_track = channel - 1
-                smf.tracks.append(self.write_pitches(smf_track, channel, self.program, voice_pitch_data))
+                smf.tracks.append(self.write_pitches(
+                    smf_track, channel, self.program, voice_pitch_data))
         for voicenum, voice_pitch_data in self.drum_pitches.items():
             if voice_pitch_data:
                 smf_track = drummap[voicenum] - 1
-                smf.tracks.append(self.write_pitches(smf_track, DRUM_CHANNEL, self.drum_program, voice_pitch_data))
+                smf.tracks.append(self.write_pitches(
+                    smf_track, DRUM_CHANNEL, self.drum_program, voice_pitch_data))
         smf.open(file_name, 'wb')
         smf.write()
 
@@ -190,7 +169,7 @@ class SidMidiFile:
             voicenum = regevent.voicenum
             voice_state = state.voices[voicenum]
             sid_f = sid.real_sid_freq(voice_state.freq)
-            _closest_midi_f, closest_midi_n = self.closest_midi(sid_f)
+            _, closest_midi_n = self.closest_midi(sid_f)
             velocity = self.sid_adsr_to_velocity(voice_state)
             # TODO: add pitch bend if significantly different to canonical note.
             if closest_midi_n != last_midi_n and voice_state.any_waveform() and velocity:

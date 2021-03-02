@@ -11,7 +11,7 @@
 
 
 import argparse
-from sidlib import debug_reg_writes, get_consolidated_changes, get_reg_changes, get_reg_writes, write_reg_writes, get_sid, VOICES
+from sidlib import debug_reg_writes, get_reg_changes, get_reg_writes, write_reg_writes, get_sid, VOICES
 
 
 parser = argparse.ArgumentParser(description='Debug a vicesnd.sid log file')

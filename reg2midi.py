@@ -11,8 +11,9 @@
 
 import argparse
 from collections import Counter
+from fileio import midi_path
 from sidlib import get_consolidated_changes, get_gate_events, get_reg_changes, get_reg_writes, get_sid, VOICES
-from sidmidi import midi_path, SidMidiFile
+from sidmidi import SidMidiFile
 from ssf import dump_patches, SidSoundFragment
 
 
