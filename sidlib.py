@@ -6,7 +6,10 @@
 
 ## THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABL E FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+from datetime import timedelta
 from functools import lru_cache
+from pyresidfp import SoundInterfaceDevice
+from pyresidfp.sound_interface_device import ChipModel
 
 from fileio import file_reader
 from sidreg import VOICES, SidRegState, SidRegEvent, frozen_sid_state_factory
@@ -14,13 +17,14 @@ from sidreg import VOICES, SidRegState, SidRegEvent, frozen_sid_state_factory
 
 class SidWrap:
 
-    def __init__(self, pal):
+    def __init__(self, pal, model=ChipModel.MOS8580):
         if pal:
-            self.clock_freq = 985248.0 # SoundInterfaceDevice.PAL_CLOCK_FREQUENCY
+            self.clock_freq = SoundInterfaceDevice.PAL_CLOCK_FREQUENCY
             self.int_freq = 50.0
         else:
-            self.clock_freq = 1022730.0 # SoundInterfaceDevice.NTSC_CLOCK_FREQUENCY
+            self.clock_freq = SoundInterfaceDevice.NTSC_CLOCK_FREQUENCY
             self.int_freq = 60.0
+        self.resid = SoundInterfaceDevice(model=model, clock_frequency=self.clock_freq)
 
     def clockq(self):
         return self.clock_freq / self.int_freq
@@ -47,6 +51,11 @@ class SidWrap:
 
     def nearest_frame_clock(self, clock):
         return round(self.clock_frame(clock) * self.frame_length())
+
+    def add_samples(self, offset):
+        timeoffset_seconds = offset / self.clock_freq
+        return self.resid.clock(timedelta(seconds=timeoffset_seconds))
+
 
 
 def get_sid(pal):

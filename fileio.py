@@ -30,6 +30,10 @@ def midi_path(snd_log_name):
     return out_path(snd_log_name, 'mid')
 
 
+def wav_path(snd_log_name):
+    return out_path(snd_log_name, 'wav')
+
+
 def file_reader(snd_log_name):
     snd_log_name = os.path.expanduser(snd_log_name)
     if snd_log_name.endswith('.gz'):
