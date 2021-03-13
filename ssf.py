@@ -131,11 +131,11 @@ class SidSoundFragment:
                     diff.update(voice_diff)
                 if self.voice_filtered:
                     filter_diff = state.mainreg.diff_filter_vol(self.voicenum, last_state.mainreg)
-                    flt_v_key = 'flt_v%u' % self.voicenum
+                    flt_v_key = 'flt%u' % self.voicenum
                     val = filter_diff.get(flt_v_key, None)
                     if val is not None:
                         del filter_diff[flt_v_key]
-                        filter_diff['flt_v%u' % self.normalize_voicenum(self.voicenum)] = val
+                        filter_diff['flt%u' % self.normalize_voicenum(self.voicenum)] = val
                     diff.update(filter_diff)
                 clock_diff = clock - self.event_start
                 frame_clock = self.sid.nearest_frame_clock(clock_diff)
@@ -155,13 +155,13 @@ class SidSoundFragment:
                     field = '%s%u' % (field, self.normalize_voicenum(voicenum))
                     fieldnames.append(field)
                     first_row[field] = val
-            flt_v_key = 'flt_v%u' % self.normalize_voicenum(self.voicenum)
+            flt_v_key = 'flt%u' % self.normalize_voicenum(self.voicenum)
             fieldnames.append(flt_v_key)
             for field in first_state.mainreg.filter_common + ['vol']:
                 val = getattr(first_state.mainreg, field)
                 fieldnames.append(field)
                 first_row[field] = val
-            first_row[flt_v_key] = getattr(first_state.mainreg, 'flt_v%u' % self.voicenum)
+            first_row[flt_v_key] = getattr(first_state.mainreg, 'flt%u' % self.voicenum)
 
         buffer = io.StringIO()
         writer = csv.DictWriter(buffer, fieldnames=fieldnames)

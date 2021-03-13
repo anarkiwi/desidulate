@@ -273,7 +273,7 @@ class SidFilterMainRegStateMiddle(SidRegHandler):
     ]
 
     def voice_filtered(self, voicenum):
-        filter_attr = 'flt_v%u' % voicenum
+        filter_attr = 'flt%u' % voicenum
         return getattr(self, filter_attr)
 
     def voice_muted(self, voicenum):
@@ -281,7 +281,7 @@ class SidFilterMainRegStateMiddle(SidRegHandler):
         return bool(getattr(self, mute_attr, False))
 
     def _voice_attrs(self, voicenum):
-        return ['flt_v%u' % voicenum] + self.filter_common
+        return ['flt%u' % voicenum] + self.filter_common
 
     def diff_filter(self, voicenum, other):
         return self.diff_attr(self._voice_attrs(voicenum), other)
@@ -296,9 +296,9 @@ class SidFilterMainRegState(SidFilterMainRegStateMiddle):
         '_REGMAP',
         'vol',
         'flt_res',
-        'flt_v1',
-        'flt_v2',
-        'flt_v3',
+        'flt1',
+        'flt2',
+        'flt3',
         'flt_ext',
         'flt_coff',
         'flt_low',
@@ -328,7 +328,7 @@ class SidFilterMainRegState(SidFilterMainRegStateMiddle):
         route, self.flt_res = self.byte2nib(2)
         descr = {'flt_res': '%.2x' % self.flt_res}
         descr.update(self.decodebits(route, {
-            0: 'flt_v1', 1: 'flt_v2', 2: 'flt_v3', 3: 'flt_ext'}))
+            0: 'flt1', 1: 'flt2', 2: 'flt3', 3: 'flt_ext'}))
         return (descr, None)
 
     def _filtermain(self, _):
@@ -461,9 +461,9 @@ class FrozenSidFilterMainRegState(SidFilterMainRegStateMiddle):
         'instance',
         'vol',
         'flt_res',
-        'flt_v1',
-        'flt_v2',
-        'flt_v3',
+        'flt1',
+        'flt2',
+        'flt3',
         'flt_ext',
         'flt_coff',
         'flt_low',

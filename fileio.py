@@ -12,7 +12,7 @@ import os
 def out_path(snd_log_name, new_ext):
     snd_log_name = os.path.expanduser(snd_log_name)
     base = os.path.basename(snd_log_name)
-    recogized_exts = {'xz', 'gz', 'dump', 'log', 'sid'}
+    recogized_exts = {'xz', 'gz', 'dump', 'log', 'sid', 'txt'}
     while True:
         dot = base.rfind('.')
         if dot <= 0:
