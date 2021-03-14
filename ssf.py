@@ -11,6 +11,7 @@
 
 import csv
 import io
+import lzma
 from collections import Counter, defaultdict
 from fileio import out_path
 from sidmidi import ELECTRIC_SNARE, BASS_DRUM, LOW_TOM
@@ -22,24 +23,27 @@ def dump_patches(logfile, patch_count, patch_output):
         if not patches:
             continue
         out_filename = out_path(logfile, ext)
-        first_csv_txt = list(patches.values())[0]
-        reader = csv.DictReader(io.StringIO(first_csv_txt))
-        next(reader)
-        fieldnames = list(reader.fieldnames)
+        for z_csv_txt in patches.values():
+            first_csv_txt = lzma.decompress(z_csv_txt).decode()
+            break
+        with io.StringIO(first_csv_txt) as buffer:
+            reader = csv.DictReader(buffer)
+            next(reader)
+            fieldnames = list(reader.fieldnames)
 
         with open(out_filename, 'w') as f:
             writer = csv.DictWriter(f, fieldnames=['hashid', 'count'] + fieldnames, dialect='unix', quoting=csv.QUOTE_NONE)
             writer.writeheader()
             for hashid, _ in sorted(patch_count.items(), key=lambda x: x[1], reverse=True):
                 if hashid in patches:
-                    csv_txt = patches[hashid]
-                    reader = csv.DictReader(io.StringIO(csv_txt))
-                    for row in reader:
-                        row.update({
-                            'hashid': hashid,
-                            'count': patch_count[hashid],
-                        })
-                        writer.writerow(row)
+                    with io.StringIO(lzma.decompress(patches[hashid]).decode()) as buffer:
+                        reader = csv.DictReader(buffer)
+                        for row in reader:
+                            row.update({
+                                'hashid': hashid,
+                                'count': patch_count[hashid],
+                            })
+                            writer.writerow(row)
 
 
 class SidSoundFragment:
@@ -84,6 +88,24 @@ class SidSoundFragment:
         if voicenum == self.voicenum:
             return 1
         return 3
+
+    def patchcsv(self, fieldnames, first_row, orig_diffs):
+        with io.StringIO() as buffer:
+            writer = csv.DictWriter(buffer, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerow(first_row)
+            for frame_clock, clock_diffs in orig_diffs.items():
+                first_clock = None
+                for clock, diff in clock_diffs:
+                    if first_clock is None:
+                        diff['clock'] = frame_clock
+                        first_clock = clock
+                    else:
+                        diff['clock'] = frame_clock + (clock - first_clock)
+                    writer.writerow(diff)
+            csv_txt = buffer.getvalue()
+            hash_csv_txt = hash(csv_txt)
+            return (lzma.compress(csv_txt.encode()), hash_csv_txt)
 
     def parse(self):
         audible_voicenums = set()
@@ -163,25 +185,11 @@ class SidSoundFragment:
                 first_row[field] = val
             first_row[flt_v_key] = getattr(first_state.mainreg, 'flt%u' % self.voicenum)
 
-        buffer = io.StringIO()
-        writer = csv.DictWriter(buffer, fieldnames=fieldnames)
-        writer.writeheader()
-        writer.writerow(first_row)
-        for frame_clock, clock_diffs in orig_diffs.items():
-            first_clock = None
-            for clock, diff in clock_diffs:
-                if first_clock is None:
-                    diff['clock'] = frame_clock
-                    first_clock = clock
-                else:
-                    diff['clock'] = frame_clock + (clock - first_clock)
-                writer.writerow(diff)
-        csv_txt = buffer.getvalue()
-        hash_csv_txt = hash(csv_txt)
+        z_csv_txt, hash_csv_txt = self.patchcsv(fieldnames, first_row, orig_diffs)
         if len(voicenums) == 1:
-            self.single_patches[hash_csv_txt] = csv_txt
+            self.single_patches[hash_csv_txt] = z_csv_txt
         else:
-            self.multi_patches[hash_csv_txt] = csv_txt
+            self.multi_patches[hash_csv_txt] = z_csv_txt
         self.patch_count[hash_csv_txt] += 1
 
     def descending_pitches(self):
