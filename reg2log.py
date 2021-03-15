@@ -11,7 +11,7 @@
 
 
 import argparse
-from sidlib import debug_reg_writes, get_reg_changes, get_reg_writes, write_reg_writes, get_sid, VOICES
+from sidlib import debug_reg_writes, get_reg_writes, write_reg_writes, get_sid, VOICES
 
 
 parser = argparse.ArgumentParser(description='Debug a vicesnd.sid log file')
@@ -29,7 +29,12 @@ args = parser.parse_args()
 voicemask = set((int(v) for v in args.voicemask.split(',')))
 
 sid = get_sid(pal=args.pal)
-reg_writes = get_reg_changes(get_reg_writes(args.logfile), voicemask=voicemask, minclock=args.minclock, maxclock=args.maxclock, maxsilentclocks=args.maxsilentclocks)
+reg_writes = get_reg_writes(
+    args.logfile,
+    minclock=args.minclock,
+    maxclock=args.maxclock,
+    voicemask=voicemask,
+    maxsilentclocks=args.maxsilentclocks)
 
 for line in debug_reg_writes(sid, reg_writes):
     print(line)

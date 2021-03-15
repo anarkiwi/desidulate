@@ -12,7 +12,7 @@
 import argparse
 from collections import Counter
 from fileio import midi_path
-from sidlib import get_consolidated_changes, get_gate_events, get_reg_changes, get_reg_writes, get_sid, VOICES
+from sidlib import get_consolidated_changes, get_gate_events, get_reg_writes, get_sid, VOICES
 from sidmidi import SidMidiFile
 from ssf import dump_patches, SidSoundFragment
 
@@ -32,10 +32,14 @@ pal_parser.add_argument('--ntsc', dest='pal', action='store_false', help='Use NT
 parser.set_defaults(pal=True, percussion=True)
 args = parser.parse_args()
 
-voicemask = set((int(v) for v in args.voicemask.split(',')))
+voicemask = frozenset((int(v) for v in args.voicemask.split(',')))
 sid = get_sid(args.pal)
 smf = SidMidiFile(sid, args.bpm)
-reg_writes = get_reg_changes(get_reg_writes(args.logfile), voicemask=voicemask, minclock=args.minclock, maxclock=args.maxclock)
+reg_writes = get_reg_writes(
+    args.logfile,
+    minclock=args.minclock,
+    maxclock=args.maxclock,
+    voicemask=voicemask)
 reg_writes_changes = get_consolidated_changes(reg_writes, voicemask)
 mainevents, voiceevents = get_gate_events(reg_writes_changes, voicemask)
 
