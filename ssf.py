@@ -9,10 +9,8 @@
 # https://codebase64.org/doku.php?id=base:building_a_music_routine
 # http://www.ucapps.de/howto_sid_wavetables_1.html
 
-import csv
-import io
-import lzma
 from collections import Counter, defaultdict
+import pandas as pd
 from fileio import out_path
 from sidmidi import ELECTRIC_SNARE, BASS_DRUM, LOW_TOM
 
@@ -23,27 +21,19 @@ def dump_patches(logfile, patch_count, patch_output):
         if not patches:
             continue
         out_filename = out_path(logfile, ext)
-        for z_csv_txt in patches.values():
-            first_csv_txt = lzma.decompress(z_csv_txt).decode()
-            break
-        with io.StringIO(first_csv_txt) as buffer:
-            reader = csv.DictReader(buffer)
-            next(reader)
-            fieldnames = list(reader.fieldnames)
-
-        with open(out_filename, 'w') as f:
-            writer = csv.DictWriter(f, fieldnames=['hashid', 'count'] + fieldnames, dialect='unix', quoting=csv.QUOTE_NONE)
-            writer.writeheader()
-            for hashid, _ in sorted(patch_count.items(), key=lambda x: x[1], reverse=True):
-                if hashid in patches:
-                    with io.StringIO(lzma.decompress(patches[hashid]).decode()) as buffer:
-                        reader = csv.DictReader(buffer)
-                        for row in reader:
-                            row.update({
-                                'hashid': hashid,
-                                'count': patch_count[hashid],
-                            })
-                            writer.writerow(row)
+        dfs = []
+        for hashid, _ in sorted(patch_count.items(), key=lambda x: x[1], reverse=True):
+            if hashid in patches:
+                df = patches[hashid]
+                df['hashid'] = hashid
+                df['count'] = patch_count[hashid]
+                dfs.append(df)
+        df = pd.concat(dfs)
+        cols = list(df.columns)
+        cols.remove('hashid')
+        cols.remove('count')
+        df = df[['hashid', 'count'] + cols]
+        df.to_csv(out_filename, index=False)
 
 
 class SidSoundFragment:
@@ -89,23 +79,20 @@ class SidSoundFragment:
             return 1
         return 3
 
-    def patchcsv(self, fieldnames, first_row, orig_diffs):
-        with io.StringIO() as buffer:
-            writer = csv.DictWriter(buffer, fieldnames=fieldnames)
-            writer.writeheader()
-            writer.writerow(first_row)
-            for frame_clock, clock_diffs in orig_diffs.items():
-                first_clock = None
-                for clock, diff in clock_diffs:
-                    if first_clock is None:
-                        diff['clock'] = frame_clock
-                        first_clock = clock
-                    else:
-                        diff['clock'] = frame_clock + (clock - first_clock)
-                    writer.writerow(diff)
-            csv_txt = buffer.getvalue()
-            hash_csv_txt = hash(csv_txt)
-            return (lzma.compress(csv_txt.encode()), hash_csv_txt)
+    def _patchcsv(self, fieldnames, first_row, orig_diffs):
+        rows = [first_row]
+        for frame_clock, clock_diffs in orig_diffs.items():
+            first_clock = None
+            for clock, diff in clock_diffs:
+                if first_clock is None:
+                    diff['clock'] = frame_clock
+                    first_clock = clock
+                else:
+                    diff['clock'] = frame_clock + (clock - first_clock)
+                rows.append(diff)
+        df = pd.DataFrame(rows, columns=fieldnames)
+        hashid = hash(tuple(df.itertuples(index=False, name=None)))
+        return (df, hashid)
 
     def parse(self):
         audible_voicenums = set()
@@ -164,8 +151,6 @@ class SidSoundFragment:
                 orig_diffs[frame_clock].append((clock, diff))
             last_clock = clock
             last_state = state
-        self.noisephases = len([waveforms for waveforms in self.waveform_order if 'noise' in waveforms])
-        self.all_noise = set(self.waveforms.keys()) == {'noise'}
 
         first_row = {'clock': 0}
         fieldnames = ['clock']
@@ -185,12 +170,18 @@ class SidSoundFragment:
                 first_row[field] = val
             first_row[flt_v_key] = getattr(first_state.mainreg, 'flt%u' % self.voicenum)
 
-        z_csv_txt, hash_csv_txt = self.patchcsv(fieldnames, first_row, orig_diffs)
+        df, hashid = self._patchcsv(fieldnames, first_row, orig_diffs)
         if len(voicenums) == 1:
-            self.single_patches[hash_csv_txt] = z_csv_txt
+            if hashid not in self.single_patches:
+                self.single_patches[hashid] = df
         else:
-            self.multi_patches[hash_csv_txt] = z_csv_txt
-        self.patch_count[hash_csv_txt] += 1
+            if hashid not in self.multi_patches:
+                self.multi_patches[hashid] = df
+        self.patch_count[hashid] += 1
+
+        self.noisephases = len([waveforms for waveforms in self.waveform_order if 'noise' in waveforms])
+        self.all_noise = set(self.waveforms.keys()) == {'noise'}
+
 
     def descending_pitches(self):
         return len(self.midi_pitches) > 2 and self.midi_pitches[0] > self.midi_pitches[-1]
