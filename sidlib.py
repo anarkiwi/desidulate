@@ -13,7 +13,6 @@ import numpy as np
 from pyresidfp import SoundInterfaceDevice
 from pyresidfp.sound_interface_device import ChipModel
 
-from fileio import file_reader
 from sidreg import VOICES, SidRegState, SidRegEvent, frozen_sid_state_factory
 
 
@@ -113,7 +112,7 @@ def write_reg_writes(snd_log_name, reg_writes):
 def debug_raw_reg_writes(reg_writes):
     state = SidRegState()
     for _, row in reg_writes.iterrows():
-        clock = int(row.clock) 
+        clock = int(row.clock)
         reg = int(row.reg)
         val = int(row.val)
         regevent = state.set(reg, val)
@@ -121,7 +120,7 @@ def debug_raw_reg_writes(reg_writes):
             regs = [state.mainreg] + [state.voices[i] for i in state.voices]
             regdumps = tuple([reg.regdump() for reg in regs])
             active_voices = ','.join((str(voicenum) for voicenum in sorted(state.gates_on())))
-            yield ((row.clock, row.reg, row.val) + (active_voices,) + regdumps + (regevent,))
+            yield (row.clock, row.reg, row.val) + (active_voices,) + regdumps + (regevent,)
 
 
 def debug_reg_writes(sid, reg_writes, consolidate_mb_clock=10):

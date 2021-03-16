@@ -58,4 +58,7 @@ if not midifile:
     midifile = midi_path(args.logfile)
 
 smf.write(midifile)
-dump_patches(args.logfile, patch_count, (('single_patches.txt', single_patches), ('multi_patches.txt', multi_patches)))
+dump_patches(
+    args.logfile,
+    patch_count,
+    (('single_patches.txt.xz', single_patches), ('multi_patches.txt.xz', multi_patches)))
