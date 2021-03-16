@@ -76,7 +76,7 @@ def get_reg_writes(snd_log_name, skipsilence=1e6, minclock=0, maxclock=0, voicem
         dtype={'clock_offset': np.uint64, 'reg': np.uint8, 'val': np.uint8})
     df['clock'] = df['clock_offset'].cumsum()
     assert df['reg'].min() >= 0
-    assert df['reg'].max() <= max(state.regstate)
+    df = df[df['reg'] <= max(state.regstate)]
     if maxclock:
         df = df[df.clock <= maxclock]
     df = df[['clock', 'reg', 'val']]
