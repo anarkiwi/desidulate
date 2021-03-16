@@ -8,17 +8,24 @@ import numpy as np
 import scipy.io.wavfile
 
 
-def make_wav_from_reg(sid, writes, wav_file_name, padclock):
+def generate_samples(sid, reg_writes, padclock):
     lastevent = 0
-    raw_samples = sid.add_samples(padclock)
+    for sample in sid.add_samples(padclock):
+        yield sample
 
-    for clock, reg, val in writes:
-        ts_offset = clock - lastevent
-        lastevent = clock
-        sid.resid.write_register(reg, val)
-        raw_samples.extend(sid.add_samples(ts_offset))
+    for _, row in reg_writes.iterrows():
+        clock_offset = row.clock - lastevent
+        lastevent = row.clock
+        for sample in sid.add_samples(clock_offset):
+            yield sample
+        sid.resid.write_register(row.reg, row.val)
 
-    raw_samples.extend(sid.add_samples(padclock))
+    for sample in sid.add_samples(padclock):
+        yield sample
 
+
+def make_wav_from_reg(sid, reg_writes, wav_file_name, padclock):
     scipy.io.wavfile.write(
-        wav_file_name, int(sid.resid.sampling_frequency), np.array(raw_samples, dtype=np.float32) / 2**15)
+        wav_file_name,
+        int(sid.resid.sampling_frequency),
+        np.fromiter(generate_samples(sid, reg_writes, padclock), count=-1, dtype=np.float32) / 2**15)

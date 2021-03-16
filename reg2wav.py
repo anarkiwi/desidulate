@@ -8,7 +8,7 @@
 
 import argparse
 from fileio import wav_path
-from sidlib import get_sid, get_reg_changes, get_reg_writes, VOICES
+from sidlib import get_sid, get_reg_writes, VOICES
 from sidwav import make_wav_from_reg
 
 
@@ -30,5 +30,9 @@ if not wavfile:
     wavfile = wav_path(args.logfile)
 
 sid = get_sid(pal=args.pal)
-reg_writes = get_reg_changes(get_reg_writes(args.logfile), voicemask=voicemask, minclock=args.minclock, maxclock=args.maxclock)
+reg_writes = get_reg_writes(
+    args.logfile,
+    minclock=args.minclock,
+    maxclock=args.maxclock,
+    voicemask=voicemask)
 make_wav_from_reg(sid, reg_writes, wavfile, args.padclock)

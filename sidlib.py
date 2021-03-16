@@ -8,6 +8,8 @@
 
 from datetime import timedelta
 from functools import lru_cache
+import pandas as pd
+import numpy as np
 from pyresidfp import SoundInterfaceDevice
 from pyresidfp.sound_interface_device import ChipModel
 
@@ -63,23 +65,40 @@ def get_sid(pal):
 
 
 # Read a VICE "-sounddev dump" register dump (emulator or vsid)
-def get_reg_writes(snd_log_name, skipsilence=1e6):
-    maxreg = max(SidRegState().regstate)
-    writes = []
-    clock = 0
-    silenceskipped = False
-    with file_reader(snd_log_name) as snd_log:
-        for line in snd_log:
-            ts_offset, reg, val = (int(i) for i in line.strip().split())
-            assert val >= 0 and reg <= 255, val
-            # skip first pause of > 1e6
-            if ts_offset > skipsilence and not silenceskipped:
-                continue
-            clock += ts_offset
-            if reg <= maxreg:
-                assert reg >= 0 and reg <= maxreg, reg
-                writes.append((clock, reg, val))
-    return writes
+def get_reg_writes(snd_log_name, skipsilence=1e6, minclock=0, maxclock=0, voicemask=VOICES, maxsilentclocks=0, passthrough=False):
+    # TODO: fix minclock
+    # TODO: fix maxsilentclocks
+    # TODO: fix skipsilence
+    state = SidRegState()
+    df = pd.read_csv(
+        snd_log_name,
+        sep=' ',
+        names=['clock_offset', 'reg', 'val'],
+        dtype={'clock_offset': np.uint64, 'reg': np.uint8, 'val': np.uint8})
+    df['clock'] = df['clock_offset'].cumsum()
+    assert df['reg'].min() >= 0
+    assert df['reg'].max() <= max(state.regstate)
+    if maxclock:
+        df = df[df.clock <= maxclock]
+    df = df[['clock', 'reg', 'val']]
+    if passthrough:
+        return df.to_numpy()
+    # remove consecutive repeated register writes
+    reg_dfs = []
+    reg_cols = ['reg', 'val']
+    for reg in sorted(df.reg.unique()):
+        voicenum = state.reg_voicenum.get(reg, None)
+        if voicenum is not None and voicenum not in voicemask:
+            continue
+        reg_df = df[df['reg'] == reg]
+        reg_df = reg_df.loc[(reg_df[reg_cols].shift() != reg_df[reg_cols]).any(axis=1)]
+        reg_dfs.append(reg_df)
+    df = pd.concat(reg_dfs)
+    df.set_index('clock')
+    df = df.sort_index()
+    # reset clock relative to 0
+    df['clock'] -= df['clock'].min()
+    return df
 
 
 def write_reg_writes(snd_log_name, reg_writes):
@@ -91,61 +110,26 @@ def write_reg_writes(snd_log_name, reg_writes):
             snd_log_f.write(' '.join((str(i) for i in (rel_clock, reg, val))) + '\n')
 
 
-def get_reg_changes(reg_writes, voicemask=VOICES, minclock=0, maxclock=0, maxsilentclocks=0):
-    change_only_writes = []
+def debug_raw_reg_writes(reg_writes):
     state = SidRegState()
-    relative_clock = 0
-    last_any_gate_on = None
-    for clock, reg, val in reg_writes:
+    for _, row in reg_writes.iterrows():
+        clock = int(row.clock) 
+        reg = int(row.reg)
+        val = int(row.val)
         regevent = state.set(reg, val)
-        if clock < minclock:
-            continue
-        if maxclock and clock > maxclock:
-            break
-        if not regevent:
-            continue
-        if regevent.voicenum and regevent.voicenum not in voicemask:
-            continue
-        gates_on_now = state.gates_on()
-        if maxsilentclocks and not gates_on_now:
-            if last_any_gate_on and clock - last_any_gate_on > maxsilentclocks:
-                break
-        if gates_on_now:
-            last_any_gate_on = clock
-        if not change_only_writes and minclock:
-            relative_clock = clock
-            for reg_pre, val_pre in state.regstate.items():
-                reg_pre_voicenum = state.reg_voicenum.get(reg_pre, None)
-                if reg_pre_voicenum is None or reg_pre_voicenum in voicemask:
-                    change_only_writes.append((clock - relative_clock, reg_pre, val_pre))
-        change_only_writes.append((clock - relative_clock, reg, val))
-    return change_only_writes
+        if regevent:
+            regs = [state.mainreg] + [state.voices[i] for i in state.voices]
+            regdumps = tuple([reg.regdump() for reg in regs])
+            active_voices = ','.join((str(voicenum) for voicenum in sorted(state.gates_on())))
+            yield ((row.clock, row.reg, row.val) + (active_voices,) + regdumps + (regevent,))
 
 
 def debug_reg_writes(sid, reg_writes, consolidate_mb_clock=10):
-    state = SidRegState()
-    raw_regevents = []
-    for clock, reg, val in reg_writes:
-        regevent = state.set(reg, val)
-        regs = [state.mainreg] + [state.voices[i] for i in state.voices]
-        regdumps = tuple([reg.regdump() for reg in regs])
-        active_voices = ','.join((str(voicenum) for voicenum in sorted(state.gates_on())))
-        raw_regevents.append((clock, reg, val) + (active_voices,) + regdumps + (regevent,))
-    lines = []
-    for i, regevents in enumerate(raw_regevents):
+    # TODO: fix consolidate_mb_clock
+    for regevents in debug_raw_reg_writes(reg_writes):
         clock, reg, val, active_voices, main_regdump, voice1_regdump, voice2_regdump, voice3_regdump, regevent = regevents
-        try:
-            next_regevents = raw_regevents[i + 1]
-        except IndexError:
-            next_regevents = None
-        descr = ''
         if isinstance(regevent, SidRegEvent):
             descr = regevent.descr
-        if next_regevents:
-            next_clock = next_regevents[0]
-            next_regevent = next_regevents[-1]
-            if next_regevent and isinstance(regevent, SidRegEvent) and next_regevent.reg == regevent.otherreg and next_clock - clock < consolidate_mb_clock:
-                descr = ''
         line_items = (
             '%9u' % clock,
             '%6.2f' % sid.clock_to_s(clock),
@@ -158,50 +142,48 @@ def debug_reg_writes(sid, reg_writes, consolidate_mb_clock=10):
             '%s' % voice3_regdump,
             descr,
         )
-        lines.append('\t'.join([str(i) for i in line_items]))
-    return lines
+        yield '\t'.join([str(i) for i in line_items])
 
 
-def get_events(writes, voicemask=VOICES):
-    events = []
+def get_events(reg_writes):
     state = SidRegState()
-    for clock, reg, val in writes:
+    last_clock = -1
+    for _, row in reg_writes.iterrows():
+        clock = int(row.clock)
+        assert clock > last_clock
+        last_clock = clock
+        reg = int(row.reg)
+        val = int(row.val)
         regevent = state.set(reg, val)
-        if not regevent:
-            continue
-        if regevent.voicenum and regevent.voicenum not in voicemask:
-            continue
-        frozen_state = frozen_sid_state_factory(state)
-        events.append((clock, reg, val, regevent, frozen_state))
-    return events
+        if regevent:
+            frozen_state = frozen_sid_state_factory(state)
+            yield (clock, reg, val, regevent, frozen_state)
 
 
 # consolidate events across multiple byte writes (e.g. collapse update of voice freq to one event)
-def get_consolidated_changes(writes, voicemask=VOICES, reg_write_clock_timeout=64):
+def get_consolidated_changes(reg_writes, voicemask=VOICES, reg_write_clock_timeout=64):
     pendingevent = []
-    consolidated = []
-    for event in get_events(writes, voicemask=voicemask):
+    for event in get_events(reg_writes):
         clock, _, _, regevent, state = event
         event = (clock, regevent, state)
         if pendingevent:
             pendingclock, pendingregevent, _pendingstate = pendingevent
             age = clock - pendingclock
             if age > reg_write_clock_timeout:
-                consolidated.append(pendingevent)
+                yield pendingevent
                 pendingevent = None
             elif regevent.otherreg == pendingregevent.reg:
                 if age < reg_write_clock_timeout:
-                    consolidated.append(event)
+                    yield event
                     pendingevent = None
                     continue
             else:
-                consolidated.append(pendingevent)
+                yield pendingevent
                 pendingevent = None
         if regevent.otherreg is not None:
             pendingevent = event
             continue
-        consolidated.append(event)
-    return sorted(consolidated, key=lambda x: x[0])
+        yield event
 
 
 # bracket voice events by gate status changes.
@@ -222,7 +204,7 @@ def get_gate_events(reg_writes, voicemask):
         voiceeventstack[voicenum].append(event)
 
     for event in reg_writes:
-        _clock, regevent, state = event
+        clock, regevent, state = event
         voicenum = regevent.voicenum
         if voicenum is None:
             mainevents.append(event)
