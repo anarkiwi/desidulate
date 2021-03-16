@@ -41,7 +41,7 @@ reg_writes = get_reg_writes(
     maxclock=args.maxclock,
     voicemask=voicemask)
 reg_writes_changes = get_consolidated_changes(reg_writes, voicemask)
-mainevents, voiceevents = get_gate_events(reg_writes_changes, voicemask)
+voiceevents = get_gate_events(reg_writes_changes, voicemask)
 
 single_patches = {}
 multi_patches = {}

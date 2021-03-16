@@ -58,7 +58,7 @@ class SidRegStateBase:
         return ''.join(('%2.2x' % int(j) for _, j in sorted(self.regstate.items())))
 
     def __hash__(self):
-        return '%2.2x%s' % (self.instance, self.regdump())
+        return hash((self.instance, tuple(sorted(self.regstate.items()))))
 
     def __str__(self):
         return self.regdump()
@@ -481,14 +481,19 @@ class FrozenSidFilterMainRegState(SidFilterMainRegStateMiddle):
         raise NotImplementedError
 
 
-def frozen_factory(state, statecache, stateclass):
-    statehash = state.__hash__()
+def frozen_factory_hash(statehash, state, statecache, stateclass):
     if statehash not in statecache:
         statecache[statehash] = stateclass(state)
     return statecache[statehash]
 
+
+def frozen_factory(state, statecache, stateclass):
+    return frozen_factory_hash(
+        state.__hash__(), state, statecache, stateclass)
+
 frozen_voice_state = {}
 frozen_main_state = {}
+frozen_regstate = {}
 
 class FrozenSidRegState(SidRegStateMiddle):
 
@@ -505,7 +510,7 @@ class FrozenSidRegState(SidRegStateMiddle):
             voicenum: frozen_factory(voicestate, frozen_voice_state, FrozenSidVoiceRegState)
             for voicenum, voicestate in state.voices.items()}
         self.mainreg = frozen_factory(state.mainreg, frozen_main_state, FrozenSidFilterMainRegState)
-        self.regstate = copy.copy(state.regstate)
+        self.regstate = frozen_factory_hash(hash(tuple(sorted(state.regstate))), state.regstate, frozen_regstate, dict)
         self.reg_voicenum = copy.copy(state.reg_voicenum)
 
     def set(self, reg, val):
