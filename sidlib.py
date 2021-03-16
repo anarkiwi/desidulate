@@ -58,19 +58,19 @@ class SidWrap:
         return self.resid.clock(timedelta(seconds=timeoffset_seconds))
 
 
-
 def get_sid(pal):
     return SidWrap(pal)
 
 
 # Read a VICE "-sounddev dump" register dump (emulator or vsid)
-def get_reg_writes(snd_log_name, skipsilence=1e6, minclock=0, maxclock=0, voicemask=VOICES, maxsilentclocks=0, passthrough=False):
+def get_reg_writes(snd_log_name, skipsilence=1e6, minclock=0, maxclock=0, voicemask=VOICES, maxsilentclocks=0, truncate=1e6, passthrough=False):
     # TODO: fix minclock
     # TODO: fix maxsilentclocks
     # TODO: fix skipsilence
     state = SidRegState()
     df = pd.read_csv(
         snd_log_name,
+        nrows=truncate,
         sep=' ',
         names=['clock_offset', 'reg', 'val'],
         dtype={'clock_offset': np.uint64, 'reg': np.uint8, 'val': np.uint8})
@@ -187,7 +187,6 @@ def get_consolidated_changes(reg_writes, voicemask=VOICES, reg_write_clock_timeo
 
 # bracket voice events by gate status changes.
 def get_gate_events(reg_writes, voicemask):
-    mainevents = []
     voiceevents = {v: [] for v in voicemask}
     voiceeventstack = {v: [] for v in voicemask}
 
@@ -205,9 +204,7 @@ def get_gate_events(reg_writes, voicemask):
     for event in reg_writes:
         clock, regevent, state = event
         voicenum = regevent.voicenum
-        if voicenum is None:
-            mainevents.append(event)
-        else:
+        if voicenum is not None:
             last_voiceevent = None
             last_gate = None
             if voiceeventstack[voicenum]:
@@ -228,4 +225,4 @@ def get_gate_events(reg_writes, voicemask):
 
     for voicenum in voicemask:
         despool_events(voicenum)
-    return mainevents, voiceevents
+    return voiceevents
