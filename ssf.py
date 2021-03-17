@@ -90,7 +90,7 @@ class SidSoundFragment:
                 else:
                     diff['clock'] = frame_clock + (clock - first_clock)
                 rows.append(diff)
-        df = pd.DataFrame(rows, columns=fieldnames)
+        df = pd.DataFrame(rows, columns=fieldnames, dtype=pd.Int64Dtype())
         hashid = hash(tuple(df.itertuples(index=False, name=None)))
         return (df, hashid)
 
