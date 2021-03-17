@@ -30,7 +30,9 @@ def midi_path(snd_log_name):
     return out_path(snd_log_name, 'mid')
 
 
-def wav_path(snd_log_name):
+def wav_path(snd_log_name, hashid=None):
+    if hashid:
+        return out_path(snd_log_name, '%d.wav' % hashid)
     return out_path(snd_log_name, 'wav')
 
 

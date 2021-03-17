@@ -6,11 +6,11 @@
 
 ## The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 
-import csv
 import argparse
 from collections import defaultdict
 
 import numpy as np
+import pandas as pd
 import scipy.io.wavfile
 from pyresidfp import Voice, ControlBits, ModeVolBits
 
@@ -20,7 +20,7 @@ from sidlib import get_sid
 
 parser = argparse.ArgumentParser(description='Convert [single|multi]_patches.csv into a WAV file')
 parser.add_argument('patchcsv', default='', help='patch CSV to read')
-parser.add_argument('hashid', default=0, help='hashid to reproduce')
+parser.add_argument('--hashid', default=0, help='hashid to reproduce')
 parser.add_argument('--wavfile', default='', help='WAV file to write')
 pal_parser = parser.add_mutually_exclusive_group(required=False)
 pal_parser.add_argument('--pal', dest='pal', action='store_true', help='Use PAL clock')
@@ -81,22 +81,15 @@ def pw_duty(voicenum, voicestate):
     return voicestate['pw_duty%u' % voicenum] & (2 ** 12 - 1)
 
 
-raw_samples = []
-lastclock = 0
-sidstate = defaultdict(int)
-arghashid = int(args.hashid)
+def generate_wav(df, sid, wavfile):
+    raw_samples = []
+    lastclock = 0
+    sidstate = defaultdict(int)
 
-with file_reader(args.patchcsv) as csvfile:
-    reader = csv.DictReader(csvfile)
-    for row in reader:
-        row = {k: int(v) for k, v in row.items() if v != ''}
-        hashid = row['hashid']
-        if hashid != arghashid:
-            continue
-        clock = row['clock']
-        ts_offset = clock - lastclock
+    for df_row in df.to_dict(orient='records'):
+        row = {k: int(v) for k, v in df_row.items() if not pd.isnull(v)}
+        ts_offset = row['clock'] - lastclock
         raw_samples.extend(sid.add_samples(ts_offset))
-
         for f in set(row.keys()) - {'hashid', 'count', 'clock'}:
             sidstate[f] += row[f]
 
@@ -112,8 +105,18 @@ with file_reader(args.patchcsv) as csvfile:
             sid.resid.sustain_release(voice, sustain_release(voicenum, sidstate))
             sid.resid.control(voice, control_reg(voicenum, sidstate))
 
-        lastclock = clock
+        lastclock = row['clock']
+
+    if raw_samples:
+        scipy.io.wavfile.write(
+            wavfile, int(sid.resid.sampling_frequency), np.array(raw_samples, dtype=np.float32) / 2**15)
 
 
-scipy.io.wavfile.write(
-    wavfile, int(sid.resid.sampling_frequency), np.array(raw_samples, dtype=np.float32) / 2**15)
+df = pd.read_csv(args.patchcsv, dtype=pd.Int64Dtype())
+hashid = np.int64(args.hashid)
+if hashid:
+    generate_wav(df[df['hashid'] == hashid], sid, wavfile)
+else:
+    for hashid, patch_df in df.groupby('hashid'):
+        wavfile = wav_path(args.patchcsv, hashid)
+        generate_wav(patch_df, sid, wavfile)
