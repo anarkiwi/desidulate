@@ -196,6 +196,7 @@ class SidSoundFragment:
                 elif self.noisephases > 1:
                     for clock, _pitch, _duration, velocity, _ in self.midi_notes:
                         self.smf.add_drum_pitch(self.voicenum, clock, self.total_duration, ELECTRIC_SNARE, velocity)
+                        break
                 else:
                     clock, _pitch, _dutation, velocity, _ = self.midi_notes[0]
                     if self.descending_pitches():
