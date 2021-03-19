@@ -111,11 +111,8 @@ def write_reg_writes(snd_log_name, reg_writes):
 
 def debug_raw_reg_writes(reg_writes):
     state = SidRegState()
-    for _, row in reg_writes.iterrows():
-        clock = int(row.clock)
-        reg = int(row.reg)
-        val = int(row.val)
-        regevent = state.set(reg, val)
+    for row in reg_writes.itertuples():
+        regevent = state.set(row.reg, row.val)
         if regevent:
             regs = [state.mainreg] + [state.voices[i] for i in state.voices]
             regdumps = tuple([reg.regdump() for reg in regs])
@@ -146,17 +143,11 @@ def debug_reg_writes(sid, reg_writes, consolidate_mb_clock=10):
 
 def get_events(reg_writes):
     state = SidRegState()
-    last_clock = -1
-    for _, row in reg_writes.iterrows():
-        clock = int(row.clock)
-        assert clock > last_clock
-        last_clock = clock
-        reg = int(row.reg)
-        val = int(row.val)
-        regevent = state.set(reg, val)
+    for row in reg_writes.itertuples():
+        regevent = state.set(row.reg, row.val)
         if regevent:
             frozen_state = frozen_sid_state_factory(state)
-            yield (clock, reg, val, regevent, frozen_state)
+            yield (row.clock, row.reg, row.val, regevent, frozen_state)
 
 
 # consolidate events across multiple byte writes (e.g. collapse update of voice freq to one event)
