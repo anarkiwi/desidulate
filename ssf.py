@@ -94,29 +94,9 @@ class SidSoundFragment:
         hashid = hash(tuple(df.itertuples(index=False, name=None)))
         return (df, hashid)
 
-    def parse(self):
-        audible_voicenums = set()
-        synced_voicenums = set()
-        for clock, _, state in self.events:
-            voicestate = state.voices[self.voicenum]
-            audible_voicenums = audible_voicenums.union(state.audible_voicenums())
-            synced_voicenums = synced_voicenums.union(voicestate.synced_voicenums())
-            self.voicestates.append((clock, voicestate, state))
-        self.trim_gateoff()
-        if self.voicenum in audible_voicenums:
-            self.midi_notes = tuple(self.smf.get_midi_notes_from_events(self.sid, self.events))
-            self.midi_pitches = tuple([midi_note[1] for midi_note in self.midi_notes])
-            self.total_duration = sum(duration for _, _, duration, _, _ in self.midi_notes)
-        if not self.midi_notes:
-            return
-        voicenums = {self.voicenum}.union(synced_voicenums)
-        if len(voicenums) > 1:
-            assert len(voicenums) == 2
-        self.max_midi_note = max(self.midi_pitches)
-        self.min_midi_note = min(self.midi_pitches)
+    def _parsedf(self, voicenums):
         last_clock = None
         rel_clock = 0
-        assert self.voicestates[0][1].gate
         orig_diffs = defaultdict(list)
         last_state = None
         first_state = None
@@ -169,19 +149,39 @@ class SidSoundFragment:
                 fieldnames.append(field)
                 first_row[field] = val
             first_row[flt_v_key] = getattr(first_state.mainreg, 'flt%u' % self.voicenum)
+        return (fieldnames, first_row, orig_diffs)
 
+    def parse(self):
+        audible_voicenums = set()
+        synced_voicenums = set()
+        for clock, _, state in self.events:
+            voicestate = state.voices[self.voicenum]
+            audible_voicenums = audible_voicenums.union(state.audible_voicenums())
+            synced_voicenums = synced_voicenums.union(voicestate.synced_voicenums())
+            self.voicestates.append((clock, voicestate, state))
+        self.trim_gateoff()
+        if self.voicenum in audible_voicenums:
+            self.midi_notes = tuple(self.smf.get_midi_notes_from_events(self.sid, self.events))
+            self.midi_pitches = tuple([midi_note[1] for midi_note in self.midi_notes])
+            self.total_duration = sum(duration for _, _, duration, _, _ in self.midi_notes)
+        if not self.midi_notes:
+            return
+        voicenums = {self.voicenum}.union(synced_voicenums)
+        if len(voicenums) > 1:
+            assert len(voicenums) == 2
+        self.max_midi_note = max(self.midi_pitches)
+        self.min_midi_note = min(self.midi_pitches)
+        assert self.voicestates[0][1].gate
+        fieldnames, first_row, orig_diffs = self._parsedf(voicenums)
         df, hashid = self._patchcsv(fieldnames, first_row, orig_diffs)
-        if len(voicenums) == 1:
-            if hashid not in self.single_patches:
+        if hashid not in self.patch_count:
+            if len(voicenums) == 1:
                 self.single_patches[hashid] = df
-        else:
-            if hashid not in self.multi_patches:
+            else:
                 self.multi_patches[hashid] = df
         self.patch_count[hashid] += 1
-
         self.noisephases = len([waveforms for waveforms in self.waveform_order if 'noise' in waveforms])
         self.all_noise = set(self.waveforms.keys()) == {'noise'}
-
 
     def descending_pitches(self):
         return len(self.midi_pitches) > 2 and self.midi_pitches[0] > self.midi_pitches[-1]
