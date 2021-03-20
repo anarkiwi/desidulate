@@ -6,6 +6,7 @@
 
 ## THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABL E FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+from collections import defaultdict
 from datetime import timedelta
 from functools import lru_cache
 import pandas as pd
@@ -178,8 +179,8 @@ def get_consolidated_changes(reg_writes, voicemask=VOICES, reg_write_clock_timeo
 
 # bracket voice events by gate status changes.
 def get_gate_events(reg_writes, voicemask):
-    voiceevents = {v: [] for v in voicemask}
-    voiceeventstack = {v: [] for v in voicemask}
+    voiceevents = defaultdict(list)
+    voiceeventstack = defaultdict(list)
 
     def despool_events(voicenum):
         if voiceeventstack[voicenum]:
@@ -207,9 +208,7 @@ def get_gate_events(reg_writes, voicemask):
             if last_gate is not None and last_gate != gate:
                 if gate:
                     despool_events(voicenum)
-                    append_event(voicenum, event)
-                else:
-                    append_event(voicenum, event)
+                append_event(voicenum, event)
                 continue
             if gate or voice_state.in_rel():
                 append_event(voicenum, event)
