@@ -152,7 +152,7 @@ def get_events(reg_writes):
 
 
 # consolidate events across multiple byte writes (e.g. collapse update of voice freq to one event)
-def get_consolidated_changes(reg_writes, voicemask=VOICES, reg_write_clock_timeout=64):
+def get_consolidated_changes(reg_writes, reg_write_clock_timeout=64):
     pendingevent = []
     for event in get_events(reg_writes):
         clock, _, _, regevent, state = event
@@ -178,7 +178,7 @@ def get_consolidated_changes(reg_writes, voicemask=VOICES, reg_write_clock_timeo
 
 
 # bracket voice events by gate status changes.
-def get_gate_events(reg_writes, voicemask):
+def get_gate_events(reg_writes):
     voiceeventstack = defaultdict(list)
 
     def despool_events(voicenum):
@@ -216,7 +216,7 @@ def get_gate_events(reg_writes, voicemask):
             if gate or voice_state.in_rel():
                 append_event(voicenum, event)
 
-    for voicenum in voicemask:
+    for voicenum in voiceeventstack:
         despooled = despool_events(voicenum)
         if despooled:
             yield despooled
