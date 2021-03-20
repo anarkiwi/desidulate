@@ -40,13 +40,12 @@ reg_writes = get_reg_writes(
     minclock=args.minclock,
     maxclock=args.maxclock,
     voicemask=voicemask)
-reg_writes_changes = get_consolidated_changes(reg_writes)
 
 single_patches = {}
 multi_patches = {}
 patch_count = Counter()
 
-gated_voice_events = get_gate_events(reg_writes_changes)
+gated_voice_events = get_gate_events(reg_writes)
 for voicenum, event_start, events in gated_voice_events:
     sse = SidSoundFragment(args.percussion, sid, smf, voicenum, event_start, events, single_patches, multi_patches, patch_count)
     sse.parse()
