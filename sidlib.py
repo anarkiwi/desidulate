@@ -109,13 +109,17 @@ def get_reg_writes(snd_log_name, skipsilence=1e6, minclock=0, maxclock=0, voicem
     return df
 
 
+def add_clock_offset(df):
+    df['clock_offset'] = df['clock'].sub(df['clock'].shift(1))
+    df['clock_offset'] = df['clock_offset'].fillna(0)
+    df = df.astype({'clock_offset': np.uint64})
+    return df
+
+
 def write_reg_writes(snd_log_name, reg_writes):
-    with open(snd_log_name, 'w') as snd_log_f:
-        last_clock = 0
-        for clock, reg, val in reg_writes:
-            rel_clock = clock - last_clock
-            last_clock = clock
-            snd_log_f.write(' '.join((str(i) for i in (rel_clock, reg, val))) + '\n')
+    reg_writes = add_clock_offset(reg_writes)
+    reg_writes = reg_writes[['clock_offset', 'reg', 'val']]
+    reg_writes.to_csv(snd_log_name, header=0, index=False)
 
 
 def debug_raw_reg_writes(reg_writes):
@@ -192,14 +196,14 @@ def get_gate_events(reg_writes, reg_write_clock_timeout=64):
         despooled = None
         if voiceeventstack[voicenum]:
             first_event = voiceeventstack[voicenum][0]
-            first_clock, _, first_state = first_event
+            _, first_state = first_event
             if first_state.voices[voicenum].gate:
-                despooled = (voicenum, first_clock, voiceeventstack[voicenum])
+                despooled = (voicenum, voiceeventstack[voicenum])
             voiceeventstack[voicenum] = []
         return despooled
 
-    def append_event(voicenum, event):
-        voiceeventstack[voicenum].append(event)
+    def append_event(voicenum, clock, state):
+        voiceeventstack[voicenum].append((clock, state))
 
     for event in get_consolidated_changes(reg_writes, reg_write_clock_timeout):
         clock, regevent, state = event
@@ -209,7 +213,7 @@ def get_gate_events(reg_writes, reg_write_clock_timeout=64):
             last_gate = None
             if voiceeventstack[voicenum]:
                 last_voiceevent = voiceeventstack[voicenum][-1]
-                _, _, last_state = last_voiceevent
+                _, last_state = last_voiceevent
                 last_gate = last_state.voices[voicenum].gate
             voice_state = state.voices[voicenum]
             gate = voice_state.gate
@@ -218,10 +222,10 @@ def get_gate_events(reg_writes, reg_write_clock_timeout=64):
                     despooled = despool_events(voicenum)
                     if despooled:
                         yield despooled
-                append_event(voicenum, event)
+                append_event(voicenum, clock, state)
                 continue
             if gate or voice_state.in_rel():
-                append_event(voicenum, event)
+                append_event(voicenum, clock, state)
 
     for voicenum in voiceeventstack:
         despooled = despool_events(voicenum)
