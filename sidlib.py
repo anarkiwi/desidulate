@@ -6,6 +6,7 @@
 
 ## THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABL E FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+from collections import defaultdict
 from datetime import timedelta
 from functools import lru_cache
 import pandas as pd
@@ -97,6 +98,14 @@ def get_reg_writes(snd_log_name, skipsilence=1e6, minclock=0, maxclock=0, voicem
     df = df.sort_index()
     # reset clock relative to 0
     df['clock'] -= df['clock'].min()
+    # TODO: use precalculated gate mask
+    # for voicenum in voicemask:
+    #     gate_name = 'gate%u' % voicenum
+    #     voice = state.voices[voicenum]
+    #     control_reg = voice.regbase() + voice.CONTROL_REG
+    #     gate_mask = (df['reg'] == control_reg)
+    #     df[gate_name] = pd.UInt8Dtype()
+    #     df.loc[gate_mask, gate_name] = df[gate_mask]['val'].values & 1
     return df
 
 
@@ -111,11 +120,8 @@ def write_reg_writes(snd_log_name, reg_writes):
 
 def debug_raw_reg_writes(reg_writes):
     state = SidRegState()
-    for _, row in reg_writes.iterrows():
-        clock = int(row.clock)
-        reg = int(row.reg)
-        val = int(row.val)
-        regevent = state.set(reg, val)
+    for row in reg_writes.itertuples():
+        regevent = state.set(row.reg, row.val)
         if regevent:
             regs = [state.mainreg] + [state.voices[i] for i in state.voices]
             regdumps = tuple([reg.regdump() for reg in regs])
@@ -146,25 +152,18 @@ def debug_reg_writes(sid, reg_writes, consolidate_mb_clock=10):
 
 def get_events(reg_writes):
     state = SidRegState()
-    last_clock = -1
-    for _, row in reg_writes.iterrows():
-        clock = int(row.clock)
-        assert clock > last_clock
-        last_clock = clock
-        reg = int(row.reg)
-        val = int(row.val)
-        regevent = state.set(reg, val)
+    for row in reg_writes.itertuples():
+        regevent = state.set(row.reg, row.val)
         if regevent:
             frozen_state = frozen_sid_state_factory(state)
-            yield (clock, reg, val, regevent, frozen_state)
+            yield (row.clock, regevent, frozen_state)
 
 
 # consolidate events across multiple byte writes (e.g. collapse update of voice freq to one event)
-def get_consolidated_changes(reg_writes, voicemask=VOICES, reg_write_clock_timeout=64):
+def get_consolidated_changes(reg_writes, reg_write_clock_timeout):
     pendingevent = []
     for event in get_events(reg_writes):
-        clock, _, _, regevent, state = event
-        event = (clock, regevent, state)
+        clock, regevent, state = event
         if pendingevent:
             pendingclock, pendingregevent, _pendingstate = pendingevent
             age = clock - pendingclock
@@ -186,22 +185,23 @@ def get_consolidated_changes(reg_writes, voicemask=VOICES, reg_write_clock_timeo
 
 
 # bracket voice events by gate status changes.
-def get_gate_events(reg_writes, voicemask):
-    voiceevents = {v: [] for v in voicemask}
-    voiceeventstack = {v: [] for v in voicemask}
+def get_gate_events(reg_writes, reg_write_clock_timeout=64):
+    voiceeventstack = defaultdict(list)
 
     def despool_events(voicenum):
+        despooled = None
         if voiceeventstack[voicenum]:
             first_event = voiceeventstack[voicenum][0]
             first_clock, _, first_state = first_event
             if first_state.voices[voicenum].gate:
-                voiceevents[voicenum].append((first_clock, voiceeventstack[voicenum]))
+                despooled = (voicenum, first_clock, voiceeventstack[voicenum])
             voiceeventstack[voicenum] = []
+        return despooled
 
     def append_event(voicenum, event):
         voiceeventstack[voicenum].append(event)
 
-    for event in reg_writes:
+    for event in get_consolidated_changes(reg_writes, reg_write_clock_timeout):
         clock, regevent, state = event
         voicenum = regevent.voicenum
         if voicenum is not None:
@@ -215,14 +215,15 @@ def get_gate_events(reg_writes, voicemask):
             gate = voice_state.gate
             if last_gate is not None and last_gate != gate:
                 if gate:
-                    despool_events(voicenum)
-                    append_event(voicenum, event)
-                else:
-                    append_event(voicenum, event)
+                    despooled = despool_events(voicenum)
+                    if despooled:
+                        yield despooled
+                append_event(voicenum, event)
                 continue
             if gate or voice_state.in_rel():
                 append_event(voicenum, event)
 
-    for voicenum in voicemask:
-        despool_events(voicenum)
-    return voiceevents
+    for voicenum in voiceeventstack:
+        despooled = despool_events(voicenum)
+        if despooled:
+            yield despooled
