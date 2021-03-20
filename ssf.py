@@ -38,20 +38,17 @@ def dump_patches(logfile, patch_count, patch_output):
 
 class SidSoundFragment:
 
-    def __init__(self, percussion, sid, smf, voicenum, event_start, events, single_patches, multi_patches, patch_count):
+    def __init__(self, percussion, sid, smf, voicenum, events, single_patches, multi_patches, patch_count):
         self.percussion = percussion
         self.voicenum = voicenum
         self.sid = sid
         self.smf = smf
-        self.event_start = event_start
-        self.events = events
         self.waveforms = Counter()
         self.waveform_order = []
         self.noisephases = 0
         self.all_noise = False
         self.midi_notes = []
         self.midi_pitches = []
-        self.voicestates = []
         self.voice_filtered = False
         self.total_duration = 0
         self.max_midi_note = 0
@@ -59,17 +56,16 @@ class SidSoundFragment:
         self.single_patches = single_patches
         self.multi_patches = multi_patches
         self.patch_count = patch_count
+        self.voicestates = [(clock, state, state.voices[self.voicenum]) for clock, state in events]
 
     def trim_gateoff(self):
         for i, clock_voicestate_state in enumerate(self.voicestates):
-            _, voicestate, state = clock_voicestate_state
+            _, state, voicestate = clock_voicestate_state
             if not voicestate.gate and not voicestate.rel:
                 self.voicestates = self.voicestates[:i+1]
                 break
-            if state.mainreg.voice_filtered(self.voicenum):
-                self.voice_filtered = True
         i = len(self.voicestates) - 1
-        while i > 0 and self.voicestates[i][1].test:
+        while i > 0 and self.voicestates[i][2].test:
             i -= 1
         if i:
             self.voicestates = self.voicestates[:i+2]
@@ -95,12 +91,18 @@ class SidSoundFragment:
         return (df, hashid)
 
     def _parsedf(self, voicenums):
+        assert self.voicestates[0][2].gate
+        for _, state, _ in self.voicestates:
+            if state.mainreg.voice_filtered(self.voicenum):
+                self.voice_filtered = True
+                break
         last_clock = None
         rel_clock = 0
         orig_diffs = defaultdict(list)
         last_state = None
         first_state = None
-        for clock, voicestate, state in self.voicestates:
+        event_start = self.voicestates[0][0]
+        for clock, state, voicestate in self.voicestates:
             if last_clock is not None:
                 rel_clock = clock - last_clock
             else:
@@ -126,11 +128,14 @@ class SidSoundFragment:
                         del filter_diff[flt_v_key]
                         filter_diff['flt%u' % self.normalize_voicenum(self.voicenum)] = val
                     diff.update(filter_diff)
-                clock_diff = clock - self.event_start
+                clock_diff = clock - event_start
                 frame_clock = self.sid.nearest_frame_clock(clock_diff)
                 orig_diffs[frame_clock].append((clock, diff))
             last_clock = clock
             last_state = state
+
+        self.noisephases = len([waveforms for waveforms in self.waveform_order if 'noise' in waveforms])
+        self.all_noise = set(self.waveforms.keys()) == {'noise'}
 
         first_row = {'clock': 0}
         fieldnames = ['clock']
@@ -152,26 +157,20 @@ class SidSoundFragment:
         return (fieldnames, first_row, orig_diffs)
 
     def parse(self):
-        audible_voicenums = set()
-        synced_voicenums = set()
-        for clock, _, state in self.events:
-            voicestate = state.voices[self.voicenum]
-            audible_voicenums = audible_voicenums.union(state.audible_voicenums())
-            synced_voicenums = synced_voicenums.union(voicestate.synced_voicenums())
-            self.voicestates.append((clock, voicestate, state))
         self.trim_gateoff()
-        if self.voicenum in audible_voicenums:
-            self.midi_notes = tuple(self.smf.get_midi_notes_from_events(self.sid, self.events))
-            self.midi_pitches = tuple([midi_note[1] for midi_note in self.midi_notes])
-            self.total_duration = sum(duration for _, _, duration, _, _ in self.midi_notes)
+        audible_voicenums = set().union(*[state.audible_voicenums() for _, state, _ in self.voicestates])
+        if self.voicenum not in audible_voicenums:
+            return
+        self.midi_notes = tuple(self.smf.get_midi_notes_from_events(self.sid, self.voicestates))
         if not self.midi_notes:
             return
+        synced_voicenums = set().union(*[voicestate.synced_voicenums() for _, _, voicestate in self.voicestates])
         voicenums = {self.voicenum}.union(synced_voicenums)
-        if len(voicenums) > 1:
-            assert len(voicenums) == 2
+        assert len(voicenums) in (1, 2)
+        self.midi_pitches = tuple([midi_note[1] for midi_note in self.midi_notes])
+        self.total_duration = sum(duration for _, _, duration, _, _ in self.midi_notes)
         self.max_midi_note = max(self.midi_pitches)
         self.min_midi_note = min(self.midi_pitches)
-        assert self.voicestates[0][1].gate
         fieldnames, first_row, orig_diffs = self._parsedf(voicenums)
         df, hashid = self._patchcsv(fieldnames, first_row, orig_diffs)
         if hashid not in self.patch_count:
@@ -180,25 +179,20 @@ class SidSoundFragment:
             else:
                 self.multi_patches[hashid] = df
         self.patch_count[hashid] += 1
-        self.noisephases = len([waveforms for waveforms in self.waveform_order if 'noise' in waveforms])
-        self.all_noise = set(self.waveforms.keys()) == {'noise'}
 
     def descending_pitches(self):
         return len(self.midi_pitches) > 2 and self.midi_pitches[0] > self.midi_pitches[-1]
 
     def smf_transcribe(self):
-        # voicenum, clock, duration, pitch, velocity
         if self.noisephases:
             if self.percussion:
+                clock, _pitch, _duration, velocity, _ = self.midi_notes[0]
+
                 if self.all_noise:
-                    for clock, _pitch, duration, velocity, _ in self.midi_notes:
-                        self.smf.add_drum_noise_duration(self.voicenum, clock, duration, velocity)
+                    self.smf.add_drum_noise_duration(self.voicenum, clock, self.total_duration, velocity)
                 elif self.noisephases > 1:
-                    for clock, _pitch, _duration, velocity, _ in self.midi_notes:
-                        self.smf.add_drum_pitch(self.voicenum, clock, self.total_duration, ELECTRIC_SNARE, velocity)
-                        break
+                    self.smf.add_drum_pitch(self.voicenum, clock, self.total_duration, ELECTRIC_SNARE, velocity)
                 else:
-                    clock, _pitch, _dutation, velocity, _ = self.midi_notes[0]
                     if self.descending_pitches():
                         # http://www.ucapps.de/howto_sid_wavetables_1.html
                         self.smf.add_drum_pitch(self.voicenum, clock, self.total_duration, BASS_DRUM, velocity)
