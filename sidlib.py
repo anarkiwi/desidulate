@@ -179,16 +179,17 @@ def get_consolidated_changes(reg_writes, voicemask=VOICES, reg_write_clock_timeo
 
 # bracket voice events by gate status changes.
 def get_gate_events(reg_writes, voicemask):
-    voiceevents = defaultdict(list)
     voiceeventstack = defaultdict(list)
 
     def despool_events(voicenum):
+        despooled = None
         if voiceeventstack[voicenum]:
             first_event = voiceeventstack[voicenum][0]
             first_clock, _, first_state = first_event
             if first_state.voices[voicenum].gate:
-                voiceevents[voicenum].append((first_clock, voiceeventstack[voicenum]))
+                despooled = (voicenum, first_clock, voiceeventstack[voicenum])
             voiceeventstack[voicenum] = []
+        return despooled
 
     def append_event(voicenum, event):
         voiceeventstack[voicenum].append(event)
@@ -207,12 +208,15 @@ def get_gate_events(reg_writes, voicemask):
             gate = voice_state.gate
             if last_gate is not None and last_gate != gate:
                 if gate:
-                    despool_events(voicenum)
+                    despooled = despool_events(voicenum)
+                    if despooled:
+                        yield despooled
                 append_event(voicenum, event)
                 continue
             if gate or voice_state.in_rel():
                 append_event(voicenum, event)
 
     for voicenum in voicemask:
-        despool_events(voicenum)
-    return voiceevents
+        despooled = despool_events(voicenum)
+        if despooled:
+            yield despooled
