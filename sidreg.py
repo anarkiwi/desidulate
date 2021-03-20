@@ -154,6 +154,8 @@ class SidVoiceRegStateMiddle(SidRegHandler):
        'noise',
     ]
 
+    CONTROL_REG = 4
+
     def __init__(self, voicenum):
         self.gate = None
         self.sync = None
@@ -250,7 +252,7 @@ class SidVoiceRegState(SidVoiceRegStateMiddle):
         return (self._sus_rel_descr(), None)
 
     def _control_descr(self):
-        val = self.regstate[4]
+        val = self.regstate[self.CONTROL_REG]
         return self.decodebits(val, {
             0: 'gate', 1: 'sync', 2: 'ring', 3: 'test',
             4: 'tri', 5: 'saw', 6: 'pulse', 7: 'noise'})
