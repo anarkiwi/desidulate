@@ -148,15 +148,14 @@ def get_events(reg_writes):
         regevent = state.set(row.reg, row.val)
         if regevent:
             frozen_state = frozen_sid_state_factory(state)
-            yield (row.clock, row.reg, row.val, regevent, frozen_state)
+            yield (row.clock, regevent, frozen_state)
 
 
 # consolidate events across multiple byte writes (e.g. collapse update of voice freq to one event)
 def get_consolidated_changes(reg_writes, reg_write_clock_timeout=64):
     pendingevent = []
     for event in get_events(reg_writes):
-        clock, _, _, regevent, state = event
-        event = (clock, regevent, state)
+        clock, regevent, state = event
         if pendingevent:
             pendingclock, pendingregevent, _pendingstate = pendingevent
             age = clock - pendingclock
