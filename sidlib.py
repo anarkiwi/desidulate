@@ -98,14 +98,14 @@ def get_reg_writes(snd_log_name, skipsilence=1e6, minclock=0, maxclock=0, voicem
     df = df.sort_index()
     # reset clock relative to 0
     df['clock'] -= df['clock'].min()
-    for voicenum in voicemask:
-        gate_name = 'gate%u' % voicenum
-        voice = state.voices[voicenum]
-        control_reg = voice.regbase() + voice.CONTROL_REG
-        gate_mask = (df['reg'] == control_reg)
-        df[gate_name] = pd.UInt8Dtype()
-        df.loc[gate_mask, gate_name] = df[gate_mask]['val'].values & 1
-    print(df[df['gate2'] == 1].head())
+    # TODO: use precalculated gate mask
+    # for voicenum in voicemask:
+    #     gate_name = 'gate%u' % voicenum
+    #     voice = state.voices[voicenum]
+    #     control_reg = voice.regbase() + voice.CONTROL_REG
+    #     gate_mask = (df['reg'] == control_reg)
+    #     df[gate_name] = pd.UInt8Dtype()
+    #     df.loc[gate_mask, gate_name] = df[gate_mask]['val'].values & 1
     return df
 
 
