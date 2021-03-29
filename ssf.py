@@ -95,13 +95,9 @@ class SidSoundFragment:
     def _patchcsv(self, voicenums, fieldnames, first_row, orig_diffs):
         rows = [first_row]
         for frame_clock, clock_diffs in orig_diffs.items():
-            first_clock = None
+            first_clock, _ = clock_diffs[0]
             for clock, diff in clock_diffs:
-                if first_clock is None:
-                    diff['clock'] = frame_clock
-                    first_clock = clock
-                else:
-                    diff['clock'] = frame_clock + (clock - first_clock)
+                diff['clock'] = frame_clock + (clock - first_clock)
                 rows.append(diff)
         df = pd.DataFrame(rows, columns=fieldnames, dtype=pd.Int64Dtype())
         nan_cols = []
