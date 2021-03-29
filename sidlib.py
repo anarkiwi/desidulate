@@ -27,9 +27,7 @@ class SidWrap:
             self.clock_freq = SoundInterfaceDevice.NTSC_CLOCK_FREQUENCY
             self.int_freq = 60.0
         self.resid = SoundInterfaceDevice(model=model, clock_frequency=self.clock_freq)
-
-    def clockq(self):
-        return self.clock_freq / self.int_freq
+        self.clockq = self.clock_freq / self.int_freq
 
     def clock_to_s(self, clock):
         return clock / self.clock_freq
@@ -44,15 +42,11 @@ class SidWrap:
         # http://www.sidmusic.org/sid/sidtech2.html
         return freq_reg * self.clock_freq / 16777216
 
-    @lru_cache(maxsize=None)
-    def frame_length(self):
-        return self.clock_freq / self.int_freq
-
     def clock_frame(self, clock):
-        return round(clock / self.frame_length())
+        return round(clock / self.clockq)
 
     def nearest_frame_clock(self, clock):
-        return round(self.clock_frame(clock) * self.frame_length())
+        return round(self.clock_frame(clock) * self.clockq)
 
     def add_samples(self, offset):
         timeoffset_seconds = offset / self.clock_freq
