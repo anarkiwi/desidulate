@@ -8,7 +8,6 @@
 
 from collections import defaultdict
 from datetime import timedelta
-from functools import lru_cache
 import pandas as pd
 import numpy as np
 from pyresidfp import SoundInterfaceDevice
@@ -27,9 +26,7 @@ class SidWrap:
             self.clock_freq = SoundInterfaceDevice.NTSC_CLOCK_FREQUENCY
             self.int_freq = 60.0
         self.resid = SoundInterfaceDevice(model=model, clock_frequency=self.clock_freq)
-
-    def clockq(self):
-        return self.clock_freq / self.int_freq
+        self.clockq = int(round(self.clock_freq / self.int_freq))
 
     def clock_to_s(self, clock):
         return clock / self.clock_freq
@@ -44,16 +41,6 @@ class SidWrap:
         # http://www.sidmusic.org/sid/sidtech2.html
         return freq_reg * self.clock_freq / 16777216
 
-    @lru_cache(maxsize=None)
-    def frame_length(self):
-        return self.clock_freq / self.int_freq
-
-    def clock_frame(self, clock):
-        return round(clock / self.frame_length())
-
-    def nearest_frame_clock(self, clock):
-        return round(self.clock_frame(clock) * self.frame_length())
-
     def add_samples(self, offset):
         timeoffset_seconds = offset / self.clock_freq
         return self.resid.clock(timedelta(seconds=timeoffset_seconds))
@@ -64,7 +51,7 @@ def get_sid(pal):
 
 
 # Read a VICE "-sounddev dump" register dump (emulator or vsid)
-def get_reg_writes(snd_log_name, skipsilence=1e6, minclock=0, maxclock=0, voicemask=VOICES, maxsilentclocks=0, truncate=1e6, passthrough=False):
+def get_reg_writes(sid, snd_log_name, skipsilence=1e6, minclock=0, maxclock=0, voicemask=VOICES, maxsilentclocks=0, truncate=1e6, passthrough=False):
     # TODO: fix minclock
     # TODO: fix maxsilentclocks
     # TODO: fix skipsilence
@@ -80,7 +67,8 @@ def get_reg_writes(snd_log_name, skipsilence=1e6, minclock=0, maxclock=0, voicem
     df = df[df['reg'] <= max(state.regstate)]
     if maxclock:
         df = df[df.clock <= maxclock]
-    df = df[['clock', 'reg', 'val']]
+    df['frame'] = df['clock'].floordiv(int(sid.clockq))
+    df = df[['clock', 'clock_offset', 'frame', 'reg', 'val']]
     if passthrough:
         return df.to_numpy()
     # remove consecutive repeated register writes
@@ -98,6 +86,8 @@ def get_reg_writes(snd_log_name, skipsilence=1e6, minclock=0, maxclock=0, voicem
     df = df.sort_index()
     # reset clock relative to 0
     df['clock'] -= df['clock'].min()
+    df['frame'] -= df['frame'].min()
+    df['clock_offset'] = df['clock'].diff().fillna(0).astype(np.uint64)
     # TODO: use precalculated gate mask
     # for voicenum in voicemask:
     #     gate_name = 'gate%u' % voicenum
@@ -133,7 +123,7 @@ def debug_raw_reg_writes(reg_writes):
             yield (row.clock, row.reg, row.val) + (active_voices,) + regdumps + (regevent,)
 
 
-def debug_reg_writes(sid, reg_writes, consolidate_mb_clock=10):
+def debug_reg_writes(sid, reg_writes, consolidate_mb_clock=18):
     # TODO: fix consolidate_mb_clock
     for regevents in debug_raw_reg_writes(reg_writes):
         clock, reg, val, active_voices, main_regdump, voice1_regdump, voice2_regdump, voice3_regdump, regevent = regevents
@@ -160,16 +150,16 @@ def get_events(reg_writes):
         regevent = state.set(row.reg, row.val)
         if regevent:
             frozen_state = frozen_sid_state_factory(state)
-            yield (row.clock, regevent, frozen_state)
+            yield (row.clock, row.frame, regevent, frozen_state)
 
 
 # consolidate events across multiple byte writes (e.g. collapse update of voice freq to one event)
 def get_consolidated_changes(reg_writes, reg_write_clock_timeout):
     pendingevent = []
     for event in get_events(reg_writes):
-        clock, regevent, state = event
+        clock, frame, regevent, _state = event
         if pendingevent:
-            pendingclock, pendingregevent, _pendingstate = pendingevent
+            pendingclock, _frame, pendingregevent, _pendingstate = pendingevent
             age = clock - pendingclock
             if age > reg_write_clock_timeout:
                 yield pendingevent
@@ -196,24 +186,24 @@ def get_gate_events(reg_writes, reg_write_clock_timeout=64):
         despooled = None
         if voiceeventstack[voicenum]:
             first_event = voiceeventstack[voicenum][0]
-            _, first_state = first_event
+            _, _, first_state = first_event
             if first_state.voices[voicenum].gate:
                 despooled = (voicenum, voiceeventstack[voicenum])
             voiceeventstack[voicenum] = []
         return despooled
 
-    def append_event(voicenum, clock, state):
-        voiceeventstack[voicenum].append((clock, state))
+    def append_event(voicenum, clock, frame, state):
+        voiceeventstack[voicenum].append((clock, frame, state))
 
     for event in get_consolidated_changes(reg_writes, reg_write_clock_timeout):
-        clock, regevent, state = event
+        clock, frame, regevent, state = event
         voicenum = regevent.voicenum
         if voicenum is not None:
             last_voiceevent = None
             last_gate = None
             if voiceeventstack[voicenum]:
                 last_voiceevent = voiceeventstack[voicenum][-1]
-                _, last_state = last_voiceevent
+                _, _, last_state = last_voiceevent
                 last_gate = last_state.voices[voicenum].gate
             voice_state = state.voices[voicenum]
             gate = voice_state.gate
@@ -222,10 +212,10 @@ def get_gate_events(reg_writes, reg_write_clock_timeout=64):
                     despooled = despool_events(voicenum)
                     if despooled:
                         yield despooled
-                append_event(voicenum, clock, state)
+                append_event(voicenum, clock, frame, state)
                 continue
             if gate or voice_state.in_rel():
-                append_event(voicenum, clock, state)
+                append_event(voicenum, clock, frame, state)
 
     for voicenum in voiceeventstack:
         despooled = despool_events(voicenum)

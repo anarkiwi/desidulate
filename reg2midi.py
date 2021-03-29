@@ -12,7 +12,7 @@
 import argparse
 from collections import Counter
 from fileio import midi_path
-from sidlib import get_consolidated_changes, get_gate_events, get_reg_writes, get_sid, VOICES
+from sidlib import get_gate_events, get_reg_writes, get_sid, VOICES
 from sidmidi import SidMidiFile
 from ssf import dump_patches, SidSoundFragment
 
@@ -36,6 +36,7 @@ voicemask = frozenset((int(v) for v in args.voicemask.split(',')))
 sid = get_sid(args.pal)
 smf = SidMidiFile(sid, args.bpm)
 reg_writes = get_reg_writes(
+    sid,
     args.logfile,
     minclock=args.minclock,
     maxclock=args.maxclock,
@@ -46,7 +47,9 @@ multi_patches = {}
 patch_count = Counter()
 
 for voicenum, events in get_gate_events(reg_writes):
-    sse = SidSoundFragment(args.percussion, sid, smf, voicenum, events, single_patches, multi_patches, patch_count)
+    sse = SidSoundFragment(
+        args.percussion, sid, smf, voicenum, events,
+        single_patches, multi_patches, patch_count)
     sse.parse()
     sse.smf_transcribe()
 

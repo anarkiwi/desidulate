@@ -142,7 +142,7 @@ class SidMidiFile:
         self.drum_pitches[voicenum].append((clock, duration, pitch, velocity))
 
     def add_drum_noise_duration(self, voicenum, clock, duration, velocity):
-        max_duration = self.sid.clockq()
+        max_duration = self.sid.clockq
         noise_pitch = None
         for noise_pitch in (PEDAL_HIHAT, CLOSED_HIHAT, OPEN_HIHAT, ACCOUSTIC_SNARE, CRASH_CYMBAL1):
             if duration <= max_duration:
@@ -164,8 +164,8 @@ class SidMidiFile:
     def get_midi_notes_from_events(self, sid, voiceevents):
         last_midi_n = None
         notes_starts = []
-        for clock, state, voicestate in voiceevents:
-            clock = int(clock / self.sid.clockq()) * self.sid.clockq()
+        for clock, _frame, state, voicestate in voiceevents:
+            clock = int(clock / self.sid.clockq) * self.sid.clockq
             sid_f = sid.real_sid_freq(voicestate.freq)
             _, closest_midi_n = self.closest_midi(sid_f)
             velocity = self.sid_adsr_to_velocity(voicestate)
@@ -184,6 +184,6 @@ class SidMidiFile:
             duration = next_clock - clock
             if not duration:
                 continue
-            duration = round(duration / self.sid.clockq()) * self.sid.clockq()
+            duration = round(duration / self.sid.clockq) * self.sid.clockq
             notes.append((clock, note, duration, velocity, sid_f))
         return notes

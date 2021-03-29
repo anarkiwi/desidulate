@@ -31,6 +31,7 @@ if not wavfile:
 
 sid = get_sid(pal=args.pal)
 reg_writes = get_reg_writes(
+    sid,
     args.logfile,
     minclock=args.minclock,
     maxclock=args.maxclock,

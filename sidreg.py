@@ -92,11 +92,15 @@ class SidRegHandler(SidRegStateBase):
     def regbase(self):
         return self.REGBASE + (self.instance - 1) * len(self._REGMAP)
 
-    def lohi(self, lo, hi):
-        return (self.regstate.get(hi, 0) << 8) + self.regstate.get(lo, 0)
+    def bitmask(self, val, bits):
+        return val & (2**bits - 1)
 
-    def lohi_attr(self, lo, hi, attr):
-        val = self.lohi(lo, hi)
+    def lohi(self, lo, hi, lobits, hibits):
+        return (self.bitmask(self.regstate.get(hi, 0), hibits) << lobits) + self.bitmask(self.regstate.get(lo, 0), lobits)
+
+    def lohi_attr(self, lo, hi, attr, lobits, hibits):
+        val = self.lohi(lo, hi, lobits, hibits)
+        assert val < 2**(lobits + hibits), val
         setattr(self, attr, val)
         return {attr: '%.2x' % val}
 
@@ -228,13 +232,13 @@ class SidVoiceRegState(SidVoiceRegStateMiddle):
         self.voicenum = voicenum
 
     def _freq_descr(self):
-        return self.lohi_attr(0, 1, 'freq')
+        return self.lohi_attr(0, 1, 'freq', 8, 8)
 
     def _freq(self, reg):
         return (self._freq_descr(), {0, 1} - {reg})
 
     def _pwduty_descr(self):
-        return self.lohi_attr(2, 3, 'pw_duty')
+        return self.lohi_attr(2, 3, 'pw_duty', 8, 4)
 
     def _pwduty(self, reg):
         return (self._pwduty_descr(), {2, 3} - {reg})
@@ -324,7 +328,7 @@ class SidFilterMainRegState(SidFilterMainRegStateMiddle):
         return self.REGBASE
 
     def _filtercutoff(self, reg):
-        return (self.lohi_attr(0, 1, 'flt_coff'), {0, 1} - {reg})
+        return (self.lohi_attr(0, 1, 'flt_coff', 3, 8), {0, 1} - {reg})
 
     def _filterresonanceroute(self, _):
         route, self.flt_res = self.byte2nib(2)
