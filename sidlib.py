@@ -57,7 +57,7 @@ def get_sid(pal):
 
 
 # Read a VICE "-sounddev dump" register dump (emulator or vsid)
-def get_reg_writes(snd_log_name, skipsilence=1e6, minclock=0, maxclock=0, voicemask=VOICES, maxsilentclocks=0, truncate=1e6, passthrough=False):
+def get_reg_writes(sid, snd_log_name, skipsilence=1e6, minclock=0, maxclock=0, voicemask=VOICES, maxsilentclocks=0, truncate=1e6, passthrough=False):
     # TODO: fix minclock
     # TODO: fix maxsilentclocks
     # TODO: fix skipsilence
@@ -73,7 +73,8 @@ def get_reg_writes(snd_log_name, skipsilence=1e6, minclock=0, maxclock=0, voicem
     df = df[df['reg'] <= max(state.regstate)]
     if maxclock:
         df = df[df.clock <= maxclock]
-    df = df[['clock', 'reg', 'val']]
+    df['frame'] = df['clock'].floordiv(int(sid.clockq))
+    df = df[['clock', 'frame', 'reg', 'val']]
     if passthrough:
         return df.to_numpy()
     # remove consecutive repeated register writes
@@ -91,6 +92,7 @@ def get_reg_writes(snd_log_name, skipsilence=1e6, minclock=0, maxclock=0, voicem
     df = df.sort_index()
     # reset clock relative to 0
     df['clock'] -= df['clock'].min()
+    df['frame'] -= df['frame'].min()
     # TODO: use precalculated gate mask
     # for voicenum in voicemask:
     #     gate_name = 'gate%u' % voicenum

@@ -13,7 +13,7 @@ def generate_samples(sid, reg_writes, padclock):
     for sample in sid.add_samples(padclock):
         yield sample
 
-    for _, row in reg_writes.iterrows():
+    for row in reg_writes.itertuples():
         clock_offset = row.clock - lastevent
         lastevent = row.clock
         for sample in sid.add_samples(clock_offset):

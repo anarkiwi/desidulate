@@ -36,6 +36,7 @@ voicemask = frozenset((int(v) for v in args.voicemask.split(',')))
 sid = get_sid(args.pal)
 smf = SidMidiFile(sid, args.bpm)
 reg_writes = get_reg_writes(
+    sid,
     args.logfile,
     minclock=args.minclock,
     maxclock=args.maxclock,
