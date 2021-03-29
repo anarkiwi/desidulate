@@ -26,7 +26,7 @@ class SidWrap:
             self.clock_freq = SoundInterfaceDevice.NTSC_CLOCK_FREQUENCY
             self.int_freq = 60.0
         self.resid = SoundInterfaceDevice(model=model, clock_frequency=self.clock_freq)
-        self.clockq = self.clock_freq / self.int_freq
+        self.clockq = int(round(self.clock_freq / self.int_freq))
 
     def clock_to_s(self, clock):
         return clock / self.clock_freq

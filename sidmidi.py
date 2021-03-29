@@ -164,7 +164,7 @@ class SidMidiFile:
     def get_midi_notes_from_events(self, sid, voiceevents):
         last_midi_n = None
         notes_starts = []
-        for clock, state, voicestate in voiceevents:
+        for clock, _frame, state, voicestate in voiceevents:
             clock = int(clock / self.sid.clockq) * self.sid.clockq
             sid_f = sid.real_sid_freq(voicestate.freq)
             _, closest_midi_n = self.closest_midi(sid_f)

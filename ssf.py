@@ -56,16 +56,16 @@ class SidSoundFragment:
         self.single_patches = single_patches
         self.multi_patches = multi_patches
         self.patch_count = patch_count
-        self.voicestates = [(clock, state, state.voices[self.voicenum]) for clock, _, state in events]
+        self.voicestates = [(clock, frame, state, state.voices[self.voicenum]) for clock, frame, state in events]
 
     def trim_gateoff(self):
         for i, clock_voicestate_state in enumerate(self.voicestates):
-            _, state, voicestate = clock_voicestate_state
+            _, _, state, voicestate = clock_voicestate_state
             if not voicestate.gate and not voicestate.rel:
                 self.voicestates = self.voicestates[:i+1]
                 break
         i = len(self.voicestates) - 1
-        while i > 0 and self.voicestates[i][2].test:
+        while i > 0 and self.voicestates[i][3].test:
             i -= 1
         if i:
             self.voicestates = self.voicestates[:i+2]
@@ -91,17 +91,17 @@ class SidSoundFragment:
         return (df, hashid)
 
     def _parsedf(self, voicenums):
-        assert self.voicestates[0][2].gate
-        for _, state, _ in self.voicestates:
+        assert self.voicestates[0][3].gate
+        for _, _, state, _ in self.voicestates:
             if state.mainreg.voice_filtered(self.voicenum):
                 self.voice_filtered = True
                 break
         first_event = self.voicestates[0]
-        event_start, first_state, _ = first_event
+        event_start, first_frame, first_state, _ = first_event
         last_clock = 0
         orig_diffs = defaultdict(list)
         last_state = None
-        for clock, state, voicestate in self.voicestates:
+        for clock, frame, state, voicestate in self.voicestates:
             rel_clock = clock - last_clock
             curr_waveforms = voicestate.flat_waveforms()
             for waveform in curr_waveforms:
@@ -124,8 +124,7 @@ class SidSoundFragment:
                         del filter_diff[flt_v_key]
                         filter_diff['flt%u' % self.normalize_voicenum(self.voicenum)] = val
                     diff.update(filter_diff)
-                clock_diff = clock - event_start
-                frame_clock = self.sid.nearest_frame_clock(clock_diff)
+                frame_clock = (frame - first_frame) * self.sid.clockq
                 orig_diffs[frame_clock].append((clock, diff))
             last_clock = clock
             last_state = state
@@ -154,13 +153,13 @@ class SidSoundFragment:
 
     def parse(self):
         self.trim_gateoff()
-        audible_voicenums = set().union(*[state.audible_voicenums() for _, state, _ in self.voicestates])
+        audible_voicenums = set().union(*[state.audible_voicenums() for _, _, state, _ in self.voicestates])
         if self.voicenum not in audible_voicenums:
             return
         self.midi_notes = tuple(self.smf.get_midi_notes_from_events(self.sid, self.voicestates))
         if not self.midi_notes:
             return
-        synced_voicenums = set().union(*[voicestate.synced_voicenums() for _, _, voicestate in self.voicestates])
+        synced_voicenums = set().union(*[voicestate.synced_voicenums() for _, _, _, voicestate in self.voicestates])
         voicenums = {self.voicenum}.union(synced_voicenums)
         assert len(voicenums) in (1, 2)
         self.midi_pitches = tuple([midi_note[1] for midi_note in self.midi_notes])
