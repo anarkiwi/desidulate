@@ -129,7 +129,7 @@ def debug_raw_reg_writes(reg_writes):
             yield (row.clock, row.reg, row.val) + (active_voices,) + regdumps + (regevent,)
 
 
-def debug_reg_writes(sid, reg_writes, consolidate_mb_clock=10):
+def debug_reg_writes(sid, reg_writes, consolidate_mb_clock=18):
     # TODO: fix consolidate_mb_clock
     for regevents in debug_raw_reg_writes(reg_writes):
         clock, reg, val, active_voices, main_regdump, voice1_regdump, voice2_regdump, voice3_regdump, regevent = regevents
