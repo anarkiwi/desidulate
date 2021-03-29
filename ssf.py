@@ -10,6 +10,7 @@
 # http://www.ucapps.de/howto_sid_wavetables_1.html
 
 from collections import Counter, defaultdict
+import numpy as np
 import pandas as pd
 from fileio import out_path
 from sidmidi import ELECTRIC_SNARE, BASS_DRUM, LOW_TOM
@@ -75,7 +76,7 @@ class SidSoundFragment:
             return 1
         return 3
 
-    def _patchcsv(self, fieldnames, first_row, orig_diffs):
+    def _patchcsv(self, voicenums, fieldnames, first_row, orig_diffs):
         rows = [first_row]
         for frame_clock, clock_diffs in orig_diffs.items():
             first_clock = None
@@ -87,6 +88,10 @@ class SidSoundFragment:
                     diff['clock'] = frame_clock + (clock - first_clock)
                 rows.append(diff)
         df = pd.DataFrame(rows, columns=fieldnames, dtype=pd.Int64Dtype())
+        for voicenum in voicenums:
+            voicenum = self.normalize_voicenum(voicenum)
+            if df['pulse%u' % voicenum].max() == 0:
+                df['pw_duty%u' % voicenum] = np.nan
         hashid = hash(tuple(df.itertuples(index=False, name=None)))
         return (df, hashid)
 
@@ -167,7 +172,7 @@ class SidSoundFragment:
         self.max_midi_note = max(self.midi_pitches)
         self.min_midi_note = min(self.midi_pitches)
         fieldnames, first_row, orig_diffs = self._parsedf(voicenums)
-        df, hashid = self._patchcsv(fieldnames, first_row, orig_diffs)
+        df, hashid = self._patchcsv(voicenums, fieldnames, first_row, orig_diffs)
         if hashid not in self.patch_count:
             if len(voicenums) == 1:
                 self.single_patches[hashid] = df
