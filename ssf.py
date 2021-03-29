@@ -122,28 +122,27 @@ class SidSoundFragment:
         assert self.voicestates[0][3].gate
         first_event = self.voicestates[0]
         event_start, first_frame, first_state, _ = first_event
-        last_clock = 0
+        last_clock = event_start
+        last_state = first_state
         orig_diffs = defaultdict(list)
-        last_state = None
-        for clock, frame, state, voicestate in self.voicestates:
+        for clock, frame, state, voicestate in self.voicestates[1:]:
             rel_clock = clock - last_clock
             curr_waveforms = voicestate.flat_waveforms()
             for waveform in curr_waveforms:
                 self.waveforms[waveform] += rel_clock
             if not self.waveform_order or self.waveform_order[-1] != curr_waveforms:
                 self.waveform_order.append(curr_waveforms)
-            if last_state:
-                diff = {}
-                for voicenum in voicenums:
-                    voicestate_now = state.voices[voicenum]
-                    last_voicestate = last_state.voices[voicenum]
-                    voice_diff = voicestate_now.diff(last_voicestate)
-                    voice_diff = {'%s%u' % (k, voicenum): v for k, v in voice_diff.items()}
-                    diff.update(voice_diff)
-                    filter_diff = state.mainreg.diff_filter_vol(voicenum, last_state.mainreg)
-                    diff.update(filter_diff)
-                frame_clock = (frame - first_frame) * self.sid.clockq
-                orig_diffs[frame_clock].append((clock, diff))
+            diff = {}
+            for voicenum in voicenums:
+                voicestate_now = state.voices[voicenum]
+                last_voicestate = last_state.voices[voicenum]
+                voice_diff = voicestate_now.diff(last_voicestate)
+                voice_diff = {'%s%u' % (k, voicenum): v for k, v in voice_diff.items()}
+                diff.update(voice_diff)
+                filter_diff = state.mainreg.diff_filter_vol(voicenum, last_state.mainreg)
+                diff.update(filter_diff)
+            frame_clock = (frame - first_frame) * self.sid.clockq
+            orig_diffs[frame_clock].append((clock, diff))
             last_clock = clock
             last_state = state
 
