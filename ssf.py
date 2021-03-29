@@ -147,21 +147,20 @@ class SidSoundFragment:
 
         first_row = {'clock': 0}
         fieldnames = ['clock']
-        if first_state:
-            for voicenum in voicenums:
-                voicestate = first_state.voices[voicenum]
-                for field in voicestate.voice_regs:
-                    val = getattr(voicestate, field)
-                    field = '%s%u' % (field, voicenum)
-                    fieldnames.append(field)
-                    first_row[field] = val
-                flt_v_key = 'flt%u' % voicenum
-                fieldnames.append(flt_v_key)
-                first_row[flt_v_key] = getattr(first_state.mainreg, flt_v_key)
-            for field in first_state.mainreg.filter_common + ['vol']:
-                val = getattr(first_state.mainreg, field)
+        for voicenum in voicenums:
+            voicestate = first_state.voices[voicenum]
+            for field in voicestate.voice_regs:
+                val = getattr(voicestate, field)
+                field = '%s%u' % (field, voicenum)
                 fieldnames.append(field)
                 first_row[field] = val
+            flt_v_key = 'flt%u' % voicenum
+            fieldnames.append(flt_v_key)
+            first_row[flt_v_key] = getattr(first_state.mainreg, flt_v_key)
+        for field in first_state.mainreg.filter_common + ['vol']:
+            val = getattr(first_state.mainreg, field)
+            fieldnames.append(field)
+            first_row[field] = val
         return (fieldnames, first_row, orig_diffs)
 
     def parse(self):
