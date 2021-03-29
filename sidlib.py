@@ -74,7 +74,7 @@ def get_reg_writes(sid, snd_log_name, skipsilence=1e6, minclock=0, maxclock=0, v
     if maxclock:
         df = df[df.clock <= maxclock]
     df['frame'] = df['clock'].floordiv(int(sid.clockq))
-    df = df[['clock', 'frame', 'reg', 'val']]
+    df = df[['clock', 'clock_offset', 'frame', 'reg', 'val']]
     if passthrough:
         return df.to_numpy()
     # remove consecutive repeated register writes
@@ -93,6 +93,7 @@ def get_reg_writes(sid, snd_log_name, skipsilence=1e6, minclock=0, maxclock=0, v
     # reset clock relative to 0
     df['clock'] -= df['clock'].min()
     df['frame'] -= df['frame'].min()
+    df['clock_offset'] = df['clock'].diff().fillna(0).astype(np.uint64)
     # TODO: use precalculated gate mask
     # for voicenum in voicemask:
     #     gate_name = 'gate%u' % voicenum
