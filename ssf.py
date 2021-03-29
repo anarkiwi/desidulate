@@ -96,17 +96,13 @@ class SidSoundFragment:
             if state.mainreg.voice_filtered(self.voicenum):
                 self.voice_filtered = True
                 break
-        last_clock = None
-        rel_clock = 0
+        first_event = self.voicestates[0]
+        event_start, first_state, _ = first_event
+        last_clock = 0
         orig_diffs = defaultdict(list)
         last_state = None
-        first_state = None
-        event_start = self.voicestates[0][0]
         for clock, state, voicestate in self.voicestates:
-            if last_clock is not None:
-                rel_clock = clock - last_clock
-            else:
-                first_state = state
+            rel_clock = clock - last_clock
             curr_waveforms = voicestate.flat_waveforms()
             for waveform in curr_waveforms:
                 self.waveforms[waveform] += rel_clock
