@@ -10,6 +10,7 @@
 # http://www.ucapps.de/howto_sid_wavetables_1.html
 
 from collections import Counter, defaultdict
+from functools import lru_cache
 import numpy as np
 import pandas as pd
 from fileio import out_path
@@ -76,6 +77,17 @@ class SidSoundFragment:
             return 1
         return 3
 
+    @lru_cache
+    def _rename_cols(self, cols):
+        renamed_cols = []
+        for col in cols:
+            last_ch = col[-1]
+            if last_ch.isdigit():
+                renamed_cols.append(col.replace(last_ch, str(self.normalize_voicenum(int(last_ch)))))
+            else:
+                renamed_cols.append(col)
+        return renamed_cols
+
     def _patchcsv(self, voicenums, fieldnames, first_row, orig_diffs):
         rows = [first_row]
         for frame_clock, clock_diffs in orig_diffs.items():
@@ -89,18 +101,14 @@ class SidSoundFragment:
                 rows.append(diff)
         df = pd.DataFrame(rows, columns=fieldnames, dtype=pd.Int64Dtype())
         for voicenum in voicenums:
-            voicenum = self.normalize_voicenum(voicenum)
             if df['pulse%u' % voicenum].max() == 0:
                 df['pw_duty%u' % voicenum] = np.nan
+        df.columns = self._rename_cols(tuple(df.columns))
         hashid = hash(tuple(df.itertuples(index=False, name=None)))
         return (df, hashid)
 
     def _parsedf(self, voicenums):
         assert self.voicestates[0][3].gate
-        for _, _, state, _ in self.voicestates:
-            if state.mainreg.voice_filtered(self.voicenum):
-                self.voice_filtered = True
-                break
         first_event = self.voicestates[0]
         event_start, first_frame, first_state, _ = first_event
         last_clock = 0
@@ -119,15 +127,9 @@ class SidSoundFragment:
                     voicestate_now = state.voices[voicenum]
                     last_voicestate = last_state.voices[voicenum]
                     voice_diff = voicestate_now.diff(last_voicestate)
-                    voice_diff = {'%s%u' % (k, self.normalize_voicenum(voicenum)): v for k, v in voice_diff.items()}
+                    voice_diff = {'%s%u' % (k, voicenum): v for k, v in voice_diff.items()}
                     diff.update(voice_diff)
-                if self.voice_filtered:
-                    filter_diff = state.mainreg.diff_filter_vol(self.voicenum, last_state.mainreg)
-                    flt_v_key = 'flt%u' % self.voicenum
-                    val = filter_diff.get(flt_v_key, None)
-                    if val is not None:
-                        del filter_diff[flt_v_key]
-                        filter_diff['flt%u' % self.normalize_voicenum(self.voicenum)] = val
+                    filter_diff = state.mainreg.diff_filter_vol(voicenum, last_state.mainreg)
                     diff.update(filter_diff)
                 frame_clock = (frame - first_frame) * self.sid.clockq
                 orig_diffs[frame_clock].append((clock, diff))
@@ -144,28 +146,28 @@ class SidSoundFragment:
                 voicestate = first_state.voices[voicenum]
                 for field in voicestate.voice_regs:
                     val = getattr(voicestate, field)
-                    field = '%s%u' % (field, self.normalize_voicenum(voicenum))
+                    field = '%s%u' % (field, voicenum)
                     fieldnames.append(field)
                     first_row[field] = val
-            flt_v_key = 'flt%u' % self.normalize_voicenum(self.voicenum)
-            fieldnames.append(flt_v_key)
+                flt_v_key = 'flt%u' % voicenum
+                fieldnames.append(flt_v_key)
+                first_row[flt_v_key] = getattr(first_state.mainreg, flt_v_key)
             for field in first_state.mainreg.filter_common + ['vol']:
                 val = getattr(first_state.mainreg, field)
                 fieldnames.append(field)
                 first_row[field] = val
-            first_row[flt_v_key] = getattr(first_state.mainreg, 'flt%u' % self.voicenum)
         return (fieldnames, first_row, orig_diffs)
 
     def parse(self):
         self.trim_gateoff()
-        audible_voicenums = set().union(*[state.audible_voicenums() for _, _, state, _ in self.voicestates])
+        audible_voicenums = frozenset().union(*[state.audible_voicenums() for _, _, state, _ in self.voicestates])
         if self.voicenum not in audible_voicenums:
             return
         self.midi_notes = tuple(self.smf.get_midi_notes_from_events(self.sid, self.voicestates))
         if not self.midi_notes:
             return
-        synced_voicenums = set().union(*[voicestate.synced_voicenums() for _, _, _, voicestate in self.voicestates])
-        voicenums = {self.voicenum}.union(synced_voicenums)
+        synced_voicenums = frozenset().union(*[voicestate.synced_voicenums() for _, _, _, voicestate in self.voicestates])
+        voicenums = frozenset({self.voicenum}).union(synced_voicenums)
         assert len(voicenums) in (1, 2)
         self.midi_pitches = tuple([midi_note[1] for midi_note in self.midi_notes])
         self.total_duration = sum(duration for _, _, duration, _, _ in self.midi_notes)
