@@ -56,7 +56,7 @@ class SidSoundFragment:
         self.single_patches = single_patches
         self.multi_patches = multi_patches
         self.patch_count = patch_count
-        self.voicestates = [(clock, state, state.voices[self.voicenum]) for clock, state in events]
+        self.voicestates = [(clock, state, state.voices[self.voicenum]) for clock, _, state in events]
 
     def trim_gateoff(self):
         for i, clock_voicestate_state in enumerate(self.voicestates):

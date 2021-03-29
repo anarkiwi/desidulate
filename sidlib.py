@@ -156,16 +156,16 @@ def get_events(reg_writes):
         regevent = state.set(row.reg, row.val)
         if regevent:
             frozen_state = frozen_sid_state_factory(state)
-            yield (row.clock, regevent, frozen_state)
+            yield (row.clock, row.frame, regevent, frozen_state)
 
 
 # consolidate events across multiple byte writes (e.g. collapse update of voice freq to one event)
 def get_consolidated_changes(reg_writes, reg_write_clock_timeout):
     pendingevent = []
     for event in get_events(reg_writes):
-        clock, regevent, _state = event
+        clock, frame, regevent, _state = event
         if pendingevent:
-            pendingclock, pendingregevent, _pendingstate = pendingevent
+            pendingclock, _frame, pendingregevent, _pendingstate = pendingevent
             age = clock - pendingclock
             if age > reg_write_clock_timeout:
                 yield pendingevent
@@ -192,24 +192,24 @@ def get_gate_events(reg_writes, reg_write_clock_timeout=64):
         despooled = None
         if voiceeventstack[voicenum]:
             first_event = voiceeventstack[voicenum][0]
-            _, first_state = first_event
+            _, _, first_state = first_event
             if first_state.voices[voicenum].gate:
                 despooled = (voicenum, voiceeventstack[voicenum])
             voiceeventstack[voicenum] = []
         return despooled
 
-    def append_event(voicenum, clock, state):
-        voiceeventstack[voicenum].append((clock, state))
+    def append_event(voicenum, clock, frame, state):
+        voiceeventstack[voicenum].append((clock, frame, state))
 
     for event in get_consolidated_changes(reg_writes, reg_write_clock_timeout):
-        clock, regevent, state = event
+        clock, frame, regevent, state = event
         voicenum = regevent.voicenum
         if voicenum is not None:
             last_voiceevent = None
             last_gate = None
             if voiceeventstack[voicenum]:
                 last_voiceevent = voiceeventstack[voicenum][-1]
-                _, last_state = last_voiceevent
+                _, _, last_state = last_voiceevent
                 last_gate = last_state.voices[voicenum].gate
             voice_state = state.voices[voicenum]
             gate = voice_state.gate
@@ -218,10 +218,10 @@ def get_gate_events(reg_writes, reg_write_clock_timeout=64):
                     despooled = despool_events(voicenum)
                     if despooled:
                         yield despooled
-                append_event(voicenum, clock, state)
+                append_event(voicenum, clock, frame, state)
                 continue
             if gate or voice_state.in_rel():
-                append_event(voicenum, clock, state)
+                append_event(voicenum, clock, frame, state)
 
     for voicenum in voiceeventstack:
         despooled = despool_events(voicenum)
