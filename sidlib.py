@@ -41,12 +41,6 @@ class SidWrap:
         # http://www.sidmusic.org/sid/sidtech2.html
         return freq_reg * self.clock_freq / 16777216
 
-    def clock_frame(self, clock):
-        return round(clock / self.clockq)
-
-    def nearest_frame_clock(self, clock):
-        return round(self.clock_frame(clock) * self.clockq)
-
     def add_samples(self, offset):
         timeoffset_seconds = offset / self.clock_freq
         return self.resid.clock(timedelta(seconds=timeoffset_seconds))
