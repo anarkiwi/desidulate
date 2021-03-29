@@ -8,7 +8,6 @@
 
 from collections import defaultdict
 from datetime import timedelta
-from functools import lru_cache
 import pandas as pd
 import numpy as np
 from pyresidfp import SoundInterfaceDevice
@@ -161,7 +160,7 @@ def get_events(reg_writes):
 def get_consolidated_changes(reg_writes, reg_write_clock_timeout):
     pendingevent = []
     for event in get_events(reg_writes):
-        clock, regevent, state = event
+        clock, regevent, _state = event
         if pendingevent:
             pendingclock, pendingregevent, _pendingstate = pendingevent
             age = clock - pendingclock
