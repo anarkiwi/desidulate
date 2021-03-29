@@ -88,6 +88,10 @@ class SidSoundFragment:
                 renamed_cols.append(col)
         return renamed_cols
 
+    @lru_cache
+    def _filter_cols(self, cols):
+        return [col for col in cols if col.startswith('flt')]
+
     def _patchcsv(self, voicenums, fieldnames, first_row, orig_diffs):
         rows = [first_row]
         for frame_clock, clock_diffs in orig_diffs.items():
@@ -100,9 +104,16 @@ class SidSoundFragment:
                     diff['clock'] = frame_clock + (clock - first_clock)
                 rows.append(diff)
         df = pd.DataFrame(rows, columns=fieldnames, dtype=pd.Int64Dtype())
+        nan_cols = []
+        filters_enabled = 0
         for voicenum in voicenums:
             if df['pulse%u' % voicenum].max() == 0:
-                df['pw_duty%u' % voicenum] = np.nan
+                nan_cols.append('pw_duty%u' % voicenum)
+            filters_enabled += df['flt%u' % voicenum].max()
+        if filters_enabled == 0:
+            nan_cols.extend(self._filter_cols(tuple(df.columns)))
+        if nan_cols:
+            df[nan_cols] = np.nan
         df.columns = self._rename_cols(tuple(df.columns))
         hashid = hash(tuple(df.itertuples(index=False, name=None)))
         return (df, hashid)
