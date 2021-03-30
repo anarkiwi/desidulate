@@ -84,7 +84,7 @@ class SidSoundFragment:
 
     def _parsedf(self, voicenums):
         first_event = self.voicestates[0]
-        event_start, first_frame, first_state, first_voicestate = first_event
+        _first_clock, first_frame, first_state, first_voicestate = first_event
         assert first_voicestate.gate
         last_state = first_state
         orig_diffs = defaultdict(list)
@@ -148,8 +148,6 @@ class SidSoundFragment:
         if self.voicenum not in audible_voicenums:
             return
         self.midi_notes = tuple(self.smf.get_midi_notes_from_events(self.sid, self.voicestates))
-        if not self.midi_notes:
-            return
         synced_voicenums = frozenset().union(*[voicestate.synced_voicenums() for _, _, _, voicestate in self.voicestates])
         voicenums = frozenset({self.voicenum}).union(synced_voicenums)
         assert len(voicenums) in (1, 2)
