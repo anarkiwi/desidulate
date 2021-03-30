@@ -6,6 +6,7 @@
 
 
 from collections import defaultdict
+from functools import lru_cache
 from music21 import midi
 
 
@@ -131,6 +132,7 @@ class SidMidiFile:
         smf.open(file_name, 'wb')
         smf.write()
 
+    @lru_cache
     def closest_midi(self, sid_f):
         closest_midi_f = min(MIDI_N_TO_F.values(), key=lambda x: abs(x - sid_f))
         return (closest_midi_f, MIDI_F_TO_N[closest_midi_f])
@@ -150,6 +152,7 @@ class SidMidiFile:
             max_duration *= 2
         self.add_drum_pitch(voicenum, clock, duration, noise_pitch, velocity)
 
+    @lru_cache
     def sid_adsr_to_velocity(self, voice_state):
         vel_nib = voice_state.sus
         # Sustain approximates velocity, but if it's 0, then go with dec.
@@ -165,7 +168,6 @@ class SidMidiFile:
         last_midi_n = None
         notes_starts = []
         for clock, _frame, state, voicestate in voiceevents:
-            clock = int(clock / self.sid.clockq) * self.sid.clockq
             clock -= first_clock
             sid_f = sid.real_sid_freq(voicestate.freq)
             _, closest_midi_n = self.closest_midi(sid_f)
