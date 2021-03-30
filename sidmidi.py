@@ -161,11 +161,12 @@ class SidMidiFile:
         return velocity
 
     # Convert gated voice events into possibly many MIDI notes
-    def get_midi_notes_from_events(self, sid, voiceevents):
+    def get_midi_notes_from_events(self, sid, first_clock, voiceevents):
         last_midi_n = None
         notes_starts = []
         for clock, _frame, state, voicestate in voiceevents:
             clock = int(clock / self.sid.clockq) * self.sid.clockq
+            clock -= first_clock
             sid_f = sid.real_sid_freq(voicestate.freq)
             _, closest_midi_n = self.closest_midi(sid_f)
             velocity = self.sid_adsr_to_velocity(voicestate)
