@@ -47,11 +47,11 @@ multi_patches = {}
 patch_count = Counter()
 
 for voicenum, events in get_gate_events(reg_writes):
-    sse = SidSoundFragment(
+    ssf = SidSoundFragment(
         args.percussion, sid, smf, voicenum, events,
         single_patches, multi_patches, patch_count)
-    sse.parse()
-    sse.smf_transcribe()
+    ssf.parse()
+    ssf.smf_transcribe()
 
 midifile = args.midifile
 if not midifile:
@@ -61,4 +61,5 @@ smf.write(midifile)
 dump_patches(
     args.logfile,
     patch_count,
-    (('single_patches.txt.xz', single_patches), ('multi_patches.txt.xz', multi_patches)))
+    (('single_patches.txt.xz', single_patches),
+     ('multi_patches.txt.xz', multi_patches)))
