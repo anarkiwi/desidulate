@@ -176,10 +176,11 @@ class SidSoundFragment:
 
         if hashid not in self.patch_count:
             self.midi_notes = tuple(self.smf.get_midi_notes_from_events(self.sid, self.first_clock, self.voicestates))
-            self.midi_pitches = tuple([midi_note[1] for midi_note in self.midi_notes])
-            self.total_duration = sum(duration for _, _, duration, _, _ in self.midi_notes)
-            self.max_midi_note = max(self.midi_pitches)
-            self.min_midi_note = min(self.midi_pitches)
+            if self.midi_notes:
+                self.midi_pitches = tuple([midi_note[1] for midi_note in self.midi_notes])
+                self.total_duration = sum(duration for _, _, duration, _, _ in self.midi_notes)
+                self.max_midi_note = max(self.midi_pitches)
+                self.min_midi_note = min(self.midi_pitches)
             last_clock = 0
             all_waveforms = frozenset({'%s1' % col for col in ('tri', 'saw', 'pulse', 'noise')})
             for row in df.itertuples():
