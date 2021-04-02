@@ -10,11 +10,10 @@
 # http://www.ucapps.de/howto_sid_wavetables_1.html
 
 import argparse
-from collections import Counter
 from fileio import midi_path
 from sidlib import get_gate_events, get_reg_writes, get_sid, VOICES
 from sidmidi import SidMidiFile
-from ssf import dump_patches, SidSoundFragment
+from ssf import SidSoundFragmentParser
 
 
 parser = argparse.ArgumentParser(description='Convert vicesnd.sid log into a MIDI file')
@@ -42,23 +41,15 @@ reg_writes = get_reg_writes(
     maxclock=args.maxclock,
     voicemask=voicemask)
 
-single_patches = {}
-multi_patches = {}
-patch_count = Counter()
-
+parser = SidSoundFragmentParser(args.logfile, args.percussion, sid, smf)
 for voicenum, events in get_gate_events(reg_writes):
-    sse = SidSoundFragment(
-        args.percussion, sid, smf, voicenum, events,
-        single_patches, multi_patches, patch_count)
-    sse.parse()
-    sse.smf_transcribe()
+    ssf, first_clock = parser.parse(voicenum, events)
+    if ssf:
+        ssf.smf_transcribe(smf, first_clock, voicenum)
 
 midifile = args.midifile
 if not midifile:
     midifile = midi_path(args.logfile)
 
 smf.write(midifile)
-dump_patches(
-    args.logfile,
-    patch_count,
-    (('single_patches.txt.xz', single_patches), ('multi_patches.txt.xz', multi_patches)))
+parser.dump_patches()

@@ -11,69 +11,108 @@
 
 from collections import Counter, defaultdict
 from functools import lru_cache
-import numpy as np
 import pandas as pd
 from fileio import out_path
 from sidmidi import ELECTRIC_SNARE, BASS_DRUM, LOW_TOM
 
-cache = {}
-
-
-def dump_patches(logfile, patch_count, patch_output):
-    for ext_patches in patch_output:
-        ext, patches = ext_patches
-        if not patches:
-            continue
-        out_filename = out_path(logfile, ext)
-        dfs = []
-        for hashid, _ in sorted(patch_count.items(), key=lambda x: x[1], reverse=True):
-            if hashid in patches:
-                df = patches[hashid]
-                df['hashid'] = hashid
-                df['count'] = patch_count[hashid]
-                dfs.append(df)
-        df = pd.concat(dfs)
-        cols = list(df.columns)
-        cols.remove('hashid')
-        cols.remove('count')
-        df = df[['hashid', 'count'] + cols]
-        df.to_csv(out_filename, index=False)
-
 
 class SidSoundFragment:
 
-    def __init__(self, percussion, sid, smf, voicenum, events, single_patches, multi_patches, patch_count):
+    def __init__(self, percussion, sid, smf, first_clock, voicestates, df):
         self.percussion = percussion
-        self.voicenum = voicenum
-        self.sid = sid
-        self.smf = smf
-        self.waveforms = Counter()
-        self.waveform_order = []
-        self.noisephases = 0
-        self.all_noise = False
-        self.midi_notes = []
+        self.midi_notes = tuple(smf.get_midi_notes_from_events(sid, first_clock, voicestates))
         self.midi_pitches = []
-        self.voice_filtered = False
         self.total_duration = 0
         self.max_midi_note = 0
         self.min_midi_note = 0
-        self.single_patches = single_patches
-        self.multi_patches = multi_patches
-        self.patch_count = patch_count
-        self.voicestates = [(clock, frame, state, state.voices[self.voicenum]) for clock, frame, state in events]
+        if self.midi_notes:
+            self.midi_pitches = tuple([midi_note[1] for midi_note in self.midi_notes])
+            self.total_duration = sum(duration for _, _, duration, _, _ in self.midi_notes)
+            self.max_midi_note = max(self.midi_pitches)
+            self.min_midi_note = min(self.midi_pitches)
+        last_clock = 0
+        self.waveforms = defaultdict(int)
+        self.waveform_order = []
+        all_waveforms = frozenset({'%s1' % col for col in ('tri', 'saw', 'pulse', 'noise')})
+        for row in df.itertuples():
+            rel_clock = row.clock - last_clock
+            row_waveforms = frozenset({col[:-1] for col in all_waveforms if pd.notna(getattr(row, col)) and getattr(row, col) == 1})
+            for waveform in row_waveforms:
+                self.waveforms[waveform] += rel_clock
+            if not self.waveform_order or self.waveform_order[-1] != row_waveforms:
+                self.waveform_order.append(row_waveforms)
+            last_clock = row.clock
+        self.noisephases = len([waveforms for waveforms in self.waveform_order if 'noise' in self.waveforms])
+        self.all_noise = set(self.waveforms.keys()) == {'noise'}
+        self.descending_pitches = len(self.midi_pitches) > 2 and self.midi_pitches[0] > self.midi_pitches[-1]
 
-    def normalize_voicenum(self, voicenum):
-        if voicenum == self.voicenum:
+    def smf_transcribe(self, smf, first_clock, voicenum):
+        if self.noisephases:
+            if self.percussion:
+                clock, _pitch, _duration, velocity, _ = self.midi_notes[0]
+                clock += first_clock
+
+                if self.all_noise:
+                    smf.add_drum_noise_duration(voicenum, clock, self.total_duration, velocity)
+                elif self.noisephases > 1:
+                    smf.add_drum_pitch(voicenum, clock, self.total_duration, ELECTRIC_SNARE, velocity)
+                else:
+                    if self.descending_pitches:
+                        # http://www.ucapps.de/howto_sid_wavetables_1.html
+                        smf.add_drum_pitch(voicenum, clock, self.total_duration, BASS_DRUM, velocity)
+                    else:
+                        smf.add_drum_pitch(voicenum, clock, self.total_duration, LOW_TOM, velocity)
+        else:
+            for clock, pitch, duration, velocity, _ in self.midi_notes:
+                clock += first_clock
+                smf.add_pitch(voicenum, clock, duration, pitch, velocity)
+
+
+class SidSoundFragmentParser:
+
+    def __init__(self, logfile, percussion, sid, smf):
+        self.logfile = logfile
+        self.percussion = percussion
+        self.sid = sid
+        self.smf = smf
+        self.single_patches = {}
+        self.multi_patches = {}
+        self.patch_count = Counter()
+        self.ssf_cache = {}
+
+    def dump_patches(self):
+        patch_output = (('single_patches.txt.xz', self.single_patches), ('multi_patches.txt.xz', self.multi_patches))
+        for ext_patches in patch_output:
+            ext, patches = ext_patches
+            if not patches:
+                continue
+            out_filename = out_path(self.logfile, ext)
+            dfs = []
+            for hashid, _ in sorted(self.patch_count.items(), key=lambda x: x[1], reverse=True):
+                if hashid in patches:
+                    df = patches[hashid]
+                    df['hashid'] = hashid
+                    df['count'] = self.patch_count[hashid]
+                    dfs.append(df)
+            df = pd.concat(dfs)
+            cols = list(df.columns)
+            cols.remove('hashid')
+            cols.remove('count')
+            df = df[['hashid', 'count'] + cols]
+            df.to_csv(out_filename, index=False)
+
+    def normalize_voicenum(self, row_voicenum, voicenum):
+        if row_voicenum == voicenum:
             return 1
         return 3
 
     @lru_cache
-    def _rename_cols(self, cols):
+    def _rename_cols(self, cols, voicenum):
         renamed_cols = []
         for col in cols:
             last_ch = col[-1]
             if last_ch.isdigit():
-                renamed_cols.append(col.replace(last_ch, str(self.normalize_voicenum(int(last_ch)))))
+                renamed_cols.append(col.replace(last_ch, str(self.normalize_voicenum(int(last_ch), voicenum))))
             else:
                 renamed_cols.append(col)
         return renamed_cols
@@ -82,30 +121,10 @@ class SidSoundFragment:
     def _filter_cols(self, cols):
         return [col for col in cols if col.startswith('flt')]
 
-    def _parsedf(self, voicenums):
-        first_event = self.voicestates[0]
-        event_start, first_frame, first_state, first_voicestate = first_event
-        assert first_voicestate.gate
-        last_state = first_state
-        orig_diffs = defaultdict(list)
-        for clock, frame, state, voicestate in self.voicestates[1:]:
-            diff = {}
-            for voicenum in voicenums:
-                voicestate_now = state.voices[voicenum]
-                last_voicestate = last_state.voices[voicenum]
-                voice_diff = voicestate_now.diff(last_voicestate)
-                voice_diff = {'%s%u' % (k, voicenum): v for k, v in voice_diff.items()}
-                diff.update(voice_diff)
-                filter_diff = state.mainreg.diff_filter_vol(voicenum, last_state.mainreg)
-                diff.update(filter_diff)
-            frame_clock = (frame - first_frame) * self.sid.clockq
-            orig_diffs[frame_clock].append((clock, diff))
-            last_state = state
-            if not voicestate.gate and voicestate.rel == 0:
-                break
-
+    def _firsts(self, first_state, voicenums):
         first_row = {'clock': 0}
         fieldnames = ['clock']
+
         for voicenum in voicenums:
             voicestate = first_state.voices[voicenum]
             for field in voicestate.voice_regs:
@@ -121,84 +140,115 @@ class SidSoundFragment:
             fieldnames.append(field)
             first_row[field] = val
 
+        return (first_row, fieldnames)
+
+    def _voicediff(self, now, last, voicenum):
+        voice_diff = now.diff(last)
+        voice_diff = {'%s%u' % (k, voicenum): v for k, v in voice_diff.items()}
+        return voice_diff
+
+    def _statediffs(self, first_row, first_state, first_frame, voicenums, voicestates):
+        last_state = first_state
+        orig_diffs = defaultdict(list)
+        voice_sounding = {v: first_state.voices[v].sounding() for v in voicenums}
+        reg_total = defaultdict(int)
+
+        for clock, frame, state, voicestate in voicestates[1:]:
+            diff = {}
+            assert not state.mainreg.mute3
+            for voicenum in voicenums:
+                voicestate_now = state.voices[voicenum]
+                last_voicestate = last_state.voices[voicenum]
+                voice_diff = self._voicediff(voicestate_now, last_voicestate, voicenum)
+                filter_diff = state.mainreg.diff_filter_vol(voicenum, last_state.mainreg)
+                if not voice_sounding[voicenum]:
+                    if voicestate_now.sounding():
+                        voice_sounding[voicenum] = True
+                    else:
+                        for k, v in voice_diff.items():
+                            first_row[k] += v
+                        continue
+                diff.update(voice_diff)
+                diff.update(filter_diff)
+            frame_clock = (frame - first_frame) * self.sid.clockq
+            orig_diffs[frame_clock].append((clock, diff))
+            for k, v in diff.items():
+                reg_total[k] += v
+            if not voicestate.gate and voicestate.rel == 0:
+                break
+            last_state = state
+
+        return (orig_diffs, reg_total)
+
+    def _del_cols(self, voicenums, reg_total):
+        del_cols = set()
+        filtered_voices = 0
+        for voicenum in voicenums:
+            pw_duty_col = 'pw_duty%u' % voicenum
+            if reg_total[pw_duty_col] == 0:
+                del_cols.add(pw_duty_col)
+            flt_col = 'flt%u' % voicenum
+            if reg_total[flt_col] == 0:
+                del_cols.add(flt_col)
+            else:
+                filtered_voices += 1
+        if filtered_voices == 0:
+            del_cols.update(self._filter_cols(tuple(reg_total.keys())))
+        return del_cols
+
+    def _compress_diffs(self, first_row, orig_diffs, del_cols):
         rows = [first_row]
         for frame_clock, clock_diffs in orig_diffs.items():
             first_clock, _ = clock_diffs[0]
             for clock, diff in clock_diffs:
-                diff['clock'] = frame_clock + (clock - first_clock)
-                rows.append(diff)
-        df = pd.DataFrame(rows, columns=fieldnames, dtype=pd.Int64Dtype())
-        nan_cols = []
-        filters_enabled = 0
-        for voicenum in voicenums:
-            if df['pulse%u' % voicenum].max() == 0:
-                nan_cols.append('pw_duty%u' % voicenum)
-            filters_enabled += df['flt%u' % voicenum].max()
-        if filters_enabled == 0:
-            nan_cols.extend(self._filter_cols(tuple(df.columns)))
-        if nan_cols:
-            df[nan_cols] = np.nan
-        df.columns = self._rename_cols(tuple(df.columns))
-        hashid = hash(tuple(df.itertuples(index=False, name=None)))
+                diff = {k: v for k, v in diff.items() if k not in del_cols}
+                if diff:
+                    diff['clock'] = frame_clock + (clock - first_clock)
+                    rows.append(diff)
+        return rows
 
-        return (df, hashid)
+    def _parsedf(self, voicenum, events):
+        voicestates = [(clock, frame, state, state.voices[voicenum]) for clock, frame, state in events]
+        audible_voicenums = frozenset().union(*[state.audible_voicenums() for _, _, state, _ in voicestates])
+        hashid = None
+        df = None
+        first_clock = None
+        voicenums = None
 
-    def parse(self):
-        audible_voicenums = frozenset().union(*[state.audible_voicenums() for _, _, state, _ in self.voicestates])
-        if self.voicenum not in audible_voicenums:
-            return
-        self.midi_notes = tuple(self.smf.get_midi_notes_from_events(self.sid, self.voicestates))
-        if not self.midi_notes:
-            return
-        synced_voicenums = frozenset().union(*[voicestate.synced_voicenums() for _, _, _, voicestate in self.voicestates])
-        voicenums = frozenset({self.voicenum}).union(synced_voicenums)
-        assert len(voicenums) in (1, 2)
-        df, hashid = self._parsedf(voicenums)
+        if voicenum in audible_voicenums:
+            first_clock = voicestates[0][0]
+            synced_voicenums = frozenset().union(*[voicestate.synced_voicenums() for _, _, _, voicestate in voicestates])
+            voicenums = frozenset({voicenum}).union(synced_voicenums)
+            assert len(voicenums) in (1, 2)
+            first_event = voicestates[0]
+            _first_clock, first_frame, first_state, first_voicestate = first_event
+            assert first_voicestate.gate
 
-        if hashid not in self.patch_count:
-            self.midi_pitches = tuple([midi_note[1] for midi_note in self.midi_notes])
-            self.total_duration = sum(duration for _, _, duration, _, _ in self.midi_notes)
-            self.max_midi_note = max(self.midi_pitches)
-            self.min_midi_note = min(self.midi_pitches)
-            last_clock = 0
-            all_waveforms = frozenset({'%s1' % col for col in ('tri', 'saw', 'pulse', 'noise')})
-            for row in df.itertuples():
-                rel_clock = row.clock - last_clock
-                waveforms = frozenset({col[:-1] for col in all_waveforms if pd.notna(getattr(row, col)) and getattr(row, col) == 1})
-                for waveform in waveforms:
-                    self.waveforms[waveform] += rel_clock
-                if not self.waveform_order or self.waveform_order[-1] != waveforms:
-                    self.waveform_order.append(waveforms)
-                last_clock = row.clock
-            self.noisephases = len([waveforms for waveforms in self.waveform_order if 'noise' in waveforms])
-            self.all_noise = set(self.waveforms.keys()) == {'noise'}
-            cache[hashid] = (self.waveforms, self.waveform_order, self.noisephases, self.all_noise, self.midi_pitches, self.total_duration, self.max_midi_note, self.min_midi_note)
-            if len(voicenums) == 1:
-                self.single_patches[hashid] = df
+            first_row, fieldnames = self._firsts(first_state, voicenums)
+            orig_diffs, reg_total = self._statediffs(first_row, first_state, first_frame, voicenums, voicestates)
+            del_cols = self._del_cols(voicenums, reg_total)
+            rows = self._compress_diffs(first_row, orig_diffs, del_cols)
+            df = pd.DataFrame(rows, columns=fieldnames, dtype=pd.Int64Dtype())
+            df.columns = self._rename_cols(tuple(df.columns), voicenum)
+            hashid = hash(tuple(df.itertuples(index=False, name=None)))
+
+        return (hashid, df, first_clock, voicestates, voicenums)
+
+    def parse(self, voicenum, events):
+        hashid, df, first_clock, voicestates, voicenums = self._parsedf(voicenum, events)
+
+        if hashid is None:
+            ssf = None
+        else:
+            if hashid in self.ssf_cache:
+                ssf = self.ssf_cache[hashid]
             else:
-                self.multi_patches[hashid] = df
-        else:
-            self.waveforms, self.waveform_order, self.noisephases, self.all_noise, self.midi_pitches, self.total_duration, self.max_midi_note, self.min_midi_note  = cache[hashid]
-        self.patch_count[hashid] += 1
-
-    def descending_pitches(self):
-        return len(self.midi_pitches) > 2 and self.midi_pitches[0] > self.midi_pitches[-1]
-
-    def smf_transcribe(self):
-        if self.noisephases:
-            if self.percussion:
-                clock, _pitch, _duration, velocity, _ = self.midi_notes[0]
-
-                if self.all_noise:
-                    self.smf.add_drum_noise_duration(self.voicenum, clock, self.total_duration, velocity)
-                elif self.noisephases > 1:
-                    self.smf.add_drum_pitch(self.voicenum, clock, self.total_duration, ELECTRIC_SNARE, velocity)
+                ssf = SidSoundFragment(self.percussion, self.sid, self.smf, first_clock, voicestates, df)
+                self.ssf_cache[hashid] = ssf
+                if len(voicenums) == 1:
+                    self.single_patches[hashid] = df
                 else:
-                    if self.descending_pitches():
-                        # http://www.ucapps.de/howto_sid_wavetables_1.html
-                        self.smf.add_drum_pitch(self.voicenum, clock, self.total_duration, BASS_DRUM, velocity)
-                    else:
-                        self.smf.add_drum_pitch(self.voicenum, clock, self.total_duration, LOW_TOM, velocity)
-        else:
-            for clock, pitch, duration, velocity, _ in self.midi_notes:
-                self.smf.add_pitch(self.voicenum, clock, duration, pitch, velocity)
+                    self.multi_patches[hashid] = df
+            self.patch_count[hashid] += 1
+
+        return (ssf, first_clock)

@@ -181,6 +181,9 @@ class SidVoiceRegStateMiddle(SidRegHandler):
     def any_waveform(self):
         return bool(self.waveforms())
 
+    def sounding(self):
+        return self.any_waveform() and not self.test
+
     def in_rel(self):
         return self.rel > 0 and not self.gate
 
