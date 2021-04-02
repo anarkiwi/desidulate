@@ -183,7 +183,7 @@ class SidSoundFragmentParser:
                     first_row[k] += v
                     reg_total[k] += v
                     reg_max[k] = max(reg_max[k], v)
-            frame_clock = (frame - first_frame) * self.sid.clockq
+            frame_clock = max((frame - first_frame) * self.sid.clockq, 1)
             orig_diffs[frame_clock].append((clock, diff))
             for k, v in diff.items():
                 reg_total[k] += v
@@ -246,6 +246,7 @@ class SidSoundFragmentParser:
             rows = self._compress_diffs(first_row, orig_diffs, del_cols)
             df = pd.DataFrame(rows, columns=fieldnames, dtype=pd.Int64Dtype())
             df.columns = self._rename_cols(tuple(df.columns), voicenum)
+            assert df['clock'].max() > 0, (df, orig_diffs)
             hashid = hash(tuple(df.itertuples(index=False, name=None)))
 
         return (hashid, df, first_clock, voicestates, voicenums)
