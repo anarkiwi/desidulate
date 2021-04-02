@@ -167,17 +167,14 @@ class SidSoundFragmentParser:
                 last_voicestate = last_state.voices[voicenum]
                 voice_diff = self._voicediff(voicestate_now, last_voicestate, voicenum)
                 filter_diff.update(state.mainreg.diff_filter_vol(voicenum, last_state.mainreg))
-                if voice_sounding[voicenum]:
-                    sounding += 1
-                else:
-                    if voicestate_now.sounding():
-                        voice_sounding[voicenum] = True
-                    else:
-                        for k, v in voice_diff.items():
-                            first_row[k] += v
-                            reg_total[k] += v
-                            reg_max[k] = max(reg_max[k], v)
-                        continue
+                if not voice_sounding[voicenum] and not voicestate_now.sounding():
+                    for k, v in voice_diff.items():
+                        first_row[k] += v
+                        reg_total[k] += v
+                        reg_max[k] = max(reg_max[k], v)
+                    continue
+                sounding += 1
+                voice_sounding[voicenum] = True
                 diff.update(voice_diff)
             if sounding:
                 diff.update(filter_diff)
