@@ -108,9 +108,11 @@ class SidSoundFragment:
         last_state = first_state
         orig_diffs = defaultdict(list)
         voice_sounding = {v: first_state.voices[v].sounding() for v in voicenums}
+        reg_total = defaultdict(int)
 
         for clock, frame, state, voicestate in self.voicestates[1:]:
             diff = {}
+            assert not state.mainreg.mute3
             for voicenum in voicenums:
                 voicestate_now = state.voices[voicenum]
                 last_voicestate = last_state.voices[voicenum]
@@ -128,27 +130,36 @@ class SidSoundFragment:
                 diff.update(filter_diff)
             frame_clock = (frame - first_frame) * self.sid.clockq
             orig_diffs[frame_clock].append((clock, diff))
+            for k, v in diff.items():
+                reg_total[k] += v
             if not voicestate.gate and voicestate.rel == 0:
                 break
             last_state = state
+
+        del_cols = set()
+        filtered_voices = 0
+        for voicenum in voicenums:
+            pw_duty_col = 'pw_duty%u' % voicenum
+            if reg_total[pw_duty_col] == 0:
+                del_cols.add(pw_duty_col)
+            flt_col = 'flt%u' % voicenum
+            if reg_total[flt_col] == 0:
+                del_cols.add(flt_col)
+            else:
+                filtered_voices += 1
+        if filtered_voices == 0:
+            del_cols.update(self._filter_cols(tuple(reg_total.keys())))
 
         rows = [first_row]
         for frame_clock, clock_diffs in orig_diffs.items():
             first_clock, _ = clock_diffs[0]
             for clock, diff in clock_diffs:
-                diff['clock'] = frame_clock + (clock - first_clock)
-                rows.append(diff)
+                diff = {k: v for k, v in diff.items() if k not in del_cols}
+                if diff:
+                    diff['clock'] = frame_clock + (clock - first_clock)
+                    rows.append(diff)
+
         df = pd.DataFrame(rows, columns=fieldnames, dtype=pd.Int64Dtype())
-        nan_cols = []
-        filters_enabled = 0
-        for voicenum in voicenums:
-            if df['pulse%u' % voicenum].max() == 0:
-                nan_cols.append('pw_duty%u' % voicenum)
-            filters_enabled += df['flt%u' % voicenum].max()
-        if filters_enabled == 0:
-            nan_cols.extend(self._filter_cols(tuple(df.columns)))
-        if nan_cols:
-            df[nan_cols] = np.nan
         df.columns = self._rename_cols(tuple(df.columns))
         hashid = hash(tuple(df.itertuples(index=False, name=None)))
 
