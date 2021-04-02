@@ -121,19 +121,7 @@ class SidSoundFragmentParser:
     def _filter_cols(self, cols):
         return [col for col in cols if col.startswith('flt')]
 
-    def _parsedf(self, event_voicenum, events):
-        voicestates = [(clock, frame, state, state.voices[event_voicenum]) for clock, frame, state in events]
-        first_clock = voicestates[0][0]
-        audible_voicenums = frozenset().union(*[state.audible_voicenums() for _, _, state, _ in voicestates])
-        if event_voicenum not in audible_voicenums:
-            return (None, None, None, None, None)
-        synced_voicenums = frozenset().union(*[voicestate.synced_voicenums() for _, _, _, voicestate in voicestates])
-        voicenums = frozenset({event_voicenum}).union(synced_voicenums)
-        assert len(voicenums) in (1, 2)
-        first_event = voicestates[0]
-        _first_clock, first_frame, first_state, first_voicestate = first_event
-        assert first_voicestate.gate
-
+    def _firsts(self, first_state, voicenums):
         first_row = {'clock': 0}
         fieldnames = ['clock']
 
@@ -152,6 +140,14 @@ class SidSoundFragmentParser:
             fieldnames.append(field)
             first_row[field] = val
 
+        return (first_row, fieldnames)
+
+    def _voicediff(self, now, last, voicenum):
+        voice_diff = now.diff(last)
+        voice_diff = {'%s%u' % (k, voicenum): v for k, v in voice_diff.items()}
+        return voice_diff
+
+    def _statediffs(self, first_row, first_state, first_frame, voicenums, voicestates):
         last_state = first_state
         orig_diffs = defaultdict(list)
         voice_sounding = {v: first_state.voices[v].sounding() for v in voicenums}
@@ -163,8 +159,7 @@ class SidSoundFragmentParser:
             for voicenum in voicenums:
                 voicestate_now = state.voices[voicenum]
                 last_voicestate = last_state.voices[voicenum]
-                voice_diff = voicestate_now.diff(last_voicestate)
-                voice_diff = {'%s%u' % (k, voicenum): v for k, v in voice_diff.items()}
+                voice_diff = self._voicediff(voicestate_now, last_voicestate, voicenum)
                 filter_diff = state.mainreg.diff_filter_vol(voicenum, last_state.mainreg)
                 if not voice_sounding[voicenum]:
                     if voicestate_now.sounding():
@@ -183,6 +178,9 @@ class SidSoundFragmentParser:
                 break
             last_state = state
 
+        return (orig_diffs, reg_total)
+
+    def _del_cols(self, voicenums, reg_total):
         del_cols = set()
         filtered_voices = 0
         for voicenum in voicenums:
@@ -196,7 +194,9 @@ class SidSoundFragmentParser:
                 filtered_voices += 1
         if filtered_voices == 0:
             del_cols.update(self._filter_cols(tuple(reg_total.keys())))
+        return del_cols
 
+    def _compress_diffs(self, first_row, orig_diffs, del_cols):
         rows = [first_row]
         for frame_clock, clock_diffs in orig_diffs.items():
             first_clock, _ = clock_diffs[0]
@@ -205,27 +205,50 @@ class SidSoundFragmentParser:
                 if diff:
                     diff['clock'] = frame_clock + (clock - first_clock)
                     rows.append(diff)
+        return rows
 
-        df = pd.DataFrame(rows, columns=fieldnames, dtype=pd.Int64Dtype())
-        df.columns = self._rename_cols(tuple(df.columns), voicenum)
-        hashid = hash(tuple(df.itertuples(index=False, name=None)))
-        return (df, hashid, first_clock, voicestates, voicenums)
+    def _parsedf(self, voicenum, events):
+        voicestates = [(clock, frame, state, state.voices[voicenum]) for clock, frame, state in events]
+        audible_voicenums = frozenset().union(*[state.audible_voicenums() for _, _, state, _ in voicestates])
+        hashid = None
+        df = None
+        first_clock = None
+        voicenums = None
+
+        if voicenum in audible_voicenums:
+            first_clock = voicestates[0][0]
+            synced_voicenums = frozenset().union(*[voicestate.synced_voicenums() for _, _, _, voicestate in voicestates])
+            voicenums = frozenset({voicenum}).union(synced_voicenums)
+            assert len(voicenums) in (1, 2)
+            first_event = voicestates[0]
+            _first_clock, first_frame, first_state, first_voicestate = first_event
+            assert first_voicestate.gate
+
+            first_row, fieldnames = self._firsts(first_state, voicenums)
+            orig_diffs, reg_total = self._statediffs(first_row, first_state, first_frame, voicenums, voicestates)
+            del_cols = self._del_cols(voicenums, reg_total)
+            rows = self._compress_diffs(first_row, orig_diffs, del_cols)
+            df = pd.DataFrame(rows, columns=fieldnames, dtype=pd.Int64Dtype())
+            df.columns = self._rename_cols(tuple(df.columns), voicenum)
+            hashid = hash(tuple(df.itertuples(index=False, name=None)))
+
+        return (hashid, df, first_clock, voicestates, voicenums)
 
     def parse(self, voicenum, events):
-        df, hashid, first_clock, voicestates, voicenums = self._parsedf(voicenum, events)
+        hashid, df, first_clock, voicestates, voicenums = self._parsedf(voicenum, events)
 
         if hashid is None:
-            return (None, None)
-
-        if hashid not in self.ssf_cache:
-            ssf = SidSoundFragment(self.percussion, self.sid, self.smf, first_clock, voicestates, df)
-            self.ssf_cache[hashid] = ssf
-            if len(voicenums) == 1:
-                self.single_patches[hashid] = df
-            else:
-                self.multi_patches[hashid] = df
+            ssf = None
         else:
-            ssf = self.ssf_cache[hashid]
-        self.patch_count[hashid] += 1
+            if hashid in self.ssf_cache:
+                ssf = self.ssf_cache[hashid]
+            else:
+                ssf = SidSoundFragment(self.percussion, self.sid, self.smf, first_clock, voicestates, df)
+                self.ssf_cache[hashid] = ssf
+                if len(voicenums) == 1:
+                    self.single_patches[hashid] = df
+                else:
+                    self.multi_patches[hashid] = df
+            self.patch_count[hashid] += 1
 
-        return ssf, first_clock
+        return (ssf, first_clock)
