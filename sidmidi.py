@@ -185,8 +185,8 @@ class SidMidiFile:
             except IndexError:
                 next_clock = last_clock
             duration = next_clock - clock
+            duration = round(duration / self.sid.clockq) * self.sid.clockq
             if not duration:
                 continue
-            duration = round(duration / self.sid.clockq) * self.sid.clockq
             notes.append((clock, note, duration, velocity, sid_f))
         return notes
