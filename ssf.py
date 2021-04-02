@@ -81,7 +81,9 @@ class SidSoundFragmentParser:
         self.ssf_cache = {}
 
     def dump_patches(self):
-        patch_output = (('single_patches.txt.xz', self.single_patches), ('multi_patches.txt.xz', self.multi_patches))
+        patch_output = (
+            ('single_patches.txt.xz', self.single_patches),
+            ('multi_patches.txt.xz', self.multi_patches))
         for ext_patches in patch_output:
             ext, patches = ext_patches
             if not patches:
@@ -201,7 +203,8 @@ class SidSoundFragmentParser:
         for frame_clock, clock_diffs in orig_diffs.items():
             first_clock, _ = clock_diffs[0]
             for clock, diff in clock_diffs:
-                diff = {k: v for k, v in diff.items() if k not in del_cols}
+                if del_cols:
+                    diff = {k: v for k, v in diff.items() if k not in del_cols}
                 if diff:
                     diff['clock'] = frame_clock + (clock - first_clock)
                     rows.append(diff)
