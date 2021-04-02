@@ -86,26 +86,10 @@ class SidSoundFragment:
         first_event = self.voicestates[0]
         _first_clock, first_frame, first_state, first_voicestate = first_event
         assert first_voicestate.gate
-        last_state = first_state
-        orig_diffs = defaultdict(list)
-        for clock, frame, state, voicestate in self.voicestates[1:]:
-            diff = {}
-            for voicenum in voicenums:
-                voicestate_now = state.voices[voicenum]
-                last_voicestate = last_state.voices[voicenum]
-                voice_diff = voicestate_now.diff(last_voicestate)
-                voice_diff = {'%s%u' % (k, voicenum): v for k, v in voice_diff.items()}
-                diff.update(voice_diff)
-                filter_diff = state.mainreg.diff_filter_vol(voicenum, last_state.mainreg)
-                diff.update(filter_diff)
-            frame_clock = (frame - first_frame) * self.sid.clockq
-            orig_diffs[frame_clock].append((clock, diff))
-            last_state = state
-            if not voicestate.gate and voicestate.rel == 0:
-                break
 
         first_row = {'clock': 0}
         fieldnames = ['clock']
+
         for voicenum in voicenums:
             voicestate = first_state.voices[voicenum]
             for field in voicestate.voice_regs:
@@ -120,6 +104,33 @@ class SidSoundFragment:
             val = getattr(first_state.mainreg, field)
             fieldnames.append(field)
             first_row[field] = val
+
+        last_state = first_state
+        orig_diffs = defaultdict(list)
+        voice_sounding = {v: first_state.voices[v].sounding() for v in voicenums}
+
+        for clock, frame, state, voicestate in self.voicestates[1:]:
+            diff = {}
+            for voicenum in voicenums:
+                voicestate_now = state.voices[voicenum]
+                last_voicestate = last_state.voices[voicenum]
+                voice_diff = voicestate_now.diff(last_voicestate)
+                voice_diff = {'%s%u' % (k, voicenum): v for k, v in voice_diff.items()}
+                filter_diff = state.mainreg.diff_filter_vol(voicenum, last_state.mainreg)
+                if not voice_sounding[voicenum]:
+                    if voicestate_now.sounding():
+                       voice_sounding[voicenum] = True
+                    else:
+                       for k, v in voice_diff.items():
+                           first_row[k] += v
+                       continue
+                diff.update(voice_diff)
+                diff.update(filter_diff)
+            frame_clock = (frame - first_frame) * self.sid.clockq
+            orig_diffs[frame_clock].append((clock, diff))
+            if not voicestate.gate and voicestate.rel == 0:
+                break
+            last_state = state
 
         rows = [first_row]
         for frame_clock, clock_diffs in orig_diffs.items():
