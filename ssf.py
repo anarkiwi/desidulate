@@ -43,7 +43,7 @@ class SidSoundFragment:
             if not self.waveform_order or self.waveform_order[-1] != row_waveforms:
                 self.waveform_order.append(row_waveforms)
             last_clock = row.clock
-        self.noisephases = len([waveforms for waveforms in self.waveform_order if 'noise' in self.waveforms])
+        self.noisephases = len([waveforms for waveforms in self.waveform_order if 'noise' in waveforms])
         self.all_noise = set(self.waveforms.keys()) == {'noise'}
         self.descending_pitches = len(self.midi_pitches) > 2 and self.midi_pitches[0] > self.midi_pitches[-1]
 
