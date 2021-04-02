@@ -14,7 +14,7 @@ from collections import Counter
 from fileio import midi_path
 from sidlib import get_gate_events, get_reg_writes, get_sid, VOICES
 from sidmidi import SidMidiFile
-from ssf import dump_patches, SidSoundFragment
+from ssf import dump_patches, SidSoundFragmentParser
 
 
 parser = argparse.ArgumentParser(description='Convert vicesnd.sid log into a MIDI file')
@@ -47,7 +47,7 @@ multi_patches = {}
 patch_count = Counter()
 
 for voicenum, events in get_gate_events(reg_writes):
-    ssf = SidSoundFragment(
+    ssf = SidSoundFragmentParser(
         args.percussion, sid, smf, voicenum, events,
         single_patches, multi_patches, patch_count)
     ssf.parse()

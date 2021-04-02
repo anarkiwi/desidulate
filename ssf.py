@@ -42,6 +42,20 @@ def dump_patches(logfile, patch_count, patch_output):
 
 class SidSoundFragment:
 
+    def __init__(self, waveforms, waveform_order, noisephases, all_noise, midi_pitches, total_duration, max_midi_note, min_midi_note, midi_notes):
+        self.waveforms = waveforms
+        self.waveform_order = waveform_order,
+        self.noisephases = noisephases
+        self.all_noise = all_noise
+        self.midi_pitches = midi_pitches
+        self.total_duration = total_duration
+        self.max_midi_note = self.max_midi_note
+        self.min_midi_note = self.min_midi_note
+        self.midi_notes = self.midi_notes
+
+
+class SidSoundFragmentParser:
+
     def __init__(self, percussion, sid, smf, voicenum, events, single_patches, multi_patches, patch_count):
         self.percussion = percussion
         self.voicenum = voicenum
