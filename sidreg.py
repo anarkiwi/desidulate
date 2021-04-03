@@ -9,7 +9,6 @@
 # https://www.c64-wiki.com/wiki/SID
 
 import copy
-from collections import defaultdict
 from functools import lru_cache
 
 VOICES = frozenset([1, 2, 3])
