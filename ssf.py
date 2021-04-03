@@ -180,7 +180,7 @@ class SidSoundFragmentParser:
                     for k, v in voice_diff.items():
                         first_row[k] += v
                         reg_total[k] += v
-                        reg_max[k] = max(reg_max[k], v)
+                        reg_max[k] = max(reg_max[k], reg_total[k])
                     continue
                 sounding += 1
                 voice_sounding[voicenum] = True
@@ -191,12 +191,12 @@ class SidSoundFragmentParser:
                 for k, v in filter_diff.items():
                     first_row[k] += v
                     reg_total[k] += v
-                    reg_max[k] = max(reg_max[k], v)
+                    reg_max[k] = max(reg_max[k], reg_total[k])
             frame_clock = max((frame - first_frame) * self.sid.clockq, self.sid.clockq)
             orig_diffs[frame_clock].append((clock, diff))
             for k, v in diff.items():
                 reg_total[k] += v
-                reg_max[k] = max(reg_max[k], v)
+                reg_max[k] = max(reg_max[k], reg_total[k])
                 assert reg_total[k] >= 0
             if not voicestate.gate and voicestate.rel == 0:
                 break
@@ -218,15 +218,20 @@ class SidSoundFragmentParser:
                 filtered_voices += 1
         if filtered_voices == 0:
             del_cols.update(self._filter_cols(tuple(reg_max.keys())))
-        return del_cols
+        return del_cols, filtered_voices
 
     def _compress_diffs(self, first_row, orig_diffs, del_cols):
-        rows = [first_row]
+
+        def _compress_row(row_diff):
+            if del_cols:
+                row_diff = {k: v for k, v in row_diff.items() if k not in del_cols}
+            return row_diff
+
+        rows = [_compress_row(first_row)]
         for frame_clock, clock_diffs in orig_diffs.items():
             first_clock, _ = clock_diffs[0]
             for clock, diff in clock_diffs:
-                if del_cols:
-                    diff = {k: v for k, v in diff.items() if k not in del_cols}
+                diff = _compress_row(diff)
                 if diff:
                     diff['clock'] = frame_clock + (clock - first_clock)
                     rows.append(diff)
@@ -250,18 +255,19 @@ class SidSoundFragmentParser:
             assert first_voicestate.gate
 
             first_row, fieldnames = self._firsts(first_state, voicenums)
-            orig_diffs, reg_total = self._statediffs(first_row, first_state, first_frame, voicenums, voicestates)
-            del_cols = self._del_cols(voicenums, reg_total)
+            orig_diffs, reg_max = self._statediffs(first_row, first_state, first_frame, voicenums, voicestates)
+            del_cols, filtered_voices = self._del_cols(voicenums, reg_max)
             rows = self._compress_diffs(first_row, orig_diffs, del_cols)
             df = pd.DataFrame(rows, columns=fieldnames, dtype=pd.Int64Dtype())
             df.columns = self._rename_cols(tuple(df.columns), voicenum)
             assert df['clock'].max() > 0, (df, orig_diffs)
+            assert filtered_voices == 0 or df['flt_coff'].max() > 0, (df, orig_diffs)
             hashid = hash(tuple(df.itertuples(index=False, name=None)))
 
-        return (hashid, df, first_clock, voicestates, voicenums)
+        return (hashid, df, first_clock, voicenums)
 
     def parse(self, voicenum, events):
-        hashid, df, first_clock, voicestates, voicenums = self._parsedf(voicenum, events)
+        hashid, df, first_clock, voicenums = self._parsedf(voicenum, events)
 
         if hashid is None:
             ssf = None
