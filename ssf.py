@@ -168,6 +168,16 @@ class SidSoundFragmentParser:
         reg_cumsum = copy.copy(first_row)
         reg_max = copy.copy(first_row)
 
+        def _keep_sum(reg_diff):
+            for k, v in reg_diff.items():
+                reg_cumsum[k] += v
+                reg_max[k] = max(reg_max[k], reg_cumsum[k])
+                assert reg_cumsum[k] >= 0
+
+        def _first_sum(reg_diff):
+            for k, v in reg_diff.items():
+                first_row[k] += v
+
         for clock, frame, state, voicestate in voicestates[1:]:
             diff = {}
             filter_diff = {}
@@ -179,10 +189,8 @@ class SidSoundFragmentParser:
                 voice_diff = self._voicediff(voicestate_now, last_voicestate, voicenum)
                 filter_diff.update(state.mainreg.diff_filter_vol(voicenum, last_state.mainreg))
                 if not voice_sounding[voicenum] and not voicestate_now.sounding():
-                    for k, v in voice_diff.items():
-                        first_row[k] += v
-                        reg_cumsum[k] += v
-                        reg_max[k] = max(reg_max[k], reg_cumsum[k])
+                    _keep_sum(voice_diff)
+                    _first_sum(voice_diff)
                     continue
                 sounding += 1
                 voice_sounding[voicenum] = True
@@ -190,16 +198,11 @@ class SidSoundFragmentParser:
             if sounding:
                 diff.update(filter_diff)
             else:
-                for k, v in filter_diff.items():
-                    first_row[k] += v
-                    reg_cumsum[k] += v
-                    reg_max[k] = max(reg_max[k], reg_cumsum[k])
+                _keep_sum(filter_diff)
+                _first_sum(filter_diff)
             frame_clock = max((frame - first_frame) * self.sid.clockq, self.sid.clockq)
             orig_diffs[frame_clock].append((clock, diff))
-            for k, v in diff.items():
-                reg_cumsum[k] += v
-                reg_max[k] = max(reg_max[k], reg_cumsum[k])
-                assert reg_cumsum[k] >= 0
+            _keep_sum(diff)
             if not voicestate.gate and voicestate.rel == 0:
                 break
             last_state = state
