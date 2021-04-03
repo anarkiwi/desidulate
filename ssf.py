@@ -48,7 +48,9 @@ class SidSoundFragment:
 
     def _undiff_df(self, df):
         cs = df.drop('clock', axis=1).fillna(0).cumsum()
-        return df[['clock']].join(cs)
+        undiff_df = df[['clock']].join(cs)
+        assert undiff_df.iloc[0].clock == 0
+        return undiff_df
 
     def _row_state(self):
         for row in self.undiff_df.itertuples():
@@ -163,7 +165,7 @@ class SidSoundFragmentParser:
         last_state = first_state
         orig_diffs = defaultdict(list)
         voice_sounding = {v: first_state.voices[v].sounding() for v in voicenums}
-        reg_total = copy.copy(first_row)
+        reg_cumsum = copy.copy(first_row)
         reg_max = copy.copy(first_row)
 
         for clock, frame, state, voicestate in voicestates[1:]:
@@ -179,8 +181,8 @@ class SidSoundFragmentParser:
                 if not voice_sounding[voicenum] and not voicestate_now.sounding():
                     for k, v in voice_diff.items():
                         first_row[k] += v
-                        reg_total[k] += v
-                        reg_max[k] = max(reg_max[k], reg_total[k])
+                        reg_cumsum[k] += v
+                        reg_max[k] = max(reg_max[k], reg_cumsum[k])
                     continue
                 sounding += 1
                 voice_sounding[voicenum] = True
@@ -190,14 +192,14 @@ class SidSoundFragmentParser:
             else:
                 for k, v in filter_diff.items():
                     first_row[k] += v
-                    reg_total[k] += v
-                    reg_max[k] = max(reg_max[k], reg_total[k])
+                    reg_cumsum[k] += v
+                    reg_max[k] = max(reg_max[k], reg_cumsum[k])
             frame_clock = max((frame - first_frame) * self.sid.clockq, self.sid.clockq)
             orig_diffs[frame_clock].append((clock, diff))
             for k, v in diff.items():
-                reg_total[k] += v
-                reg_max[k] = max(reg_max[k], reg_total[k])
-                assert reg_total[k] >= 0
+                reg_cumsum[k] += v
+                reg_max[k] = max(reg_max[k], reg_cumsum[k])
+                assert reg_cumsum[k] >= 0
             if not voicestate.gate and voicestate.rel == 0:
                 break
             last_state = state
