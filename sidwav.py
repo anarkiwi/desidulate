@@ -25,4 +25,4 @@ def make_wav_from_reg(sid, reg_writes, wav_file_name, padclock):
     scipy.io.wavfile.write(
         wav_file_name,
         int(sid.resid.sampling_frequency),
-        np.fromiter(generate_samples(sid, reg_writes, padclock), count=-1, dtype=np.float32) / 2**15)
+        np.fromiter(generate_samples(sid, reg_writes, padclock), count=-1, dtype=np.int16))
