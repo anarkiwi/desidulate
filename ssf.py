@@ -49,7 +49,7 @@ class SidSoundFragment:
     def _undiff_df(self, df):
         cs = df.drop('clock', axis=1).fillna(0).cumsum()
         undiff_df = df[['clock']].join(cs)
-        assert undiff_df.iloc[0].clock == 0
+        assert undiff_df.iloc[0].clock == 0, (undiff_df, df)
         return undiff_df
 
     def _row_state(self):
@@ -204,6 +204,7 @@ class SidSoundFragmentParser:
                 break
             last_state = state
 
+        orig_diffs[0] = [(0, first_row)] + orig_diffs[0]
         return (orig_diffs, reg_max)
 
     def _del_cols(self, voicenums, reg_max):
@@ -222,18 +223,13 @@ class SidSoundFragmentParser:
             del_cols.update(self._filter_cols(tuple(reg_max.keys())))
         return del_cols, filtered_voices
 
-    def _compress_diffs(self, first_row, orig_diffs, del_cols):
-
-        def _compress_row(row_diff):
-            if del_cols:
-                row_diff = {k: v for k, v in row_diff.items() if k not in del_cols}
-            return row_diff
-
-        rows = [_compress_row(first_row)]
-        for frame_clock, clock_diffs in orig_diffs.items():
+    def _compress_diffs(self, orig_diffs, del_cols):
+        rows = []
+        for frame_clock, clock_diffs in sorted(orig_diffs.items()):
             first_clock, _ = clock_diffs[0]
             for clock, diff in clock_diffs:
-                diff = _compress_row(diff)
+                if del_cols:
+                    diff = {k: v for k, v in diff.items() if k not in del_cols}
                 if diff:
                     diff['clock'] = frame_clock + (clock - first_clock)
                     rows.append(diff)
@@ -259,7 +255,7 @@ class SidSoundFragmentParser:
             first_row, fieldnames = self._firsts(first_state, voicenums)
             orig_diffs, reg_max = self._statediffs(first_row, first_state, first_frame, voicenums, voicestates)
             del_cols, filtered_voices = self._del_cols(voicenums, reg_max)
-            rows = self._compress_diffs(first_row, orig_diffs, del_cols)
+            rows = self._compress_diffs(orig_diffs, del_cols)
             df = pd.DataFrame(rows, columns=fieldnames, dtype=pd.Int64Dtype())
             df.columns = self._rename_cols(tuple(df.columns), voicenum)
             assert df['clock'].max() > 0, (df, orig_diffs)
