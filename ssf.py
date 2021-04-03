@@ -19,9 +19,10 @@ from sidmidi import ELECTRIC_SNARE, BASS_DRUM, LOW_TOM
 
 class SidSoundFragment:
 
-    def __init__(self, percussion, sid, smf, first_clock, voicestates, df):
+    def __init__(self, percussion, sid, smf, df):
+        self.undiff_df = self._undiff_df(df)
         self.percussion = percussion
-        self.midi_notes = tuple(smf.get_midi_notes_from_events(sid, first_clock, voicestates))
+        self.midi_notes = tuple(smf.get_midi_notes_from_events(sid, self._row_state()))
         self.midi_pitches = []
         self.total_duration = 0
         self.max_midi_note = 0
@@ -34,10 +35,8 @@ class SidSoundFragment:
         last_clock = 0
         self.waveforms = defaultdict(int)
         self.waveform_order = []
-        all_waveforms = frozenset({'%s1' % col for col in ('tri', 'saw', 'pulse', 'noise')})
-        for row in df.itertuples():
+        for row, row_waveforms in self._row_state():
             rel_clock = row.clock - last_clock
-            row_waveforms = frozenset({col[:-1] for col in all_waveforms if pd.notna(getattr(row, col)) and getattr(row, col) == 1})
             for waveform in row_waveforms:
                 self.waveforms[waveform] += rel_clock
             if not self.waveform_order or self.waveform_order[-1] != row_waveforms:
@@ -46,6 +45,16 @@ class SidSoundFragment:
         self.noisephases = len([waveforms for waveforms in self.waveform_order if 'noise' in waveforms])
         self.all_noise = set(self.waveforms.keys()) == {'noise'}
         self.descending_pitches = len(self.midi_pitches) > 2 and self.midi_pitches[0] > self.midi_pitches[-1]
+
+    def _undiff_df(self, df):
+        cs = df.drop('clock', axis=1).fillna(0).cumsum()
+        return df[['clock']].join(cs)
+
+    def _row_state(self):
+        for row in self.undiff_df.itertuples():
+            waveforms = frozenset(
+                waveform[:-1] for waveform in ('noise1', 'pulse1', 'tri1', 'saw1') if getattr(row, waveform) > 0)
+            yield (row, waveforms)
 
     def smf_transcribe(self, smf, first_clock, voicenum):
         if self.noisephases:
@@ -183,7 +192,7 @@ class SidSoundFragmentParser:
                     first_row[k] += v
                     reg_total[k] += v
                     reg_max[k] = max(reg_max[k], v)
-            frame_clock = max((frame - first_frame) * self.sid.clockq, 1)
+            frame_clock = max((frame - first_frame) * self.sid.clockq, self.sid.clockq)
             orig_diffs[frame_clock].append((clock, diff))
             for k, v in diff.items():
                 reg_total[k] += v
@@ -260,7 +269,7 @@ class SidSoundFragmentParser:
             if hashid in self.ssf_cache:
                 ssf = self.ssf_cache[hashid]
             else:
-                ssf = SidSoundFragment(self.percussion, self.sid, self.smf, first_clock, voicestates, df)
+                ssf = SidSoundFragment(self.percussion, self.sid, self.smf, df)
                 self.ssf_cache[hashid] = ssf
                 if len(voicenums) == 1:
                     self.single_patches[hashid] = df

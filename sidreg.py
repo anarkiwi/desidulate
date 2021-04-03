@@ -11,7 +11,6 @@
 import copy
 from collections import defaultdict
 from functools import lru_cache
-import pandas as pd
 
 VOICES = frozenset([1, 2, 3])
 
@@ -532,16 +531,3 @@ frozen_sid_state = {}
 
 def frozen_sid_state_factory(state):
     return frozen_factory(state, frozen_sid_state, FrozenSidRegState)
-
-
-def df_state(df):
-    reg_total = defaultdict(int)
-    cols = set(df.columns) - {'clock'}
-    for row in df.itertuples():
-        for col in cols:
-            val = getattr(row, col)
-            if pd.notna(val):
-                reg_total[col] += val
-        waveforms = frozenset(
-            waveform[:-1] for waveform in ('noise1', 'pulse1', 'tri1', 'saw1') if reg_total[waveform])
-        yield (row, reg_total, waveforms)

@@ -153,30 +153,32 @@ class SidMidiFile:
         self.add_drum_pitch(voicenum, clock, duration, noise_pitch, velocity)
 
     @lru_cache
-    def sid_adsr_to_velocity(self, voice_state):
-        vel_nib = voice_state.sus
+    def sid_adsr_to_velocity(self, row):
+        vel_nib = row.sus1
         # Sustain approximates velocity, but if it's 0, then go with dec.
         # TODO: could use time in atk?
         if vel_nib == 0:
             # assert voice_state.atk == 0
-            vel_nib = voice_state.dec
+            vel_nib = row.dec1
         velocity = int(vel_nib / 15 * 127)
         return velocity
 
     # Convert gated voice events into possibly many MIDI notes
-    def get_midi_notes_from_events(self, sid, first_clock, voiceevents):
+    def get_midi_notes_from_events(self, sid, row_states):
         last_midi_n = None
         notes_starts = []
-        for clock, _frame, state, voicestate in voiceevents:
-            clock -= first_clock
-            sid_f = sid.real_sid_freq(voicestate.freq)
+        last_clock = None
+        for row, row_waveforms in row_states:
+            if not row_waveforms:
+                continue
+            sid_f = sid.real_sid_freq(row.freq1)
             _, closest_midi_n = self.closest_midi(sid_f)
-            velocity = self.sid_adsr_to_velocity(voicestate)
+            velocity = self.sid_adsr_to_velocity(row)
             # TODO: add pitch bend if significantly different to canonical note.
-            if closest_midi_n != last_midi_n and voicestate.any_waveform() and velocity:
-                notes_starts.append((closest_midi_n, clock, sid_f, velocity))
+            if closest_midi_n != last_midi_n and velocity:
+                notes_starts.append((closest_midi_n, row.clock, sid_f, velocity))
                 last_midi_n = closest_midi_n
-            last_clock = clock
+            last_clock = row.clock
         notes = []
         for i, note_clocks in enumerate(notes_starts):
             note, clock, sid_f, velocity = note_clocks
