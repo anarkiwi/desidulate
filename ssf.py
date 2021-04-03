@@ -39,7 +39,8 @@ class SidSoundFragment:
             rel_clock = row.clock - last_clock
             for waveform in row_waveforms:
                 self.waveforms[waveform] += rel_clock
-            if not self.waveform_order or self.waveform_order[-1] != row_waveforms:
+            if ((self.waveform_order and self.waveform_order[-1] != row_waveforms) or
+                  (not self.waveform_order and row_waveforms)):
                 self.waveform_order.append(row_waveforms)
             last_clock = row.clock
         self.noisephases = len([waveforms for waveforms in self.waveform_order if 'noise' in waveforms])
