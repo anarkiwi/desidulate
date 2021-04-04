@@ -25,7 +25,6 @@ pal_parser.add_argument('--ntsc', dest='pal', action='store_false', help='Use NT
 parser.set_defaults(pal=True)
 args = parser.parse_args()
 
-sid = get_sid(pal=args.pal)
 wavfile = args.wavfile
 if not wavfile:
     wavfile = wav_path(args.patchcsv)
@@ -34,8 +33,10 @@ if not wavfile:
 df = pd.read_csv(args.patchcsv, dtype=pd.Int64Dtype())
 hashid = np.int64(args.hashid)
 if hashid:
+    sid = get_sid(pal=args.pal)
     df2wav(df[df['hashid'] == hashid], sid, wavfile)
 else:
     for hashid, patch_df in df.groupby('hashid'):
+        sid = get_sid(pal=args.pal)
         wavfile = wav_path(args.patchcsv, hashid)
         df2wav(patch_df, sid, wavfile)

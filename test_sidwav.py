@@ -19,8 +19,7 @@ class SidWavTestCase(unittest.TestCase):
         self.tmpdir.cleanup() 
 
     def test_df2wav(self):
-        # test_wav = os.path.join(self.tmpdir.name, 'test.wav')
-        test_wav = '/tmp/test.wav'
+        test_wav = os.path.join(self.tmpdir.name, 'test.wav')
         transformer = sox.Transformer()
 
         for i in range(1, 5):
