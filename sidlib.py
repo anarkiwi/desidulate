@@ -18,14 +18,16 @@ from sidreg import VOICES, SidRegState, SidRegEvent, frozen_sid_state_factory
 
 class SidWrap:
 
-    def __init__(self, pal, model=ChipModel.MOS8580):
+    def __init__(self, pal, model=ChipModel.MOS8580, sampling_frequency=22050):
         if pal:
             self.clock_freq = SoundInterfaceDevice.PAL_CLOCK_FREQUENCY
             self.int_freq = 50.0
         else:
             self.clock_freq = SoundInterfaceDevice.NTSC_CLOCK_FREQUENCY
             self.int_freq = 60.0
-        self.resid = SoundInterfaceDevice(model=model, clock_frequency=self.clock_freq)
+        self.resid = SoundInterfaceDevice(
+            model=model, clock_frequency=self.clock_freq,
+            sampling_frequency=sampling_frequency)
         self.clockq = int(round(self.clock_freq / self.int_freq))
 
     def clock_to_s(self, clock):

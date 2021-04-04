@@ -7,15 +7,12 @@
 ## The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 
 import argparse
-from collections import defaultdict
-
 import numpy as np
 import pandas as pd
-import scipy.io.wavfile
-from pyresidfp import Voice, ControlBits, ModeVolBits
 
-from fileio import file_reader, wav_path
+from fileio import wav_path
 from sidlib import get_sid
+from sidwav import df2wav
 
 
 parser = argparse.ArgumentParser(description='Convert [single|multi]_patches.csv into a WAV file')
@@ -34,89 +31,11 @@ if not wavfile:
     wavfile = wav_path(args.patchcsv)
 
 
-def control_reg(voicenum, voicestate):
-    return ControlBits(
-        (ControlBits.GATE.value * voicestate['gate%u' % voicenum]) |
-        (ControlBits.SYNC.value * voicestate['sync%u' % voicenum]) |
-        (ControlBits.RING_MOD.value * voicestate['ring%u' % voicenum]) |
-        (ControlBits.TEST.value * voicestate['test%u' % voicenum]) |
-        (ControlBits.TRIANGLE.value * voicestate['tri%u' % voicenum]) |
-        (ControlBits.SAWTOOTH.value * voicestate['saw%u' % voicenum]) |
-        (ControlBits.PULSE.value * voicestate['pulse%u' % voicenum]) |
-        (ControlBits.NOISE.value * voicestate['noise%u' % voicenum]))
-
-
-def filter_coff_reg(voicestate):
-    return voicestate['flt_coff'] & (2 ** 11 - 1)
-
-
-def filtermodevol_reg(voicestate):
-    return ModeVolBits(
-        (ModeVolBits.BP.value * voicestate['flt_band']) |
-        (ModeVolBits.HP.value * voicestate['flt_high']) |
-        (ModeVolBits.LP.value * voicestate['flt_low'])).value + voicestate['vol']
-
-
-def nib2byte(hi, lo):
-    return (hi << 4) + lo
-
-
-def filterres_reg(voicenum, voicestate):
-    return nib2byte(voicestate['flt_res'], voicestate['flt%u' % voicenum])
-
-
-def attack_decay(voicenum, voicestate):
-    return nib2byte(voicestate['atk%u' % voicenum], voicestate['dec%u' % voicenum])
-
-
-def sustain_release(voicenum, voicestate):
-    return nib2byte(voicestate['sus%u' % voicenum], voicestate['rel%u' % voicenum])
-
-
-def freq(voicenum, voicestate):
-    return voicestate['freq%u' % voicenum]
-
-
-def pw_duty(voicenum, voicestate):
-    return voicestate['pw_duty%u' % voicenum] & (2 ** 12 - 1)
-
-
-def generate_wav(df, sid, wavfile):
-    raw_samples = []
-    lastclock = 0
-    sidstate = defaultdict(int)
-
-    for df_row in df.to_dict(orient='records'):
-        row = {k: int(v) for k, v in df_row.items() if not pd.isnull(v)}
-        ts_offset = row['clock'] - lastclock
-        raw_samples.extend(sid.add_samples(ts_offset))
-        for f in set(row.keys()) - {'hashid', 'count', 'clock'}:
-            sidstate[f] += row[f]
-
-        sid.resid.filter_cutoff(filter_coff_reg(sidstate))
-        sid.resid.Filter_Mode_Vol = filtermodevol_reg(sidstate)
-
-        for voice in (Voice.ONE, Voice.THREE):
-            voicenum = voice.value + 1
-            sid.resid.Filter_Res_Filt = filterres_reg(voicenum, sidstate)
-            sid.resid.oscillator(voice, freq(voicenum, sidstate))
-            sid.resid.pulse_width(voice, pw_duty(voicenum, sidstate))
-            sid.resid.attack_decay(voice, attack_decay(voicenum, sidstate))
-            sid.resid.sustain_release(voice, sustain_release(voicenum, sidstate))
-            sid.resid.control(voice, control_reg(voicenum, sidstate))
-
-        lastclock = row['clock']
-
-    if raw_samples:
-        scipy.io.wavfile.write(
-            wavfile, int(sid.resid.sampling_frequency), np.array(raw_samples, dtype=np.float32) / 2**15)
-
-
 df = pd.read_csv(args.patchcsv, dtype=pd.Int64Dtype())
 hashid = np.int64(args.hashid)
 if hashid:
-    generate_wav(df[df['hashid'] == hashid], sid, wavfile)
+    df2wav(df[df['hashid'] == hashid], sid, wavfile)
 else:
     for hashid, patch_df in df.groupby('hashid'):
         wavfile = wav_path(args.patchcsv, hashid)
-        generate_wav(patch_df, sid, wavfile)
+        df2wav(patch_df, sid, wavfile)
