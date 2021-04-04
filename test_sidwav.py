@@ -33,8 +33,8 @@ class SidWavTestCase(unittest.TestCase):
             power_df = pd.DataFrame(transformer.power_spectrum(test_wav), columns=['freq', 'val'])
             val_max = power_df['val'].max()
             freq_max = power_df[power_df['val'] == val_max].iloc[0]['freq']
-            self.assertGreaterEqual(freq_max, test_real_freq - 3)
-            self.assertLessEqual(freq_max, test_real_freq + 3)
+            freq_diff = abs(freq_max - test_real_freq)
+            self.assertLessEqual(freq_diff, 3)
 
 
 if __name__ == "__main__":
