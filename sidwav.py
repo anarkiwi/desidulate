@@ -62,6 +62,8 @@ def df2wav(df, sid, wavfile):
     raw_samples = []
     lastclock = 0
     sidstate = defaultdict(int)
+    sid.resid.reset()
+    sid.add_samples(sid.clock_freq)
 
     for df_row in df.to_dict(orient='records'):
         row = {k: int(v) for k, v in df_row.items() if not pd.isnull(v)}

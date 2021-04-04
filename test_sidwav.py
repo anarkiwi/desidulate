@@ -19,11 +19,11 @@ class SidWavTestCase(unittest.TestCase):
         self.tmpdir.cleanup() 
 
     def test_df2wav(self):
+        sid = get_sid(pal=True)
         test_wav = os.path.join(self.tmpdir.name, 'test.wav')
         transformer = sox.Transformer()
 
         for i in range(1, 5):
-            sid = get_sid(pal=True)
             test_raw_freq = int(i * 2048)
             test_real_freq = sid.real_sid_freq(test_raw_freq)
             df = pd.DataFrame(
