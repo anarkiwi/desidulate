@@ -19,6 +19,7 @@ parser.add_argument('--voicemask', default=','.join((str(v) for v in VOICES)), h
 parser.add_argument('--minclock', default=0, type=int, help='start rendering from this clock value')
 parser.add_argument('--maxclock', default=0, type=int, help='if > 0, stop rendering at this clock value')
 parser.add_argument('--padclock', default=int(1e3), type=int, help='pad beginning and end of WAV with this clock value')
+parser.add_argument('--maxsilentclocks', default=int(1e6), type=int, help='max number of consecutive silent output samples')
 pal_parser = parser.add_mutually_exclusive_group(required=False)
 pal_parser.add_argument('--pal', dest='pal', action='store_true', help='Use PAL clock')
 pal_parser.add_argument('--ntsc', dest='pal', action='store_false', help='Use NTSC clock')
@@ -36,4 +37,5 @@ reg_writes = get_reg_writes(
     minclock=args.minclock,
     maxclock=args.maxclock,
     voicemask=voicemask)
-make_wav_from_reg(sid, reg_writes, wavfile, args.padclock)
+make_wav_from_reg(
+    sid, reg_writes, wavfile, args.padclock, args.maxsilentclocks)
