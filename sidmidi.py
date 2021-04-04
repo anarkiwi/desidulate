@@ -169,13 +169,11 @@ class SidMidiFile:
         notes_starts = []
         last_clock = None
         for row, row_waveforms in row_states:
-            if not row_waveforms:
-                continue
             sid_f = sid.real_sid_freq(row.freq1)
             _, closest_midi_n = self.closest_midi(sid_f)
             velocity = self.sid_adsr_to_velocity(row)
             # TODO: add pitch bend if significantly different to canonical note.
-            if closest_midi_n != last_midi_n and velocity:
+            if closest_midi_n != last_midi_n and row_waveforms and velocity:
                 notes_starts.append((closest_midi_n, row.clock, sid_f, velocity))
                 last_midi_n = closest_midi_n
             last_clock = row.clock
