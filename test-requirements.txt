@@ -1,0 +1,6 @@
+attrs
+wheel
+pytype
+pylint
+pytest
+sox
