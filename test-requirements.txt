@@ -3,4 +3,5 @@ wheel
 pytype
 pylint
 pytest
+pytest-cov
 sox
