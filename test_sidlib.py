@@ -12,9 +12,9 @@ class SidLibTestCase(unittest.TestCase):
 
     def setUp(self):
         self.tmpdir = tempfile.TemporaryDirectory()
-  
+
     def tearDown(self):
-        self.tmpdir.cleanup() 
+        self.tmpdir.cleanup()
 
     def test_df2wav(self):
         sid = get_sid(True)
