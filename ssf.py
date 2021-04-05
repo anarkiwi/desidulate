@@ -202,8 +202,9 @@ class SidSoundFragmentParser:
                 _keep_sum(filter_diff)
                 _first_sum(filter_diff)
             frame_clock = max((frame - first_frame) * self.sid.clockq, self.sid.clockq)
-            orig_diffs[frame_clock].append((clock, diff))
-            _keep_sum(diff)
+            if diff:
+                orig_diffs[frame_clock].append((clock, diff))
+                _keep_sum(diff)
             if not voicestate.gate and voicestate.rel == 0:
                 break
             last_state = state
@@ -235,7 +236,8 @@ class SidSoundFragmentParser:
                 if del_cols:
                     diff = {k: v for k, v in diff.items() if k not in del_cols}
                 if diff:
-                    diff['clock'] = frame_clock + (clock - first_clock)
+                    diff_clock = clock - first_clock
+                    diff['clock'] = frame_clock + diff_clock
                     rows.append(diff)
         return rows
 
