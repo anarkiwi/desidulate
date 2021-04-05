@@ -60,6 +60,8 @@ class SidSoundFragment:
             yield (row, waveforms)
 
     def smf_transcribe(self, smf, first_clock, voicenum):
+        if not self.midi_notes:
+            return
         if self.noisephases:
             if self.percussion:
                 clock, _pitch, _duration, velocity, _ = self.midi_notes[0]
@@ -76,9 +78,14 @@ class SidSoundFragment:
                     else:
                         smf.add_drum_pitch(voicenum, clock, self.total_duration, LOW_TOM, velocity)
         else:
-            for clock, pitch, duration, velocity, _ in self.midi_notes:
+            if set(self.waveforms.keys()) == {'pulse'} and self.descending_pitches:
+                clock, _pitch, _duration, velocity, _ = self.midi_notes[0]
                 clock += first_clock
-                smf.add_pitch(voicenum, clock, duration, pitch, velocity)
+                smf.add_drum_pitch(voicenum, clock, self.total_duration, BASS_DRUM, velocity)
+            else:
+                for clock, pitch, duration, velocity, _ in self.midi_notes:
+                    clock += first_clock
+                    smf.add_pitch(voicenum, clock, duration, pitch, velocity)
 
 
 class SidSoundFragmentParser:
