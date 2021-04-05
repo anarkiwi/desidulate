@@ -168,7 +168,14 @@ class SidMidiFile:
         last_midi_n = None
         notes_starts = []
         last_clock = None
+        sounding = False
         for row, row_waveforms in row_states:
+            if not sounding:
+                if row_waveforms and row.vol and not row.test1:
+                    sounding = True
+                else:
+                    last_clock = row.clock
+                    continue
             sid_f = sid.real_sid_freq(row.freq1)
             _, closest_midi_n = self.closest_midi(sid_f)
             velocity = self.sid_adsr_to_velocity(row)
