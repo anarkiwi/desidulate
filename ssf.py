@@ -27,8 +27,10 @@ class SidSoundFragment:
         self.total_duration = 0
         self.max_midi_note = 0
         self.min_midi_note = 0
+        self.initial_midi_pitches = []
         if self.midi_notes:
             self.midi_pitches = tuple([midi_note[1] for midi_note in self.midi_notes])
+            self.initial_midi_pitches = tuple([midi_note[1] for midi_note in self.midi_notes if midi_note[0] < 1e5])
             self.total_duration = sum(duration for _, _, duration, _, _ in self.midi_notes)
             self.max_midi_note = max(self.midi_pitches)
             self.min_midi_note = min(self.midi_pitches)
@@ -43,9 +45,15 @@ class SidSoundFragment:
                   (not self.waveform_order and row_waveforms)):
                 self.waveform_order.append(row_waveforms)
             last_clock = row.clock
+        self.waveforms = frozenset(self.waveforms.keys())
         self.noisephases = len([waveforms for waveforms in self.waveform_order if 'noise' in waveforms])
-        self.all_noise = set(self.waveforms.keys()) == {'noise'}
-        self.descending_pitches = len(self.midi_pitches) > 2 and self.midi_pitches[0] > self.midi_pitches[-1]
+        self.all_noise = self.waveforms == {'noise'}
+        self.initial_pitch_drop = False
+        if len(self.initial_midi_pitches) > 2:
+            first_pitch = self.initial_midi_pitches[0]
+            last_pitch = self.initial_midi_pitches[1]
+            if first_pitch > last_pitch and first_pitch - last_pitch > 12:
+                self.initial_pitch_drop = True
 
     def _undiff_df(self, df):
         cs = df.drop('clock', axis=1).fillna(0).cumsum()
@@ -72,13 +80,13 @@ class SidSoundFragment:
                 elif self.noisephases > 1:
                     smf.add_drum_pitch(voicenum, clock, self.total_duration, ELECTRIC_SNARE, velocity)
                 else:
-                    if self.descending_pitches:
+                    if self.initial_pitch_drop:
                         # http://www.ucapps.de/howto_sid_wavetables_1.html
                         smf.add_drum_pitch(voicenum, clock, self.total_duration, BASS_DRUM, velocity)
                     else:
                         smf.add_drum_pitch(voicenum, clock, self.total_duration, LOW_TOM, velocity)
         else:
-            if set(self.waveforms.keys()) == {'pulse'} and self.descending_pitches:
+            if self.waveforms == {'pulse'} and self.initial_pitch_drop:
                 clock, _pitch, _duration, velocity, _ = self.midi_notes[0]
                 clock += first_clock
                 smf.add_drum_pitch(voicenum, clock, self.total_duration, BASS_DRUM, velocity)
