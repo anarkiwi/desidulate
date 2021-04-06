@@ -166,7 +166,7 @@ class SidMidiFile:
         sounding = False
         for row, row_waveforms in row_states:
             if last_clock is not None:
-                assert row.clock > last_clock, (row.clock, last_clock, df[10:])
+                assert row.clock > last_clock, (row.clock, last_clock)
             if not sounding:
                 if row_waveforms and row.vol and not row.test1:
                     sounding = True
