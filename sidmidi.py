@@ -86,11 +86,13 @@ class SidMidiFile:
         self.add_program_change(track, channel, program)
         last_pitch_data = tuple()
         deoverlapped = []
-        for pitch_data in voice_pitch_data:
+        for pitch_data in sorted(voice_pitch_data, key=lambda x: x[0]):
             if last_pitch_data:
                 last_clock, last_duration, last_pitch, last_velocity = last_pitch_data
+                assert last_duration > 0, (last_pitch_data, pitch_data)
                 clock, _, _, _ = pitch_data
                 last_duration = min(last_duration, clock - last_clock)
+                assert last_duration > 0, (last_duration, clock, last_clock, clock - last_clock)
                 deoverlapped.append((last_clock, last_duration, last_pitch, last_velocity))
             last_pitch_data = pitch_data
         if deoverlapped:
@@ -138,19 +140,12 @@ class SidMidiFile:
         return (closest_midi_f, MIDI_F_TO_N[closest_midi_f])
 
     def add_pitch(self, voicenum, clock, duration, pitch, velocity):
+        assert duration > 0, duration
         self.pitches[voicenum].append((clock, duration, pitch, velocity))
 
     def add_drum_pitch(self, voicenum, clock, duration, pitch, velocity):
+        assert duration > 0, duration
         self.drum_pitches[voicenum].append((clock, duration, pitch, velocity))
-
-    def add_drum_noise_duration(self, voicenum, clock, duration, velocity):
-        max_duration = self.sid.clockq
-        noise_pitch = None
-        for noise_pitch in (PEDAL_HIHAT, CLOSED_HIHAT, OPEN_HIHAT, ACCOUSTIC_SNARE, CRASH_CYMBAL1):
-            if duration <= max_duration:
-                break
-            max_duration *= 2
-        self.add_drum_pitch(voicenum, clock, duration, noise_pitch, velocity)
 
     @lru_cache
     def sid_adsr_to_velocity(self, row):
@@ -170,11 +165,12 @@ class SidMidiFile:
         last_clock = None
         sounding = False
         for row, row_waveforms in row_states:
+            if last_clock is not None:
+                assert row.clock > last_clock, (row.clock, last_clock)
             if not sounding:
                 if row_waveforms and row.vol and not row.test1:
                     sounding = True
                 else:
-                    last_clock = row.clock
                     continue
             sid_f = sid.real_sid_freq(row.freq1)
             _, closest_midi_n = self.closest_midi(sid_f)
@@ -192,6 +188,7 @@ class SidMidiFile:
             except IndexError:
                 next_clock = last_clock
             duration = next_clock - clock
+            assert duration >= 0, (duration, next_clock, clock)
             duration = round(duration / self.sid.clockq) * self.sid.clockq
             if not duration:
                 continue

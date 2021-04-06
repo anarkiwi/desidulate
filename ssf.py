@@ -14,7 +14,7 @@ from collections import Counter, defaultdict
 from functools import lru_cache
 import pandas as pd
 from fileio import out_path
-from sidmidi import ELECTRIC_SNARE, BASS_DRUM, LOW_TOM
+from sidmidi import ELECTRIC_SNARE, BASS_DRUM, LOW_TOM, PEDAL_HIHAT, CLOSED_HIHAT, OPEN_HIHAT, ACCOUSTIC_SNARE, CRASH_CYMBAL1
 
 
 class SidSoundFragment:
@@ -54,6 +54,9 @@ class SidSoundFragment:
             last_pitch = self.initial_midi_pitches[1]
             if first_pitch > last_pitch and first_pitch - last_pitch > 12:
                 self.initial_pitch_drop = True
+        self.drum_pitches = []
+        self.pitches = []
+        self._set_pitches(sid)
 
     def _undiff_df(self, df):
         cs = df.drop('clock', axis=1).fillna(0).cumsum()
@@ -67,33 +70,51 @@ class SidSoundFragment:
                 waveform[:-1] for waveform in ('noise1', 'pulse1', 'tri1', 'saw1') if getattr(row, waveform) > 0)
             yield (row, waveforms)
 
-    def smf_transcribe(self, smf, first_clock, voicenum):
+    def drum_noise_duration(self, sid, duration):
+        max_duration = sid.clockq
+        noise_pitch = None
+        for noise_pitch in (PEDAL_HIHAT, CLOSED_HIHAT, OPEN_HIHAT, ACCOUSTIC_SNARE, CRASH_CYMBAL1):
+            if duration <= max_duration:
+                break
+            max_duration *= 2
+        return noise_pitch
+
+    def _set_pitches(self, sid):
         if not self.midi_notes:
             return
+        clock, _pitch, _duration, velocity, _ = self.midi_notes[0]
+
         if self.noisephases:
             if self.percussion:
-                clock, _pitch, _duration, velocity, _ = self.midi_notes[0]
-                clock += first_clock
-
                 if self.all_noise:
-                    smf.add_drum_noise_duration(voicenum, clock, self.total_duration, velocity)
+                    self.drum_pitches.append(
+                        (clock, self.total_duration, self.drum_noise_duration(sid, self.total_duration), velocity))
                 elif self.noisephases > 1:
-                    smf.add_drum_pitch(voicenum, clock, self.total_duration, ELECTRIC_SNARE, velocity)
+                    self.drum_pitches.append(
+                        (clock, self.total_duration, ELECTRIC_SNARE, velocity))
                 else:
                     if self.initial_pitch_drop:
                         # http://www.ucapps.de/howto_sid_wavetables_1.html
-                        smf.add_drum_pitch(voicenum, clock, self.total_duration, BASS_DRUM, velocity)
+                        self.drum_pitches.append(
+                            (clock, self.total_duration, BASS_DRUM, velocity))
                     else:
-                        smf.add_drum_pitch(voicenum, clock, self.total_duration, LOW_TOM, velocity)
+                        self.drum_pitches.append(
+                            (clock, self.total_duration, LOW_TOM, velocity))
         else:
             if self.waveforms == {'pulse'} and self.initial_pitch_drop:
-                clock, _pitch, _duration, velocity, _ = self.midi_notes[0]
-                clock += first_clock
-                smf.add_drum_pitch(voicenum, clock, self.total_duration, BASS_DRUM, velocity)
+                self.drum_pitches.append(
+                    (clock, self.total_duration, BASS_DRUM, velocity))
             else:
                 for clock, pitch, duration, velocity, _ in self.midi_notes:
-                    clock += first_clock
-                    smf.add_pitch(voicenum, clock, duration, pitch, velocity)
+                    assert duration > 0, self.midi_notes
+                    self.pitches.append(
+                        (clock, duration, pitch, velocity))
+
+    def smf_transcribe(self, smf, first_clock, voicenum):
+        for clock, duration, pitch, velocity in self.pitches:
+            smf.add_pitch(voicenum, first_clock + clock, duration, pitch, velocity)
+        for clock, duration, pitch, velocity in self.drum_pitches:
+            smf.add_drum_pitch(voicenum, first_clock + clock, duration, pitch, velocity)
 
 
 class SidSoundFragmentParser:
@@ -254,7 +275,7 @@ class SidSoundFragmentParser:
                     diff_clock = clock - first_clock
                     diff['clock'] = frame_clock + diff_clock
                     rows.append(diff)
-        return rows
+        return sorted(rows, key=lambda x: x['clock'])
 
     def _parsedf(self, voicenum, events):
         voicestates = [(clock, frame, state, state.voices[voicenum]) for clock, frame, state in events]
