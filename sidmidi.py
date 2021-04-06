@@ -143,15 +143,6 @@ class SidMidiFile:
     def add_drum_pitch(self, voicenum, clock, duration, pitch, velocity):
         self.drum_pitches[voicenum].append((clock, duration, pitch, velocity))
 
-    def add_drum_noise_duration(self, voicenum, clock, duration, velocity):
-        max_duration = self.sid.clockq
-        noise_pitch = None
-        for noise_pitch in (PEDAL_HIHAT, CLOSED_HIHAT, OPEN_HIHAT, ACCOUSTIC_SNARE, CRASH_CYMBAL1):
-            if duration <= max_duration:
-                break
-            max_duration *= 2
-        self.add_drum_pitch(voicenum, clock, duration, noise_pitch, velocity)
-
     @lru_cache
     def sid_adsr_to_velocity(self, row):
         vel_nib = row.sus1
