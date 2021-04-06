@@ -106,6 +106,7 @@ class SidSoundFragment:
                     (clock, self.total_duration, BASS_DRUM, velocity))
             else:
                 for clock, pitch, duration, velocity, _ in self.midi_notes:
+                    assert duration > 0, self.midi_notes
                     self.pitches.append(
                         (clock, duration, pitch, velocity))
 
@@ -274,7 +275,7 @@ class SidSoundFragmentParser:
                     diff_clock = clock - first_clock
                     diff['clock'] = frame_clock + diff_clock
                     rows.append(diff)
-        return rows
+        return sorted(rows, key=lambda x: x['clock'])
 
     def _parsedf(self, voicenum, events):
         voicestates = [(clock, frame, state, state.voices[voicenum]) for clock, frame, state in events]
