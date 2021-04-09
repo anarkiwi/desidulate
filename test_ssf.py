@@ -57,9 +57,9 @@ class SSFTestCase(unittest.TestCase):
                 '100 11 129',
                 '100000 11 0')) + '\n')
         reg_writes = get_reg_writes(sid, test_log)
-        parser = SidSoundFragmentParser(logfile=None, percussion=True, sid=sid, smf=smf)
+        parser = SidSoundFragmentParser(logfile=None, percussion=True, sid=sid)
         for voicenum, events in get_gate_events(reg_writes):
-            ssf, first_clock = parser.parse(voicenum, events)
+            ssf, first_clock = parser.parse(voicenum, events, smf)
             self.assertNotEqual(ssf, None)
             if ssf:
                 self.assertEqual(first_clock, 103)
