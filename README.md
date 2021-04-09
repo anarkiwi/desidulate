@@ -21,9 +21,10 @@ A SID register dump is parsed into partitions based on SID voice gate events (e.
 
 $ x64sc -sounddev dump /path/to/sid/or/game.d64
 
-2. Generate MIDI file (by default, generates reg2mid.mid in current directory).
+2. Generate MIDI file 
 
-$ ./reg2mid.py vicesnd.sid
+$ ./reg2ssf.py vicesnd.sid
+$ ./ssf2mid.py vicesnd.ssf.txt.xz
 
 
 ## Transcribing to a WAV file
@@ -42,10 +43,8 @@ desidulate can parse a log file and parse SID state, automatically discarding re
 
 ## Ongoing work
 
-* Better transcription of noise waveform only percussion events.
 * Pitchbending for following small pitch changes.
 * Reduce state requirements for complex SID demos.
-* Support for ring/sync modulation.
 * Support for SID-based sample playback.
 * Export to defMON.
 
