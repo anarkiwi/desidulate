@@ -41,9 +41,9 @@ reg_writes = get_reg_writes(
     maxclock=args.maxclock,
     voicemask=voicemask)
 
-parser = SidSoundFragmentParser(args.logfile, args.percussion, sid, smf)
+parser = SidSoundFragmentParser(args.logfile, args.percussion, sid)
 for voicenum, events in get_gate_events(reg_writes):
-    ssf, first_clock = parser.parse(voicenum, events)
+    ssf, first_clock = parser.parse(voicenum, events, smf)
     if ssf:
         ssf.smf_transcribe(smf, first_clock, voicenum)
 
@@ -53,3 +53,4 @@ if not midifile:
 
 smf.write(midifile)
 parser.dump_patches()
+parser.dump_events()
