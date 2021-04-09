@@ -10,6 +10,7 @@
 # http://www.ucapps.de/howto_sid_wavetables_1.html
 
 import copy
+import os
 from collections import Counter, defaultdict
 from functools import lru_cache
 import pandas as pd
@@ -119,21 +120,31 @@ class SidSoundFragment:
 
 class SidSoundFragmentParser:
 
-    def __init__(self, logfile, percussion, sid, smf):
+    def __init__(self, logfile, percussion, sid):
         self.logfile = logfile
         self.percussion = percussion
         self.sid = sid
-        self.smf = smf
         self.single_patches = {}
         self.multi_patches = {}
         self.patch_count = Counter()
-        self.ssf_cache = {}
-
-    def dump_patches(self):
-        patch_output = (
+        self.ssf_events = []
+        self.patch_output = (
             ('single_patches.txt.xz', self.single_patches),
             ('multi_patches.txt.xz', self.multi_patches))
-        for ext_patches in patch_output:
+
+    def read_patches(self):
+        for ext_patches in self.patch_output:
+            ext, patches = ext_patches
+            patch_log = out_path(self.logfile, ext)
+            if not os.path.exists(patch_log):
+                continue
+            patches_df = pd.read_csv(patch_log)
+            for hashid, df in patches_df.groupby('hashid'):
+                self.patch_count[hashid] = df['count'].max()
+                patches[hashid] = df.drop(['hashid', 'count'], axis=1)
+
+    def dump_patches(self):
+        for ext_patches in self.patch_output:
             ext, patches = ext_patches
             if not patches:
                 continue
@@ -151,6 +162,11 @@ class SidSoundFragmentParser:
             cols.remove('count')
             df = df[['hashid', 'count'] + cols]
             df.to_csv(out_filename, index=False)
+
+    def dump_events(self):
+        out_filename = out_path(self.logfile, 'ssf.txt.xz')
+        df = pd.DataFrame(self.ssf_events, columns=('first_clock', 'hashid', 'voicenum'), dtype=pd.Int64Dtype)
+        df.to_csv(out_filename, index=False)
 
     def normalize_voicenum(self, row_voicenum, voicenum):
         if row_voicenum == voicenum:
@@ -277,7 +293,7 @@ class SidSoundFragmentParser:
                     rows.append(diff)
         return sorted(rows, key=lambda x: x['clock'])
 
-    def _parsedf(self, voicenum, events):
+    def parsedf(self, voicenum, events):
         voicestates = [(clock, frame, state, state.voices[voicenum]) for clock, frame, state in events]
         audible_voicenums = frozenset().union(*[state.audible_voicenums() for _, _, state, _ in voicestates])
         hashid = None
@@ -303,24 +319,11 @@ class SidSoundFragmentParser:
             assert df['clock'].max() > 0, (df, orig_diffs)
             assert filtered_voices == 0 or df['flt_coff'].max() > 0, (df, orig_diffs)
             hashid = hash(tuple(df.itertuples(index=False, name=None)))
+            if len(voicenums) == 1:
+                self.single_patches[hashid] = df
+            else:
+                self.multi_patches[hashid] = df
+            self.patch_count[hashid] += 1
+            self.ssf_events.append((first_clock, hashid, voicenum))
 
         return (hashid, df, first_clock, voicenums)
-
-    def parse(self, voicenum, events):
-        hashid, df, first_clock, voicenums = self._parsedf(voicenum, events)
-
-        if hashid is None:
-            ssf = None
-        else:
-            if hashid in self.ssf_cache:
-                ssf = self.ssf_cache[hashid]
-            else:
-                ssf = SidSoundFragment(self.percussion, self.sid, self.smf, df)
-                self.ssf_cache[hashid] = ssf
-                if len(voicenums) == 1:
-                    self.single_patches[hashid] = df
-                else:
-                    self.multi_patches[hashid] = df
-            self.patch_count[hashid] += 1
-
-        return (ssf, first_clock)
