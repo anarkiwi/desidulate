@@ -59,8 +59,8 @@ class SSFTestCase(unittest.TestCase):
         reg_writes = get_reg_writes(sid, test_log)
         parser = SidSoundFragmentParser(logfile=None, percussion=True, sid=sid)
         for voicenum, events in get_gate_events(reg_writes):
-            ssf, first_clock = parser.parse(voicenum, events, smf)
-            self.assertNotEqual(ssf, None)
+            hashid, df, first_clock, voicenums = parser.parsedf(voicenum, events)
+            ssf = SidSoundFragment(percussion=True, sid=sid, smf=smf, df=df)
             if ssf:
                 self.assertEqual(first_clock, 103)
                 self.assertEqual(ssf.midi_pitches, (95,))
