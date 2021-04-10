@@ -178,7 +178,7 @@ class SidSoundFragmentParser:
         renamed_cols = []
         for col in cols:
             last_ch = col[-1]
-            if last_ch.isdigit():
+            if last_ch.isdigit() and col != 'mute3':
                 renamed_cols.append(col.replace(last_ch, str(self.normalize_voicenum(int(last_ch), voicenum))))
             else:
                 renamed_cols.append(col)
@@ -235,7 +235,6 @@ class SidSoundFragmentParser:
         for clock, frame, state, voicestate in voicestates[1:]:
             diff = {}
             filter_diff = {}
-            assert not state.mainreg.mute3
             sounding = 0
             for voicenum in voicenums:
                 voicestate_now = state.voices[voicenum]
@@ -268,6 +267,9 @@ class SidSoundFragmentParser:
     def _del_cols(self, voicenums, reg_max):
         del_cols = set()
         filtered_voices = 0
+        mute3 = reg_max.get('mute3', 0)
+        if not mute3:
+            del_cols.update('mute3')
         for voicenum in voicenums:
             pw_duty_col = 'pw_duty%u' % voicenum
             if reg_max[pw_duty_col] == 0:
@@ -321,7 +323,7 @@ class SidSoundFragmentParser:
             df = pd.DataFrame(rows, columns=fieldnames, dtype=pd.Int64Dtype())
             df.columns = self._rename_cols(tuple(df.columns), voicenum)
             assert df['clock'].max() > 0 or len(df) == 1, (df, orig_diffs)
-            assert filtered_voices == 0 or df['flt_coff'].max() > 0, (df, orig_diffs)
+            # assert filtered_voices == 0 or df['flt_coff'].max() > 0, (df, orig_diffs)
             hashid = hash(tuple(df.itertuples(index=False, name=None)))
             if len(voicenums) == 1:
                 self.single_patches[hashid] = df

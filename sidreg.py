@@ -296,7 +296,7 @@ class SidFilterMainRegStateMiddle(SidRegHandler):
         return self.diff_attr(self._voice_attrs(voicenum), other)
 
     def diff_filter_vol(self, voicenum, other):
-        return self.diff_attr(['vol'] + self._voice_attrs(voicenum), other)
+        return self.diff_attr(['vol', 'mute3'] + self._voice_attrs(voicenum), other)
 
 
 class SidFilterMainRegState(SidFilterMainRegStateMiddle):
