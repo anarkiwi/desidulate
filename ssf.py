@@ -323,7 +323,7 @@ class SidSoundFragmentParser:
             df = pd.DataFrame(rows, columns=fieldnames, dtype=pd.Int64Dtype())
             df.columns = self._rename_cols(tuple(df.columns), voicenum)
             assert df['clock'].max() > 0 or len(df) == 1, (df, orig_diffs)
-            assert filtered_voices == 0 or df['flt_coff'].max() > 0, (df, orig_diffs)
+            # assert filtered_voices == 0 or df['flt_coff'].max() > 0, (df, orig_diffs)
             hashid = hash(tuple(df.itertuples(index=False, name=None)))
             if len(voicenums) == 1:
                 self.single_patches[hashid] = df
