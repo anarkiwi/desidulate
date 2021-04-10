@@ -202,7 +202,7 @@ class SidSoundFragmentParser:
             flt_v_key = 'flt%u' % voicenum
             fieldnames.append(flt_v_key)
             first_row[flt_v_key] = getattr(first_state.mainreg, flt_v_key)
-        for field in first_state.mainreg.filter_common + ['vol']:
+        for field in first_state.mainreg.filter_common + ['vol', 'mute3']:
             val = getattr(first_state.mainreg, field)
             fieldnames.append(field)
             first_row[field] = val
