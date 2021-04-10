@@ -129,8 +129,8 @@ class SidSoundFragmentParser:
         self.patch_count = Counter()
         self.ssf_events = []
         self.patch_output = (
-            ('single_patches.txt.xz', self.single_patches),
-            ('multi_patches.txt.xz', self.multi_patches))
+            ('single_ssf.txt.xz', self.single_patches),
+            ('multi_ssf.txt.xz', self.multi_patches))
 
     def read_patches(self):
         for ext_patches in self.patch_output:
@@ -214,7 +214,7 @@ class SidSoundFragmentParser:
         voice_diff = {'%s%u' % (k, voicenum): v for k, v in voice_diff.items()}
         return voice_diff
 
-    def _statediffs(self, first_row, first_state, first_frame, voicenums, voicestates):
+    def _statediffs(self, first_clock, first_row, first_state, first_frame, voicenums, voicestates):
         last_state = first_state
         orig_diffs = defaultdict(list)
         voice_sounding = {v: first_state.voices[v].sounding() for v in voicenums}
@@ -227,9 +227,10 @@ class SidSoundFragmentParser:
                 reg_max[k] = max(reg_max[k], reg_cumsum[k])
                 assert reg_cumsum[k] >= 0
 
-        def _first_sum(reg_diff):
+        def _first_sum(reg_diff, reg_clock):
             for k, v in reg_diff.items():
                 first_row[k] += v
+            first_clock = reg_clock
 
         for clock, frame, state, voicestate in voicestates[1:]:
             diff = {}
@@ -243,7 +244,7 @@ class SidSoundFragmentParser:
                 filter_diff.update(state.mainreg.diff_filter_vol(voicenum, last_state.mainreg))
                 if not voice_sounding[voicenum] and not voicestate_now.sounding():
                     _keep_sum(voice_diff)
-                    _first_sum(voice_diff)
+                    _first_sum(voice_diff, clock)
                     continue
                 sounding += 1
                 voice_sounding[voicenum] = True
@@ -252,16 +253,16 @@ class SidSoundFragmentParser:
                 diff.update(filter_diff)
             else:
                 _keep_sum(filter_diff)
-                _first_sum(filter_diff)
-            frame_clock = max((frame - first_frame) * self.sid.clockq, self.sid.clockq)
+                _first_sum(filter_diff, clock)
             if diff:
+                frame_clock = (frame - first_frame) * self.sid.clockq
                 orig_diffs[frame_clock].append((clock, diff))
                 _keep_sum(diff)
             if not voicestate.gate and voicestate.rel == 0:
                 break
             last_state = state
 
-        orig_diffs[0] = [(0, first_row)] + orig_diffs[0]
+        orig_diffs[0] = [(first_clock, first_row)] + orig_diffs[0]
         return (orig_diffs, reg_max)
 
     def _del_cols(self, voicenums, reg_max):
@@ -282,6 +283,7 @@ class SidSoundFragmentParser:
 
     def _compress_diffs(self, orig_diffs, del_cols):
         rows = []
+        last_clock = 0
         for frame_clock, clock_diffs in sorted(orig_diffs.items()):
             first_clock, _ = clock_diffs[0]
             for clock, diff in clock_diffs:
@@ -290,8 +292,10 @@ class SidSoundFragmentParser:
                 if diff:
                     diff_clock = clock - first_clock
                     diff['clock'] = frame_clock + diff_clock
+                    assert last_clock == 0 or diff['clock'] > last_clock, (orig_diffs, rows)
+                    last_clock = diff['clock']
                     rows.append(diff)
-        return sorted(rows, key=lambda x: x['clock'])
+        return rows
 
     def parsedf(self, voicenum, events):
         voicestates = [(clock, frame, state, state.voices[voicenum]) for clock, frame, state in events]
@@ -307,16 +311,16 @@ class SidSoundFragmentParser:
             voicenums = frozenset({voicenum}).union(synced_voicenums)
             assert len(voicenums) in (1, 2)
             first_event = voicestates[0]
-            _first_clock, first_frame, first_state, first_voicestate = first_event
+            first_clock, first_frame, first_state, first_voicestate = first_event
             assert first_voicestate.gate
 
             first_row, fieldnames = self._firsts(first_state, voicenums)
-            orig_diffs, reg_max = self._statediffs(first_row, first_state, first_frame, voicenums, voicestates)
+            orig_diffs, reg_max = self._statediffs(first_clock, first_row, first_state, first_frame, voicenums, voicestates)
             del_cols, filtered_voices = self._del_cols(voicenums, reg_max)
             rows = self._compress_diffs(orig_diffs, del_cols)
             df = pd.DataFrame(rows, columns=fieldnames, dtype=pd.Int64Dtype())
             df.columns = self._rename_cols(tuple(df.columns), voicenum)
-            assert df['clock'].max() > 0, (df, orig_diffs)
+            assert df['clock'].max() > 0 or len(df) == 1, (df, orig_diffs)
             assert filtered_voices == 0 or df['flt_coff'].max() > 0, (df, orig_diffs)
             hashid = hash(tuple(df.itertuples(index=False, name=None)))
             if len(voicenums) == 1:
