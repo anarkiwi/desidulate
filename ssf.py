@@ -165,7 +165,7 @@ class SidSoundFragmentParser:
 
     def dump_events(self):
         out_filename = out_path(self.logfile, 'ssf.txt.xz')
-        df = pd.DataFrame(self.ssf_events, columns=('first_clock', 'hashid', 'voicenum'), dtype=pd.Int64Dtype)
+        df = pd.DataFrame(self.ssf_events, columns=('first_clock', 'hashid', 'voicenum'), dtype=pd.Int64Dtype())
         df.to_csv(out_filename, index=False)
 
     def normalize_voicenum(self, row_voicenum, voicenum):
