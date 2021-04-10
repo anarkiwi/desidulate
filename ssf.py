@@ -267,7 +267,7 @@ class SidSoundFragmentParser:
     def _del_cols(self, voicenums, reg_max):
         del_cols = set()
         filtered_voices = 0
-        mute3 = get_max.get('mute3', 0)
+        mute3 = reg_max.get('mute3', 0)
         if not mute3:
             del_cols.update('mute3')
         for voicenum in voicenums:
