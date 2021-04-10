@@ -178,7 +178,7 @@ class SidSoundFragmentParser:
         renamed_cols = []
         for col in cols:
             last_ch = col[-1]
-            if last_ch.isdigit() and col != 'mute3':
+            if last_ch.isdigit():
                 renamed_cols.append(col.replace(last_ch, str(self.normalize_voicenum(int(last_ch), voicenum))))
             else:
                 renamed_cols.append(col)
@@ -268,7 +268,7 @@ class SidSoundFragmentParser:
         del_cols = set()
         filtered_voices = 0
         mute3 = reg_max.get('mute3', 0)
-        if not mute3:
+        if not mute3 or 3 not in voicenums:
             del_cols.update('mute3')
         for voicenum in voicenums:
             pw_duty_col = 'pw_duty%u' % voicenum
