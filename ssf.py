@@ -230,6 +230,7 @@ class SidSoundFragmentParser:
         def _first_sum(reg_diff, reg_clock):
             for k, v in reg_diff.items():
                 first_row[k] += v
+                reg_max[k] = max(reg_max[k], first_row[k])
             first_clock = reg_clock
 
         for clock, frame, state, voicestate in voicestates[1:]:
@@ -271,8 +272,9 @@ class SidSoundFragmentParser:
         if not mute3 or 3 not in voicenums:
             del_cols.update('mute3')
         for voicenum in voicenums:
+            pulse_col = 'pulse%u' % voicenum
             pw_duty_col = 'pw_duty%u' % voicenum
-            if reg_max[pw_duty_col] == 0:
+            if reg_max[pulse_col] == 0:
                 del_cols.add(pw_duty_col)
             flt_col = 'flt%u' % voicenum
             if reg_max[flt_col] == 0:
