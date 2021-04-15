@@ -366,13 +366,20 @@ class SidRegStateMiddle(SidRegStateBase):
     def gates_on(self):
         return {voicenum for voicenum in self.voices if self.voices[voicenum].gate}
 
-    def audible_voicenums(self):
+    def audible_voicenums(self, prevstate):
         audible = copy.copy(VOICES)
         for voicenum in VOICES:
             voicestate = self.voices[voicenum]
-            if not voicestate.gate or voicestate.test or self.mainreg.voice_muted(voicenum):
+            if self.mainreg.voice_muted(voicenum) or voicestate.test:
                 audible -= {voicenum}
                 continue
+            if not voicestate.gate:
+                prevvoicestate = None
+                if prevstate:
+                    prevvoicestate = prevstate.voices[voicenum]
+                if prevvoicestate is None or not (prevvoicestate.gate and prevvoicestate.rel > 0):
+                    audible -= {voicenum}
+                    continue
             synced_voicenums = voicestate.synced_voicenums()
             if synced_voicenums:
                 audible -= synced_voicenums

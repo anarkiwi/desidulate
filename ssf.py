@@ -303,7 +303,11 @@ class SidSoundFragmentParser:
 
     def parsedf(self, voicenum, events):
         voicestates = [(clock, frame, state, state.voices[voicenum]) for clock, frame, state in events]
-        audible_voicenums = frozenset().union(*[state.audible_voicenums() for _, _, state, _ in voicestates])
+        audible_voicenums = set()
+        prev_state = None
+        for _, _, state, _ in voicestates:
+            audible_voicenums = audible_voicenums.union(*[state.audible_voicenums(prev_state)])
+            prev_state = state
         hashid = None
         df = None
         first_clock = None
