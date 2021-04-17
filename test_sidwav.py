@@ -3,10 +3,12 @@
 import os
 import unittest
 import tempfile
+from io import StringIO
 import pandas as pd
 import sox
 from sidlib import get_sid
-from sidwav import df2wav 
+from sidwav import df2wav, df2samples
+from ssf import normalize_ssf
 
 
 class SidWavTestCase(unittest.TestCase):
@@ -17,6 +19,57 @@ class SidWavTestCase(unittest.TestCase):
   
     def tearDown(self):
         self.tmpdir.cleanup() 
+
+    def verify_normalize(self, df_txt):
+        df = pd.read_csv(df_txt, dtype=pd.Int64Dtype())
+        sid = get_sid(pal=True)
+        samples = tuple(df2samples(df, sid))
+        df_str = df.to_string() 
+        normalized_df = normalize_ssf(df)
+        normalized_df_str = normalized_df.to_string()
+        self.assertNotEqual(df_str, normalized_df_str)
+        normalized_samples = tuple(df2samples(normalized_df, sid))
+        self.assertEqual(samples, normalized_samples)
+        print(df_str)
+        print(normalized_df_str)
+
+    def test_snare_normalize_ssf(self):
+        df_txt = StringIO("""
+hashid,count,clock,freq1,pw_duty1,atk1,dec1,sus1,rel1,gate1,sync1,ring1,test1,tri1,saw1,pulse1,noise1,flt1,flt_res,flt_coff,flt_low,flt_band,flt_high,vol,mute1,mute3
+1976258253992649556,336,0,7940,2048,0,2,15,7,1,0,0,1,0,0,0,0,,,,,,,15,0,
+1976258253992649556,336,19705,,,,,,,,,,-1,,,,1,,,,,,,,,
+1976258253992649556,336,39410,-4789,,,,,,,,,,,,,,,,,,,,,,
+1976258253992649556,336,39423,,,,,,,,,,,,,1,-1,,,,,,,,,
+1976258253992649556,336,59115,-923,,,,,,,,,,,,,,,,,,,,,,
+1976258253992649556,336,59128,,,,,,,-1,,,,,,,,,,,,,,,,
+1976258253992649556,336,78820,48188,,,,,,,,,,,,,,,,,,,,,,
+1976258253992649556,336,78833,,,,,,,,,,,,,-1,1,,,,,,,,,
+1976258253992649556,336,118230,,,,13,,,,,,,,,,,,,,,,,,,
+1976258253992649556,336,157640,,,,-13,-5,-5,,,,,,,,,,,,,,,,,
+""")
+        self.verify_normalize(df_txt)
+
+    def test_squeeze_ssf(self):
+        df_txt = StringIO("""
+hashid,count,clock,freq1,pw_duty1,atk1,dec1,sus1,rel1,gate1,sync1,ring1,test1,tri1,saw1,pulse1,noise1,flt1,flt_res,flt_coff,flt_low,flt_band,flt_high,vol,mute1,mute3
+-4489989180376990138,276,0,50416,0,0,1,8,4,1,0,0,1,0,0,0,0,,,,,,,15,0,
+-4489989180376990138,276,19705,,,,,,,,,,-1,,,,1,,,,,,,,,
+-4489989180376990138,276,39410,,,,,,,-1,,,,,,,,,,,,,,,,
+-4489989180376990138,276,118230,,,,14,,,,,,,,,,,,,,,,,,,
+-4489989180376990138,276,157640,,,,-13,2,-2,,,,,,,,,,,,,,,,,
+""")
+        self.verify_normalize(df_txt)
+
+    def test_null_envelope_ssf(self):
+        df_txt = StringIO("""
+hashid,count,clock,freq1,pw_duty1,atk1,dec1,sus1,rel1,gate1,sync1,ring1,test1,tri1,saw1,pulse1,noise1,flt1,flt_res,flt_coff,flt_low,flt_band,flt_high,vol,mute1,mute3
+-5729649771641807184,279,0,50416,0,0,1,8,4,1,0,0,1,0,0,0,0,,,,,,,15,0,
+-5729649771641807184,279,19705,,,,,,,,,,-1,,,,1,,,,,,,,,
+-5729649771641807184,279,39410,,,,14,,,,,,,,,,,,,,,,,,,
+-5729649771641807184,279,39419,,,,,-8,-4,,,,,,,,,,,,,,,,,
+-5729649771641807184,279,39468,,,,,,,-1,,,,,,,,,,,,,,,,
+""")
+        self.verify_normalize(df_txt)
 
     def test_df2wav(self):
         sid = get_sid(pal=True)
@@ -37,5 +90,5 @@ class SidWavTestCase(unittest.TestCase):
             self.assertLessEqual(freq_diff, 3)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()
