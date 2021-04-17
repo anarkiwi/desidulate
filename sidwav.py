@@ -58,7 +58,7 @@ def pw_duty(voicenum, voicestate):
     return voicestate['pw_duty%u' % voicenum]
 
 
-def df2wav(df, sid, wavfile):
+def df2samples(df, sid):
     raw_samples = []
     lastclock = 0
     sidstate = defaultdict(int)
@@ -86,6 +86,11 @@ def df2wav(df, sid, wavfile):
 
         lastclock = row['clock']
 
+    return raw_samples
+
+
+def df2wav(df, sid, wavfile):
+    raw_samples = df2samples(df, sid)
     if raw_samples:
         write_wav(wavfile, sid, np.array(raw_samples, dtype=np.int16))
 
