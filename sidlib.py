@@ -18,6 +18,25 @@ from sidreg import VOICES, SidRegState, SidRegEvent, frozen_sid_state_factory
 
 class SidWrap:
 
+    release_ms = {
+        0: 6,
+        1: 24,
+        2: 48,
+        3: 72,
+        4: 114,
+        5: 168,
+        6: 204,
+        7: 240,
+        8: 300,
+        9: 750,
+        10: 1500,
+        11: 2400,
+        12: 3000,
+        13: 9000,
+        14: 15000,
+        15: 24000,
+    }
+
     def __init__(self, pal, model=ChipModel.MOS8580, sampling_frequency=22050):
         if pal:
             self.clock_freq = SoundInterfaceDevice.PAL_CLOCK_FREQUENCY
@@ -29,6 +48,8 @@ class SidWrap:
             model=model, clock_frequency=self.clock_freq,
             sampling_frequency=sampling_frequency)
         self.clockq = int(round(self.clock_freq / self.int_freq))
+        self.release_clock = {
+            k: (v / 1e3 * self.clock_freq) for k, v in self.release_ms.items()}
 
     def clock_to_s(self, clock):
         return clock / self.clock_freq

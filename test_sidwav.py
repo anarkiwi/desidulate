@@ -21,15 +21,20 @@ class SidWavTestCase(unittest.TestCase):
         self.tmpdir.cleanup() 
 
     def verify_normalize(self, df_txt):
+        sid = get_sid(pal=True)
         df = pd.read_csv(df_txt, dtype=pd.Int64Dtype())
         sid = get_sid(pal=True)
         samples = tuple(df2samples(df, sid))
         df_str = df.to_string() 
-        normalized_df = normalize_ssf(df)
+        normalized_df = normalize_ssf(df, sid)
         normalized_df_str = normalized_df.to_string()
         self.assertNotEqual(df_str, normalized_df_str)
         normalized_samples = tuple(df2samples(normalized_df, sid))
-        self.assertEqual(samples, normalized_samples)
+        if len(samples) == len(normalized_samples):
+            self.assertEqual(samples, normalized_samples)
+        else:
+            for i, j in enumerate(normalized_samples):
+                self.assertEqual(j, samples[i])
         print(df_str)
         print(normalized_df_str)
 
