@@ -26,35 +26,38 @@ def hash_df(df):
     return hash(tuple(df.itertuples(index=False, name=None)))
 
 
-def normalize_ssf(ssf_df, gateoff_window=64):
+def normalize_ssf(ssf_df, sid, gateoff_window=64):
     for voicenum in (1, 3):
         gate = append_voicenum(['gate'], voicenum)[0]
         if gate not in ssf_df.columns:
             continue
-        gateoff = ssf_df[ssf_df[gate] == -1].index.values[-1]
+        gateoff_index = ssf_df[ssf_df[gate] == -1].index.values
+        if not len(gateoff_index):
+            continue
+        gateoff = gateoff_index[-1]
         gateoff_clock = ssf_df.at[gateoff, 'clock']
         ssf_df.loc[ssf_df['clock'] >= (gateoff_clock - gateoff_window), append_voicenum(['atk', 'dec', 'sus', 'rel'], voicenum)] = pd.NA
         rel = append_voicenum(['rel'], voicenum)[0]
         rel_sum = ssf_df[:gateoff][rel].sum()
+        max_rel_clock = gateoff_clock + sid.release_clock[rel_sum]
         if rel_sum == 0:
             ssf_df[rel] = pd.NA
             ssf_df.loc[ssf_df['clock'] == ssf_df['clock'].min(), rel] = 0
+        else:
+            ssf_df.drop(ssf_df[ssf_df['clock'] > max_rel_clock].index, inplace=True)
         try:
             pulse, pw_duty = append_voicenum(['pulse', 'pw_duty'], voicenum)
             pulseoff = ssf_df[ssf_df[pulse] == -1].index.values[-1]
             if pulseoff:
                 ssf_df.loc[pulseoff:, [pw_duty]] = pd.NA
         except IndexError:
-           pass
+            pass
     squeeze_cols = list(ssf_df.columns)
     squeeze_cols.remove('count')
     squeeze_cols.remove('clock')
     squeeze_cols.remove('hashid')
-    last_row = ssf_df[-1:].copy()
     ssf_df.dropna(how='all', subset=squeeze_cols, inplace=True)
-    if ssf_df['clock'].max() != last_row['clock'].max():
-        ssf_df = ssf_df.append(last_row)
-    ssf_df['normhashid'] = hash_df(ssf_df.drop(['hashid', 'count'], axis=1))
+    ssf_df['hashid'] = hash_df(ssf_df.drop(['hashid', 'count'], axis=1))
     return ssf_df
 
 
