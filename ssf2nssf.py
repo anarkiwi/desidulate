@@ -7,6 +7,7 @@
 ## The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 
 import argparse
+import copy
 import pandas as pd
 from fileio import out_path
 from ssf import normalize_ssf
@@ -16,6 +17,7 @@ from sidwav import df2samples
 parser = argparse.ArgumentParser(description='Normalize [single|multi]_patches.csv')
 parser.add_argument('patchcsv', nargs='+', default=[], help='patch CSV(s) to read')
 parser.add_argument('--outcsv', default='', help='patch CSV to write')
+parser.add_argument('--maxclock', default=0, type=int, help='if > 0, max clock for normalization')
 pal_parser = parser.add_mutually_exclusive_group(required=False)
 pal_parser.add_argument('--pal', dest='pal', action='store_true', help='Use PAL clock')
 pal_parser.add_argument('--ntsc', dest='pal', action='store_false', help='Use NTSC clock')
@@ -30,9 +32,15 @@ outcsv = args.outcsv
 for patchcsv in args.patchcsv:
     ssf_dfs = pd.read_csv(patchcsv, dtype=pd.Int64Dtype())
     if not outcsv:
-        outcsv = out_path(patchcsv, 'nssf.txt.xz')
+        ext = 'nssf.txt.xz'
+        if args.maxclock:
+            ext = '%u-%s' % (args.maxclock, ext)
+        outcsv = out_path(patchcsv, ext)
 
-    for _, ssf_df in ssf_dfs.groupby('hashid'):
+    for _, orig_ssf_df in ssf_dfs.groupby('hashid'):
+        ssf_df = orig_ssf_df
+        if args.maxclock:
+            ssf_df = copy.copy(orig_ssf_df[orig_ssf_df['clock'] <= args.maxclock])
         new_ssf = normalize_ssf(ssf_df, sid)
         hashid = new_ssf['hashid'].max()
         count = new_ssf['count'].max()
