@@ -10,13 +10,15 @@ import argparse
 import copy
 import pandas as pd
 from fileio import out_path
-from ssf import normalize_ssf
+from ssf import normalize_ssf, waveform_state
 from sidlib import get_sid
 from sidwav import df2samples
+
 
 parser = argparse.ArgumentParser(description='Normalize [single|multi]_patches.csv')
 parser.add_argument('patchcsv', nargs='+', default=[], help='patch CSV(s) to read')
 parser.add_argument('--outcsv', default='', help='patch CSV to write')
+parser.add_argument('--metaoutcsv', default='', help='meta patch CSV to write')
 parser.add_argument('--maxclock', default=0, type=int, help='if > 0, max clock for normalization')
 pal_parser = parser.add_mutually_exclusive_group(required=False)
 pal_parser.add_argument('--pal', dest='pal', action='store_true', help='Use PAL clock')
@@ -28,6 +30,24 @@ sid = get_sid(pal=args.pal)
 new_ssf_dfs = {}
 sample_hashes = {}
 outcsv = args.outcsv
+nssf_meta = {}
+
+
+def ssf_meta(df_hashid, df):
+    max_freq_diff = df['freq1'][1:].abs().max()
+    cs = df.drop(['hashid', 'clock', 'count'], axis=1).fillna(0).cumsum()
+    waveforms = []
+    last_waveform = None
+    for _, waveform in waveform_state(cs):
+        if waveform and waveform != last_waveform:
+            waveforms.append(tuple(waveform))
+            last_waveform = waveform
+    return {
+        'hashid': df_hashid,
+        'waveforms': tuple(waveforms),
+        'max_freq_diff': max_freq_diff,
+    }
+
 
 for patchcsv in args.patchcsv:
     ssf_dfs = pd.read_csv(patchcsv, dtype=pd.Int64Dtype())
@@ -54,6 +74,10 @@ for patchcsv in args.patchcsv:
             else:
                 new_ssf_dfs[hashid] = new_ssf
                 sample_hashes[samples_hash] = hashid
+                nssf_meta[hashid] = ssf_meta(hashid, new_ssf)
 
 ssf_dfs = pd.concat(sorted(new_ssf_dfs.values(), key=lambda x: x['count'].max(), reverse=True))
 ssf_dfs.to_csv(outcsv, index=False)
+meta_ssf_dfs = pd.DataFrame(nssf_meta.values())
+if args.metaoutcsv:
+    meta_ssf_dfs.to_csv(args.metaoutcsv, index=False)
