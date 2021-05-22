@@ -61,12 +61,19 @@ def normalize_ssf(ssf_df, sid, gateoff_window=64):
     return ssf_df
 
 
+def waveform_state(ssf):
+    for row in ssf.itertuples():
+        waveforms = frozenset(
+            waveform[:-1] for waveform in ('noise1', 'pulse1', 'tri1', 'saw1') if pd.notna(getattr(row, waveform)) and getattr(row, waveform) > 0)
+        yield (row, waveforms)
+
+
 class SidSoundFragment:
 
     def __init__(self, percussion, sid, smf, df):
         self.undiff_df = self._undiff_df(df)
         self.percussion = percussion
-        self.midi_notes = tuple(smf.get_midi_notes_from_events(sid, self._row_state()))
+        self.midi_notes = tuple(smf.get_midi_notes_from_events(sid, waveform_state(self.undiff_df)))
         self.midi_pitches = []
         self.total_duration = 0
         self.max_midi_note = 0
@@ -81,7 +88,7 @@ class SidSoundFragment:
         last_clock = 0
         self.waveforms = defaultdict(int)
         self.waveform_order = []
-        for row, row_waveforms in self._row_state():
+        for row, row_waveforms in waveform_state(self.undiff_df):
             rel_clock = row.clock - last_clock
             for waveform in row_waveforms:
                 self.waveforms[waveform] += rel_clock
@@ -107,12 +114,6 @@ class SidSoundFragment:
         undiff_df = df[['clock']].join(cs)
         assert undiff_df.iloc[0].clock == 0, (undiff_df, df)
         return undiff_df
-
-    def _row_state(self):
-        for row in self.undiff_df.itertuples():
-            waveforms = frozenset(
-                waveform[:-1] for waveform in ('noise1', 'pulse1', 'tri1', 'saw1') if getattr(row, waveform) > 0)
-            yield (row, waveforms)
 
     def drum_noise_duration(self, sid, duration):
         max_duration = sid.clockq
