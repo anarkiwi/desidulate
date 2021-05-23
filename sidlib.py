@@ -221,7 +221,10 @@ def get_gate_events(reg_writes, reg_write_clock_timeout=64):
     for event in get_consolidated_changes(reg_writes, reg_write_clock_timeout):
         clock, frame, regevent, state = event
         voicenum = regevent.voicenum
-        if voicenum is not None:
+        if voicenum is None:
+            for voicenum in voiceeventstack:
+                append_event(voicenum, clock, frame, state)
+        else:
             last_voiceevent = None
             last_gate = None
             if voiceeventstack[voicenum]:
