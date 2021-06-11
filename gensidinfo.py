@@ -37,7 +37,7 @@ def scrape_sidinfo(sidfile):
             if fields_match:
                 field, val = fields_match.group(1).strip(), fields_match.group(2).strip()
                 subfields_match = subfields_re.match(val)
-                if subfields_match:
+                if subfields_match and field not in ('Title', 'Author', 'Released'):
                     for subfield in val.split(','):
                         subfield_match = subfields_re.match(subfield.strip())
                         field, val = subfield_match.group(1).strip(), subfield_match.group(2).strip()
