@@ -369,7 +369,7 @@ class SidSoundFragmentParser:
         if voicenum in audible_voicenums:
             first_clock = voicestates[0][0]
             synced_voicenums = frozenset().union(*[voicestate.synced_voicenums() for _, _, _, voicestate in voicestates])
-            voicenums = frozenset({voicenum}).union(synced_voicenums)
+            voicenums = (voicenum,) + tuple(synced_voicenums)
             assert len(voicenums) in (1, 2)
             first_event = voicestates[0]
             first_clock, first_frame, first_state, first_voicestate = first_event

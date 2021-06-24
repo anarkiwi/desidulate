@@ -158,6 +158,12 @@ class SidVoiceRegStateMiddle(SidRegHandler):
        'noise',
     ]
 
+    sync_map = {
+       1: 3,
+       2: 1,
+       3: 2,
+    }
+
     CONTROL_REG = 4
 
     def __init__(self, voicenum):
@@ -188,13 +194,9 @@ class SidVoiceRegStateMiddle(SidRegHandler):
         return self.rel > 0 and not self.gate
 
     def synced_voicenums(self):
-        voicenums = set()
-        sync_voicenum = self.voicenum + 2
-        if sync_voicenum > len(VOICES):
-            sync_voicenum -= len(VOICES)
         if self.sync or (self.ring and self.tri):
-            voicenums.add(sync_voicenum)
-        return voicenums
+            return {self.sync_map[self.voicenum]}
+        return set()
 
 
 class SidVoiceRegState(SidVoiceRegStateMiddle):
