@@ -144,18 +144,18 @@ class SidVoiceRegStateMiddle(SidRegHandler):
     voice_regs = [
        'freq',
        'pw_duty',
+       'gate',
+       'test',
+       'noise',
+       'pulse',
+       'tri',
+       'saw',
        'atk',
        'dec',
        'sus',
        'rel',
-       'gate',
        'sync',
        'ring',
-       'test',
-       'tri',
-       'saw',
-       'pulse',
-       'noise',
     ]
 
     sync_map = {
