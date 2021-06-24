@@ -382,9 +382,6 @@ class SidRegStateMiddle(SidRegStateBase):
                 if prevvoicestate is None or not (prevvoicestate.gate and prevvoicestate.rel > 0):
                     audible -= {voicenum}
                     continue
-            synced_voicenums = voicestate.synced_voicenums()
-            if synced_voicenums:
-                audible -= synced_voicenums
         return audible
 
 
