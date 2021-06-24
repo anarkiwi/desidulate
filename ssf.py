@@ -110,8 +110,8 @@ class SidSoundFragment:
         self.initial_pitch_drop = False
         if len(self.initial_midi_pitches) > 2:
             first_pitch = self.initial_midi_pitches[0]
-            last_pitch = self.initial_midi_pitches[1]
-            if first_pitch > last_pitch and first_pitch - last_pitch > 12:
+            last_pitch = self.initial_midi_pitches[-1]
+            if first_pitch > last_pitch and first_pitch - last_pitch > 6:
                 self.initial_pitch_drop = True
         self.drum_pitches = []
         self.pitches = []
@@ -137,7 +137,7 @@ class SidSoundFragment:
             return
         clock, _pitch, _duration, velocity, _ = self.midi_notes[0]
 
-        if self.noisephases:
+        if self.noisephases or self.initial_pitch_drop:
             if self.percussion:
                 if self.all_noise:
                     self.drum_pitches.append(
@@ -154,15 +154,10 @@ class SidSoundFragment:
                         self.drum_pitches.append(
                             (clock, self.total_duration, LOW_TOM, velocity))
         else:
-            if self.waveforms == {'pulse'} and self.initial_pitch_drop:
-                if self.percussion:
-                    self.drum_pitches.append(
-                        (clock, self.total_duration, BASS_DRUM, velocity))
-            else:
-                for clock, pitch, duration, velocity, _ in self.midi_notes:
-                    assert duration > 0, self.midi_notes
-                    self.pitches.append(
-                        (clock, duration, pitch, velocity))
+            for clock, pitch, duration, velocity, _ in self.midi_notes:
+                assert duration > 0, self.midi_notes
+                self.pitches.append(
+                    (clock, duration, pitch, velocity))
 
     def smf_transcribe(self, smf, first_clock, voicenum):
         for clock, duration, pitch, velocity in self.pitches:
@@ -191,7 +186,7 @@ class SidSoundFragmentParser:
             patch_log = out_path(self.logfile, ext)
             if not os.path.exists(patch_log):
                 continue
-            patches_df = pd.read_csv(patch_log)
+            patches_df = pd.read_csv(patch_log, dtype=pd.Int64Dtype())
             for hashid, df in patches_df.groupby('hashid'):
                 self.patch_count[hashid] = df['count'].max()
                 patches[hashid] = df.drop(['hashid', 'count'], axis=1)
