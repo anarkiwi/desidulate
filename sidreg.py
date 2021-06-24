@@ -192,7 +192,7 @@ class SidVoiceRegStateMiddle(SidRegHandler):
         sync_voicenum = self.voicenum + 2
         if sync_voicenum > len(VOICES):
             sync_voicenum -= len(VOICES)
-        if self.sync or self.ring:
+        if self.sync or (self.ring and self.tri):
             voicenums.add(sync_voicenum)
         return voicenums
 
