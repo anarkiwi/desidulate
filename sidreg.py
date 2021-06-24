@@ -194,7 +194,7 @@ class SidVoiceRegStateMiddle(SidRegHandler):
         return self.rel > 0 and not self.gate
 
     def synced_voicenums(self):
-        if self.sync or (self.ring and self.tri):
+        if self.sync or (self.ring and getattr(self, 'tri', None)):
             return {self.sync_map[self.voicenum]}
         return set()
 
