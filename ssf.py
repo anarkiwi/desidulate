@@ -45,11 +45,19 @@ def normalize_ssf(ssf_df, sid, gateoff_window=64):
             ssf_df.loc[ssf_df['clock'] == ssf_df['clock'].min(), rel] = 0
         else:
             ssf_df.drop(ssf_df[ssf_df['clock'] > max_rel_clock].index, inplace=True)
+        # Remove pw_duty changes after pulse is deselected, finally.
         try:
             pulse, pw_duty = append_voicenum(['pulse', 'pw_duty'], voicenum)
             pulseoff = ssf_df[ssf_df[pulse] == -1].index.values[-1]
             if pulseoff:
                 ssf_df.loc[pulseoff:, [pw_duty]] = pd.NA
+        except IndexError:
+            pass
+        # If ring modulation selected but not triangle, remove ring modulation.
+        try:
+            ring, tri = append_voicenum(['ring', 'tri'], voicenum)
+            if ssf_df[tri].max() != 1:
+                ssf_df[ring] = pd.NA
         except IndexError:
             pass
     squeeze_cols = list(ssf_df.columns)
@@ -147,8 +155,9 @@ class SidSoundFragment:
                             (clock, self.total_duration, LOW_TOM, velocity))
         else:
             if self.waveforms == {'pulse'} and self.initial_pitch_drop:
-                self.drum_pitches.append(
-                    (clock, self.total_duration, BASS_DRUM, velocity))
+                if self.percussion:
+                    self.drum_pitches.append(
+                        (clock, self.total_duration, BASS_DRUM, velocity))
             else:
                 for clock, pitch, duration, velocity, _ in self.midi_notes:
                     assert duration > 0, self.midi_notes
