@@ -89,7 +89,7 @@ class SidSoundFragment:
         self.initial_midi_pitches = []
         if self.midi_notes:
             self.midi_pitches = tuple([midi_note[1] for midi_note in self.midi_notes])
-            self.initial_midi_pitches = tuple([midi_note[1] for midi_note in self.midi_notes if midi_note[0] < 1e5])
+            self.initial_midi_pitches = tuple([midi_note[1] for midi_note in self.midi_notes if midi_note[0] < 2 * 1e5])
             self.total_duration = sum(duration for _, _, duration, _, _ in self.midi_notes)
             self.max_midi_note = max(self.midi_pitches)
             self.min_midi_note = min(self.midi_pitches)
@@ -111,7 +111,7 @@ class SidSoundFragment:
         if len(self.initial_midi_pitches) > 2:
             first_pitch = self.initial_midi_pitches[0]
             last_pitch = self.initial_midi_pitches[-1]
-            if first_pitch > last_pitch and first_pitch - last_pitch > 6:
+            if first_pitch > last_pitch and first_pitch - last_pitch > 12:
                 self.initial_pitch_drop = True
         self.drum_pitches = []
         self.pitches = []
