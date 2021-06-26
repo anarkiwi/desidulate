@@ -227,7 +227,8 @@ class SidSoundFragmentParser:
         for col in cols:
             last_ch = col[-1]
             if last_ch.isdigit():
-                renamed_cols.append(col.replace(last_ch, str(self.normalize_voicenum(int(last_ch), voicenum))))
+                renamed_cols.append(col.replace(
+                    last_ch, str(self.normalize_voicenum(int(last_ch), voicenum))))
             else:
                 renamed_cols.append(col)
         return renamed_cols
@@ -333,7 +334,8 @@ class SidSoundFragmentParser:
             del_cols.update(self._filter_cols(tuple(reg_max.keys())))
         return del_cols, filtered_voices
 
-    def _compress_diffs(self, orig_diffs, del_cols):
+    @staticmethod
+    def _compress_diffs(orig_diffs, del_cols):
         rows = []
         last_clock = 0
         for frame_clock, clock_diffs in sorted(orig_diffs.items()):
@@ -348,6 +350,11 @@ class SidSoundFragmentParser:
                     last_clock = diff['clock']
                     rows.append(diff)
         return rows
+
+    @staticmethod
+    def drop_synced_voice_regs(df):
+        dropped_cols = [col for col in df.columns if col.endswith('3') and not col in ('test3', 'freq3')]
+        return df.drop(dropped_cols, axis=1)
 
     def parsedf(self, voicenum, events):
         voicestates = [(clock, frame, state, state.voices[voicenum]) for clock, frame, state in events]
@@ -376,6 +383,8 @@ class SidSoundFragmentParser:
             rows = self._compress_diffs(orig_diffs, del_cols)
             df = pd.DataFrame(rows, columns=fieldnames, dtype=pd.Int64Dtype())
             df.columns = self._rename_cols(tuple(df.columns), voicenum)
+            if synced_voicenums:
+               df = self.drop_synced_voice_regs(df)
             assert df['clock'].max() > 0 or len(df) == 1, (df, orig_diffs)
             # assert filtered_voices == 0 or df['flt_coff'].max() > 0, (df, orig_diffs)
             hashid = hash_df(df)
