@@ -319,7 +319,7 @@ class SidSoundFragmentParser:
         filtered_voices = 0
         mute3 = reg_max.get('mute3', 0)
         if not mute3 or 3 not in voicenums:
-            del_cols.update('mute3')
+            del_cols.add('mute3')
         for voicenum in voicenums:
             pulse_col = 'pulse%u' % voicenum
             pw_duty_col = 'pw_duty%u' % voicenum
