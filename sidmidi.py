@@ -4,7 +4,7 @@
 
 ## The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 
-
+import pandas as pd
 from collections import defaultdict
 from functools import lru_cache
 from music21 import midi
@@ -150,6 +150,8 @@ class SidMidiFile:
     @lru_cache
     def sid_adsr_to_velocity(self, row):
         vel_nib = row.sus1
+        if pd.isna(vel_nib):
+            vel_nib = 15
         # Sustain approximates velocity, but if it's 0, then go with dec.
         # TODO: could use time in atk?
         if vel_nib == 0:

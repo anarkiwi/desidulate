@@ -15,9 +15,9 @@ from sidlib import get_sid
 from sidwav import df2wav
 
 
-parser = argparse.ArgumentParser(description='Convert [single|multi]_patches.csv into a WAV file')
-parser.add_argument('patchcsv', default='', help='patch CSV to read')
-parser.add_argument('--hashid', default=0, help='hashid to reproduce')
+parser = argparse.ArgumentParser(description='Convert .ssf into a WAV file')
+parser.add_argument('ssffile', default='', help='ssf to read')
+parser.add_argument('hashid', default=0, help='hashid to reproduce')
 parser.add_argument('--wavfile', default='', help='WAV file to write')
 pal_parser = parser.add_mutually_exclusive_group(required=False)
 pal_parser.add_argument('--pal', dest='pal', action='store_true', help='Use PAL clock')
@@ -28,14 +28,9 @@ args = parser.parse_args()
 sid = get_sid(pal=args.pal)
 wavfile = args.wavfile
 if not wavfile:
-    wavfile = wav_path(args.patchcsv)
+    wavfile = wav_path(args.ssffile)
 
-
-df = pd.read_csv(args.patchcsv, dtype=pd.Int64Dtype())
+df = pd.read_csv(args.ssffile, dtype=pd.Int64Dtype())
 hashid = np.int64(args.hashid)
-if hashid:
-    df2wav(df[df['hashid'] == hashid], sid, wavfile)
-else:
-    for hashid, patch_df in df.groupby('hashid'):
-        wavfile = wav_path(args.patchcsv, hashid)
-        df2wav(patch_df, sid, wavfile)
+ssf_df = df[df['hashid'] == hashid].set_index('clock')
+df2wav(ssf_df, sid, wavfile)
