@@ -331,11 +331,11 @@ class SidSoundFragmentParser:
         if filtered_voices == 0:
             del_cols.update(self._filter_cols(tuple(reg_max.keys())))
         for voicenum in synced_voicenums:
-            (test_col, freq_col) = append_voicenum(['test', 'freq'], voicenum)
-            for field in [field for field in fieldnames if field.endswith(str(voicenum))]:
-                if field not in (test_col, freq_col):
-                    del_cols.add(field)
-        return del_cols, filtered_voices
+            test_col, freq_col = append_voicenum(['test', 'freq'], voicenum)
+            synced_fieldnames = {field for field in fieldnames if field.endswith(str(voicenum))} - {test_col, freq_col}
+            del_cols.update(synced_fieldnames)
+            fieldnames = [field for field in fieldnames if field not in synced_fieldnames]
+        return del_cols, fieldnames, filtered_voices
 
     @staticmethod
     def _compress_diffs(orig_diffs, del_cols):
@@ -377,7 +377,7 @@ class SidSoundFragmentParser:
 
             first_row, fieldnames = self._firsts(first_state, voicenums)
             orig_diffs, reg_max = self._statediffs(first_clock, first_row, first_state, first_frame, voicenums, voicestates)
-            del_cols, filtered_voices = self._del_cols(voicenums, synced_voicenums, fieldnames, reg_max)
+            del_cols, fieldnames, filtered_voices = self._del_cols(voicenums, synced_voicenums, fieldnames, reg_max)
             rows = self._compress_diffs(orig_diffs, del_cols)
             df = pd.DataFrame(rows, columns=fieldnames, dtype=pd.Int64Dtype())
             df.columns = self._rename_cols(tuple(df.columns), voicenum)
