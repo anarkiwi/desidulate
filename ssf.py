@@ -226,7 +226,7 @@ class SidSoundFragmentParser:
         renamed_cols = []
         for col in cols:
             last_ch = col[-1]
-            if last_ch.isdigit():
+            if last_ch.isdigit() and col != 'mute3':
                 renamed_cols.append(col.replace(
                     last_ch, str(self.normalize_voicenum(int(last_ch), voicenum))))
             else:
@@ -314,24 +314,27 @@ class SidSoundFragmentParser:
         orig_diffs[0] = [(first_clock, first_row)] + orig_diffs[0]
         return (orig_diffs, reg_max)
 
-    def _del_cols(self, voicenums, reg_max):
+    def _del_cols(self, voicenums, synced_voicenums, fieldnames, reg_max):
         del_cols = set()
         filtered_voices = 0
         mute3 = reg_max.get('mute3', 0)
         if not mute3 or 3 not in voicenums:
             del_cols.add('mute3')
         for voicenum in voicenums:
-            pulse_col = 'pulse%u' % voicenum
-            pw_duty_col = 'pw_duty%u' % voicenum
+            pulse_col, pw_duty_col, flt_col = append_voicenum(['pulse', 'pw_duty', 'flt'], voicenum)
             if reg_max[pulse_col] == 0:
                 del_cols.add(pw_duty_col)
-            flt_col = 'flt%u' % voicenum
             if reg_max[flt_col] == 0:
                 del_cols.add(flt_col)
             else:
                 filtered_voices += 1
         if filtered_voices == 0:
             del_cols.update(self._filter_cols(tuple(reg_max.keys())))
+        for voicenum in synced_voicenums:
+            (test_col, freq_col) = append_voicenum(['test', 'freq'], voicenum)
+            for field in [field for field in fieldnames if field.endswith(str(voicenum))]:
+                if field not in (test_col, freq_col):
+                    del_cols.add(field)
         return del_cols, filtered_voices
 
     @staticmethod
@@ -350,11 +353,6 @@ class SidSoundFragmentParser:
                     last_clock = diff['clock']
                     rows.append(diff)
         return rows
-
-    @staticmethod
-    def drop_synced_voice_regs(df):
-        dropped_cols = [col for col in df.columns if col.endswith('3') and not col in ('test3', 'freq3')]
-        return df.drop(dropped_cols, axis=1)
 
     def parsedf(self, voicenum, events):
         voicestates = [(clock, frame, state, state.voices[voicenum]) for clock, frame, state in events]
@@ -379,12 +377,10 @@ class SidSoundFragmentParser:
 
             first_row, fieldnames = self._firsts(first_state, voicenums)
             orig_diffs, reg_max = self._statediffs(first_clock, first_row, first_state, first_frame, voicenums, voicestates)
-            del_cols, filtered_voices = self._del_cols(voicenums, reg_max)
+            del_cols, filtered_voices = self._del_cols(voicenums, synced_voicenums, fieldnames, reg_max)
             rows = self._compress_diffs(orig_diffs, del_cols)
             df = pd.DataFrame(rows, columns=fieldnames, dtype=pd.Int64Dtype())
             df.columns = self._rename_cols(tuple(df.columns), voicenum)
-            if synced_voicenums:
-               df = self.drop_synced_voice_regs(df)
             assert df['clock'].max() > 0 or len(df) == 1, (df, orig_diffs)
             # assert filtered_voices == 0 or df['flt_coff'].max() > 0, (df, orig_diffs)
             hashid = hash_df(df)
