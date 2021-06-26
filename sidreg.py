@@ -144,19 +144,25 @@ class SidVoiceRegStateMiddle(SidRegHandler):
     voice_regs = [
        'freq',
        'pw_duty',
+       'gate',
+       'test',
+       'noise',
+       'pulse',
+       'tri',
+       'saw',
        'atk',
        'dec',
        'sus',
        'rel',
-       'gate',
        'sync',
        'ring',
-       'test',
-       'tri',
-       'saw',
-       'pulse',
-       'noise',
     ]
+
+    sync_map = {
+       1: 3,
+       2: 1,
+       3: 2,
+    }
 
     CONTROL_REG = 4
 
@@ -188,13 +194,9 @@ class SidVoiceRegStateMiddle(SidRegHandler):
         return self.rel > 0 and not self.gate
 
     def synced_voicenums(self):
-        voicenums = set()
-        sync_voicenum = self.voicenum + 2
-        if sync_voicenum > len(VOICES):
-            sync_voicenum -= len(VOICES)
-        if self.sync or self.ring:
-            voicenums.add(sync_voicenum)
-        return voicenums
+        if self.sync or (self.ring and getattr(self, 'tri', None)):
+            return {self.sync_map[self.voicenum]}
+        return set()
 
 
 class SidVoiceRegState(SidVoiceRegStateMiddle):
@@ -380,9 +382,6 @@ class SidRegStateMiddle(SidRegStateBase):
                 if prevvoicestate is None or not (prevvoicestate.gate and prevvoicestate.rel > 0):
                     audible -= {voicenum}
                     continue
-            synced_voicenums = voicestate.synced_voicenums()
-            if synced_voicenums:
-                audible -= synced_voicenums
         return audible
 
 
