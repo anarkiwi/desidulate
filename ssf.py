@@ -53,13 +53,6 @@ def normalize_ssf(ssf_df, sid, gateoff_window=64):
                 ssf_df.loc[pulseoff:, [pw_duty]] = pd.NA
         except IndexError:
             pass
-        # If ring modulation selected but not triangle, remove ring modulation.
-        try:
-            ring, tri = append_voicenum(['ring', 'tri'], voicenum)
-            if ssf_df[tri].max() != 1:
-                ssf_df[ring] = pd.NA
-        except IndexError:
-            pass
     squeeze_cols = list(ssf_df.columns)
     squeeze_cols.remove('count')
     squeeze_cols.remove('clock')
@@ -321,9 +314,12 @@ class SidSoundFragmentParser:
         if not mute3 or 3 not in voicenums:
             del_cols.add('mute3')
         for voicenum in voicenums:
-            pulse_col, pw_duty_col, flt_col = append_voicenum(['pulse', 'pw_duty', 'flt'], voicenum)
+            pulse_col, pw_duty_col, flt_col, ring_col, tri_col = append_voicenum([
+                'pulse', 'pw_duty', 'flt', 'ring', 'tri'], voicenum)
             if reg_max[pulse_col] == 0:
                 del_cols.add(pw_duty_col)
+            if reg_max[tri_col] == 0:
+                del_cols.add(ring_col)
             if reg_max[flt_col] == 0:
                 del_cols.add(flt_col)
             else:
@@ -331,8 +327,10 @@ class SidSoundFragmentParser:
         if filtered_voices == 0:
             del_cols.update(self._filter_cols(tuple(reg_max.keys())))
         for voicenum in synced_voicenums:
+            synced_fieldnames = {field for field in fieldnames if field.endswith(str(voicenum))}
             test_col, freq_col = append_voicenum(['test', 'freq'], voicenum)
-            synced_fieldnames = {field for field in fieldnames if field.endswith(str(voicenum))} - {test_col, freq_col}
+            if reg_max[freq_col]:
+                synced_fieldnames -= {test_col, freq_col}
             del_cols.update(synced_fieldnames)
             fieldnames = [field for field in fieldnames if field not in synced_fieldnames]
         return del_cols, fieldnames, filtered_voices
