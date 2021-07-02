@@ -10,35 +10,21 @@
 # http://www.ucapps.de/howto_sid_wavetables_1.html
 
 import argparse
-from sidlib import get_gate_events, get_reg_writes, get_sid, VOICES
-from ssf import SidSoundFragmentParser
-
+from fileio import out_path
+from sidlib import get_sid, reg2state, state2ssfs
 
 parser = argparse.ArgumentParser(description='Convert vicesnd.sid log into SSF log files')
 parser.add_argument('logfile', default='vicesnd.sid', help='log file to read')
-parser.add_argument('--voicemask', default=','.join((str(v) for v in VOICES)), help='command separated list of SID voices to use')
-parser.add_argument('--minclock', default=0, type=int, help='start rendering from this clock value')
-parser.add_argument('--maxclock', default=0, type=int, help='if > 0, stop rendering at this clock value')
-parser.add_argument('--percussion', dest='percussion', action='store_true')
-parser.add_argument('--no-percussion', dest='percussion', action='store_false')
 pal_parser = parser.add_mutually_exclusive_group(required=False)
 pal_parser.add_argument('--pal', dest='pal', action='store_true', help='Use PAL clock')
 pal_parser.add_argument('--ntsc', dest='pal', action='store_false', help='Use NTSC clock')
-parser.set_defaults(pal=True, percussion=True)
+parser.set_defaults(pal=True)
 args = parser.parse_args()
 
-voicemask = frozenset((int(v) for v in args.voicemask.split(',')))
 sid = get_sid(args.pal)
-reg_writes = get_reg_writes(
-    sid,
-    args.logfile,
-    minclock=args.minclock,
-    maxclock=args.maxclock,
-    voicemask=voicemask)
-
-parser = SidSoundFragmentParser(args.logfile, args.percussion, sid)
-for voicenum, events in get_gate_events(reg_writes):
-    parser.parsedf(voicenum, events)
-
-parser.dump_patches()
-parser.dump_events()
+df = reg2state(sid, args.logfile)
+ssf_log_df, ssf_df = state2ssfs(df, sid)
+if ssf_log_df is not None and ssf_df is not None:
+    ssf_log_df.to_csv(out_path(args.logfile, 'log.xz'))
+    ssf_df.to_csv(out_path(args.logfile, 'ssf.xz'))
+assert ssf_log_df is not None, 'no SSFs present: voiceless sample playback?'

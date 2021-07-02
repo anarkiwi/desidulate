@@ -4,9 +4,9 @@ import os
 import tempfile
 import unittest
 import pandas as pd
-from sidlib import get_sid, get_reg_writes, get_gate_events
+from sidlib import get_sid, reg2state, state2ssfs
 from sidmidi import SidMidiFile
-from ssf import SidSoundFragment, SidSoundFragmentParser
+from ssf import SidSoundFragment
 
 
 class SSFTestCase(unittest.TestCase):
@@ -21,12 +21,12 @@ class SSFTestCase(unittest.TestCase):
     def _df2ssf(self, df, percussion=True):
         sid = get_sid(pal=True)
         smf = SidMidiFile(sid, 125)
-        return SidSoundFragment(percussion=True, sid=sid, smf=smf, df=df)
+        return SidSoundFragment(percussion=percussion, sid=sid, smf=smf, df=df)
 
     def test_notest_ssf(self):
         df = pd.DataFrame(
-            [{'hashid': -1, 'count': 1, 'clock': 0, 'freq1': 1024, 'pw_duty1': 0, 'atk1': 0, 'dec1': 0, 'sus1': 15, 'rel1': 0, 'gate1': 1, 'sync1': 0, 'ring1': 0, 'test1': 0, 'tri1': 1, 'saw1': 0, 'pulse1': 0, 'noise1': 0, 'flt1': 1, 'flt_res': 0, 'flt_coff': 0, 'flt_low': 0, 'flt_band': 0, 'flt_high': 0, 'vol': 15},
-             {'hashid': -1, 'count': 1, 'clock': 1e6 * 10, 'gate1': -1}], dtype=pd.Int64Dtype)
+            [{'hashid': 1, 'count': 1, 'clock': 0, 'freq1': 1024, 'pwduty1': 0, 'atk1': 0, 'dec1': 0, 'sus1': 15, 'rel1': 0, 'gate1': 1, 'sync1': 0, 'ring1': 0, 'test1': 0, 'tri1': 1, 'saw1': 0, 'pulse1': 0, 'noise1': 0, 'flt1': 1, 'fltres': 0, 'fltcoff': 0, 'fltlo': 0, 'fltband': 0, 'flthi': 0, 'vol': 15},
+             {'hashid': 1, 'count': 1, 'clock': 1e6 * 10, 'gate1': 0}], dtype=pd.UInt64Dtype())
         s = self._df2ssf(df, percussion=True)
         self.assertEqual(s.waveforms, {'tri'})
         self.assertEqual(s.midi_pitches, (35,))
@@ -35,9 +35,9 @@ class SSFTestCase(unittest.TestCase):
 
     def test_test_ssf(self):
         df = pd.DataFrame(
-            [{'hashid': -1, 'count': 1, 'clock': 0, 'freq1': 1024, 'pw_duty1': 0, 'atk1': 0, 'dec1': 0, 'sus1': 15, 'rel1': 0, 'gate1': 1, 'sync1': 0, 'ring1': 0, 'test1': 1, 'tri1': 1, 'saw1': 0, 'pulse1': 0, 'noise1': 0, 'flt1': 1, 'flt_res': 0, 'flt_coff': 0, 'flt_low': 0, 'flt_band': 0, 'flt_high': 0, 'vol': 15},
-             {'hashid': -1, 'count': 1, 'clock': 2 * 1e4, 'test1': -1},
-             {'hashid': -1, 'count': 1, 'clock': 1e6 * 10, 'gate1': -1}], dtype=pd.Int64Dtype)
+            [{'hashid': 1, 'count': 1, 'clock': 0, 'freq1': 1024, 'pwduty1': 0, 'atk1': 0, 'dec1': 0, 'sus1': 15, 'rel1': 0, 'gate1': 1, 'sync1': 0, 'ring1': 0, 'test1': 1, 'tri1': 1, 'saw1': 0, 'pulse1': 0, 'noise1': 0, 'flt1': 1, 'fltres': 0, 'fltcoff': 0, 'fltlo': 0, 'fltband': 0, 'flthi': 0, 'vol': 15},
+             {'hashid': 1, 'count': 1, 'clock': 2 * 1e4, 'test1': 0},
+             {'hashid': 1, 'count': 1, 'clock': 1e6 * 10, 'gate1': 0}], dtype=pd.UInt64Dtype())
         s = self._df2ssf(df, percussion=True)
         self.assertEqual(s.waveforms, {'tri'})
         self.assertEqual(s.midi_pitches, (35,))
@@ -45,7 +45,7 @@ class SSFTestCase(unittest.TestCase):
         self.assertEqual(s.midi_notes, ((20000, 35, 9970730, 127, 60.134765625),))
 
     def test_ssf_parser(self):
-        sid = get_sid(True)
+        sid = get_sid(pal=True)
         smf = SidMidiFile(sid, 125)
         test_log = os.path.join(self.tmpdir.name, 'vicesnd.log')
         with open(test_log, 'w') as log:
@@ -56,17 +56,19 @@ class SSFTestCase(unittest.TestCase):
                 '1 13 255',
                 '100 11 129',
                 '100000 11 0')) + '\n')
-        reg_writes = get_reg_writes(sid, test_log)
-        parser = SidSoundFragmentParser(logfile=None, percussion=True, sid=sid)
-        for voicenum, events in get_gate_events(reg_writes):
-            hashid, df, first_clock, voicenums = parser.parsedf(voicenum, events)
-            ssf = SidSoundFragment(percussion=True, sid=sid, smf=smf, df=df)
-            if ssf:
-                self.assertEqual(first_clock, 103)
+        ssf_log_df, ssf_df = state2ssfs(reg2state(sid, test_log), sid)
+        ssf_log_df.reset_index(level=0, inplace=True)
+        ssf_df.reset_index(level=0, inplace=True)
+        for row in ssf_log_df.itertuples():
+            ssf = SidSoundFragment(percussion=True, sid=sid, smf=smf, df=ssf_df[ssf_df['hashid'] == row.hashid])
+            if ssf and row.clock == 103:
+                self.assertEqual(row.clock, 103)
                 self.assertEqual(ssf.midi_pitches, (95,))
                 self.assertEqual(ssf.total_duration, 98525)
-                self.assertEqual(voicenum, 2)
+                self.assertEqual(row.voice, 2)
+                return
+        self.assertTrue(False)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()

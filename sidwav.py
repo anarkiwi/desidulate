@@ -4,119 +4,145 @@
 
 ## The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 
-from collections import defaultdict
 import numpy as np
 import pandas as pd
 import scipy.io.wavfile
-from pyresidfp import Voice, ControlBits, ModeVolBits
+from pyresidfp import ControlBits, ModeVolBits, ResFiltBits, Voice
 
 
-def control_reg(voicenum, voicestate):
-    return ControlBits(
-        (ControlBits.GATE.value * voicestate['gate%u' % voicenum]) |
-        (ControlBits.SYNC.value * voicestate['sync%u' % voicenum]) |
-        (ControlBits.RING_MOD.value * voicestate['ring%u' % voicenum]) |
-        (ControlBits.TEST.value * voicestate['test%u' % voicenum]) |
-        (ControlBits.TRIANGLE.value * voicestate['tri%u' % voicenum]) |
-        (ControlBits.SAWTOOTH.value * voicestate['saw%u' % voicenum]) |
-        (ControlBits.PULSE.value * voicestate['pulse%u' % voicenum]) |
-        (ControlBits.NOISE.value * voicestate['noise%u' % voicenum]))
+def state2samples(orig_df, sid):
 
+    def nib2byte(hi, lo):
+        return (int(hi) << 4) + int(lo)
 
-def filter_coff_reg(voicestate):
-    return voicestate['flt_coff'] & (2 ** 11 - 1)
+    def control(gate, sync, ring, test, tri, saw, pulse, noise):
+        return int(
+            int(ControlBits.GATE.value * gate) |
+            int(ControlBits.SYNC.value * sync) |
+            int(ControlBits.RING_MOD.value * ring) |
+            int(ControlBits.TEST.value * test) |
+            int(ControlBits.TRIANGLE.value * tri) |
+            int(ControlBits.SAWTOOTH.value * saw) |
+            int(ControlBits.PULSE.value * pulse) |
+            int(ControlBits.NOISE.value * noise))
 
+    def control1(row):
+        sid.resid.control(
+            Voice.ONE, control(
+                row.gate1, row.sync1, row.ring1, row.test1, row.tri1, row.saw1, row.pulse1, row.noise1))
 
-def filtermodevol_reg(voicestate):
-    return ModeVolBits(
-        (ModeVolBits.BP.value * voicestate['flt_band']) |
-        (ModeVolBits.HP.value * voicestate['flt_high']) |
-        (ModeVolBits.LP.value * voicestate['flt_low'])).value + voicestate['vol']
+    def control2(row):
+        sid.resid.control(
+            Voice.TWO, control(
+                row.gate2, row.sync2, row.ring2, row.test2, row.tri2, row.saw2, row.pulse2, row.noise2))
 
+    def control3(row):
+        sid.resid.control(
+            Voice.THREE, control(
+                row.gate3, row.sync3, row.ring3, row.test3, row.tri3, row.saw3, row.pulse3, row.noise3))
 
-def nib2byte(hi, lo):
-    return (hi << 4) + lo
+    def flt(row):
+        sid.resid.Filter_Res_Filt = (
+            int(ResFiltBits.Filt1.value * row.flt1) |
+            int(ResFiltBits.Filt2.value * row.flt2) |
+            int(ResFiltBits.Filt3.value * row.flt3) |
+            int(ResFiltBits.FiltEX.value * row.fltext)) + (int(row.fltres) << 4)
 
+    def main(row):
+        sid.resid.Filter_Mode_Vol = (
+            int(ModeVolBits.LP.value * row.fltlo) |
+            int(ModeVolBits.BP.value * row.fltband) |
+            int(ModeVolBits.HP.value * row.flthi) |
+            int(ModeVolBits.THREE_OFF.value * row.mute3)) + int(row.vol)
 
-def filterres_reg(voicenum, voicestate):
-    return nib2byte(voicestate['flt_res'], voicestate['flt%u' % voicenum])
+    funcs = {
+        'atk1': lambda row: sid.resid.attack_decay(Voice.ONE, nib2byte(row.atk1, row.dec1)),
+        'atk2': lambda row: sid.resid.attack_decay(Voice.TWO, nib2byte(row.atk2, row.dec2)),
+        'atk3': lambda row: sid.resid.attack_decay(Voice.THREE, nib2byte(row.atk3, row.dec3)),
+        'dec1': lambda row: sid.resid.attack_decay(Voice.ONE, nib2byte(row.atk1, row.dec1)),
+        'dec2': lambda row: sid.resid.attack_decay(Voice.TWO, nib2byte(row.atk2, row.dec2)),
+        'dec3': lambda row: sid.resid.attack_decay(Voice.THREE, nib2byte(row.atk3, row.dec3)),
+        'flt1': flt,
+        'flt2': flt,
+        'flt3': flt,
+        'fltband': main,
+        'fltcoff': lambda row: sid.resid.filter_cutoff(int(row.fltcoff)),
+        'flthi': main,
+        'fltlo': main,
+        'fltres': flt,
+        'fltext': flt,
+        'freq1': lambda row: sid.resid.oscillator(Voice.ONE, int(row.freq1)),
+        'freq2': lambda row: sid.resid.oscillator(Voice.TWO, int(row.freq2)),
+        'freq3': lambda row: sid.resid.oscillator(Voice.THREE, int(row.freq3)),
+        'gate1': control1,
+        'gate2': control2,
+        'gate3': control3,
+        'mute3': main,
+        'noise1': control1,
+        'noise2': control2,
+        'noise3': control3,
+        'pulse1': control1,
+        'pulse2': control2,
+        'pulse3': control3,
+        'pwduty1': lambda row: sid.resid.pulse_width(Voice.ONE, int(row.pwduty1)),
+        'pwduty2': lambda row: sid.resid.pulse_width(Voice.TWO, int(row.pwduty2)),
+        'pwduty3': lambda row: sid.resid.pulse_width(Voice.THREE, int(row.pwduty3)),
+        'rel1': lambda row: sid.resid.sustain_release(Voice.ONE, nib2byte(row.sus1, row.rel1)),
+        'rel2': lambda row: sid.resid.sustain_release(Voice.TWO, nib2byte(row.sus2, row.rel2)),
+        'rel3': lambda row: sid.resid.sustain_release(Voice.THREE, nib2byte(row.sus3, row.rel3)),
+        'ring1': control1,
+        'ring2': control2,
+        'ring3': control3,
+        'saw1': control1,
+        'saw2': control2,
+        'saw3': control3,
+        'sus1': lambda row: sid.resid.sustain_release(Voice.ONE, nib2byte(row.sus1, row.rel1)),
+        'sus2': lambda row: sid.resid.sustain_release(Voice.TWO, nib2byte(row.sus2, row.rel2)),
+        'sus3': lambda row: sid.resid.sustain_release(Voice.THREE, nib2byte(row.sus3, row.rel3)),
+        'sync1': control1,
+        'sync2': control2,
+        'sync3': control3,
+        'test1': control1,
+        'test2': control2,
+        'test3': control3,
+        'tri1': control1,
+        'tri2': control2,
+        'tri3': control3,
+        'vol': main,
+    }
 
-
-def attack_decay(voicenum, voicestate):
-    return nib2byte(voicestate['atk%u' % voicenum], voicestate['dec%u' % voicenum])
-
-
-def sustain_release(voicenum, voicestate):
-    return nib2byte(voicestate['sus%u' % voicenum], voicestate['rel%u' % voicenum])
-
-
-def freq(voicenum, voicestate):
-    return voicestate['freq%u' % voicenum]
-
-
-def pw_duty(voicenum, voicestate):
-    return voicestate['pw_duty%u' % voicenum]
-
-
-def df2samples(df, sid):
-    raw_samples = []
-    lastclock = 0
-    sidstate = defaultdict(int)
     sid.resid.reset()
     sid.add_samples(sid.clock_freq)
+    df = orig_df.copy()
+    for col in funcs:
+        if col not in df:
+            df[col] = 0
+    df = df.fillna(0).astype(pd.Int64Dtype())
+    df['clock'] = df.index
+    raw_samples = []
 
-    for df_row in df.to_dict(orient='records'):
-        row = {k: int(v) for k, v in df_row.items() if not pd.isnull(v)}
-        ts_offset = row['clock'] - lastclock
-        raw_samples.extend(sid.add_samples(ts_offset))
-        for f in set(row.keys()) - {'hashid', 'count', 'clock'}:
-            sidstate[f] += row[f]
+    row = df.iloc[0]
+    for k, f in funcs.items():
+        f(row)
 
-        sid.resid.filter_cutoff(filter_coff_reg(sidstate))
-        sid.resid.Filter_Mode_Vol = filtermodevol_reg(sidstate)
+    diff_cols = {}
+    for col in df.columns:
+        diff_col = 'diff_%s' % col
+        df[diff_col] = df[col].diff().astype(pd.Int32Dtype())
+        if col in funcs:
+            diff_cols[diff_col] = col
+    for row in df[1:].itertuples():
+        raw_samples.extend(sid.add_samples(row.diff_clock))
+        diffs_funcs = [funcs[v] for k, v in diff_cols.items() if getattr(row, k) != 0]
+        for func in diffs_funcs:
+            func(row)
 
-        for voice in (Voice.ONE, Voice.THREE):
-            voicenum = voice.value + 1
-            sid.resid.Filter_Res_Filt = filterres_reg(voicenum, sidstate)
-            sid.resid.oscillator(voice, freq(voicenum, sidstate))
-            sid.resid.pulse_width(voice, pw_duty(voicenum, sidstate))
-            sid.resid.attack_decay(voice, attack_decay(voicenum, sidstate))
-            sid.resid.sustain_release(voice, sustain_release(voicenum, sidstate))
-            sid.resid.control(voice, control_reg(voicenum, sidstate))
-
-        lastclock = row['clock']
-
-    return raw_samples
-
-
-def df2wav(df, sid, wavfile):
-    raw_samples = df2samples(df, sid)
-    if raw_samples:
-        write_wav(wavfile, sid, np.array(raw_samples, dtype=np.int16))
-
-
-def generate_samples(sid, reg_writes, padclock, maxsilentclocks):
-    for sample in sid.add_samples(padclock):
-        yield sample
-
-    lastloud = 0
-
-    for row in reg_writes.itertuples():
-        for sample in sid.add_samples(row.clock_offset):
-            if abs(sample) > 256:
-                lastloud = row.clock
-            yield sample
-        if row.clock - lastloud > maxsilentclocks:
-            break
-        sid.resid.write_register(row.reg, row.val)
-
-    for sample in sid.add_samples(padclock):
-        yield sample
+    return np.array(raw_samples, dtype=np.int16)
 
 
 def write_wav(wav_file_name, sid, raw_samples):
     scipy.io.wavfile.write(wav_file_name, int(sid.resid.sampling_frequency), raw_samples)
 
 
-def make_wav_from_reg(sid, reg_writes, wav_file_name, padclock, maxsilentclocks):
-    write_wav(wav_file_name, sid, np.fromiter(generate_samples(sid, reg_writes, padclock, maxsilentclocks), count=-1, dtype=np.int16))
+def df2wav(df, sid, wav_file_name):
+    write_wav(wav_file_name, sid, state2samples(df, sid))

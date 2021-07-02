@@ -13,8 +13,6 @@ import numpy as np
 from pyresidfp import SoundInterfaceDevice
 from pyresidfp.sound_interface_device import ChipModel
 
-from sidreg import VOICES, SidRegState, SidRegEvent, frozen_sid_state_factory
-
 
 class SidWrap:
 
@@ -49,7 +47,7 @@ class SidWrap:
             sampling_frequency=sampling_frequency)
         self.clockq = int(round(self.clock_freq / self.int_freq))
         self.release_clock = {
-            k: (v / 1e3 * self.clock_freq) for k, v in self.release_ms.items()}
+            k: int(v / 1e3 * self.clock_freq) for k, v in self.release_ms.items()}
 
     def clock_to_s(self, clock):
         return clock / self.clock_freq
@@ -73,177 +71,211 @@ def get_sid(pal):
     return SidWrap(pal)
 
 
+def hash_df(df):
+    return hash(tuple(df.itertuples(index=False, name=None)))
+
+
 # Read a VICE "-sounddev dump" register dump (emulator or vsid)
-def get_reg_writes(sid, snd_log_name, skipsilence=1e6, minclock=0, maxclock=0, voicemask=VOICES, maxsilentclocks=0, truncate=1e6, passthrough=False):
-    # TODO: fix minclock
-    # TODO: fix maxsilentclocks
-    # TODO: fix skipsilence
-    state = SidRegState()
-    df = pd.read_csv(
-        snd_log_name,
-        nrows=truncate,
-        sep=' ',
-        names=['clock_offset', 'reg', 'val'],
-        dtype={'clock_offset': np.uint64, 'reg': np.uint8, 'val': np.uint8})
-    df['clock'] = df['clock_offset'].cumsum()
-    assert df['reg'].min() >= 0
-    df = df[df['reg'] <= max(state.regstate)]
-    if maxclock:
-        df = df[df.clock <= maxclock]
-    df['frame'] = df['clock'].floordiv(int(sid.clockq))
-    df = df[['clock', 'clock_offset', 'frame', 'reg', 'val']]
-    if passthrough:
-        return df.to_numpy()
-    # remove consecutive repeated register writes
-    reg_dfs = []
-    reg_cols = ['reg', 'val']
-    for reg in sorted(df.reg.unique()):
-        voicenum = state.reg_voicenum.get(reg, None)
-        if voicenum is not None and voicenum not in voicemask:
-            continue
-        reg_df = df[df['reg'] == reg]
-        reg_df = reg_df.loc[(reg_df[reg_cols].shift() != reg_df[reg_cols]).any(axis=1)]
-        reg_dfs.append(reg_df)
-    df = pd.concat(reg_dfs)
-    df.set_index('clock')
-    df = df.sort_index()
-    # reset clock relative to 0
-    df['clock'] -= df['clock'].min()
-    df['frame'] -= df['frame'].min()
-    df['clock_offset'] = df['clock'].diff().fillna(0).astype(np.uint64)
-    # TODO: use precalculated gate mask
-    # for voicenum in voicemask:
-    #     gate_name = 'gate%u' % voicenum
-    #     voice = state.voices[voicenum]
-    #     control_reg = voice.regbase() + voice.CONTROL_REG
-    #     gate_mask = (df['reg'] == control_reg)
-    #     df[gate_name] = pd.UInt8Dtype()
-    #     df.loc[gate_mask, gate_name] = df[gate_mask]['val'].values & 1
+def reg2state(sid, snd_log_name):
+
+    def compress_writes():
+        df = pd.read_csv(
+            snd_log_name,
+            sep=' ',
+            names=['clock_offset', 'reg', 'val'],
+            dtype={'clock_offset': np.uint64, 'reg': np.uint8, 'val': np.uint8})
+        df['clock'] = df['clock_offset'].cumsum()
+        df['frame'] = df['clock'].floordiv(int(sid.clockq))
+        assert df['reg'].min() >= 0
+        df = df[['clock', 'frame', 'reg', 'val']]
+        # remove consecutive repeated register writes
+        reg_dfs = []
+        reg_cols = ['reg', 'val']
+        for reg in sorted(df.reg.unique()):
+            reg_df = df[df['reg'] == reg]
+            reg_df = reg_df.loc[(reg_df[reg_cols].shift() != reg_df[reg_cols]).any(axis=1)]
+            reg_dfs.append(reg_df)
+        df = pd.concat(reg_dfs)
+        df['clock'] -= df['clock'].min()
+        df['frame'] -= df['frame'].min()
+        df = df.set_index('clock')
+        df = df.sort_index()
+        return df
+
+    def set_bit(df, val, b, bit_name):
+        df[bit_name] = val & 2**b
+        df[bit_name] = df[bit_name].clip(0, 1)
+
+    def set_bits(reg_df, val, names, start=0):
+        for b, name in enumerate(names, start=start):
+            set_bit(reg_df, val, b, name)
+
+    def set_hi_lo_nib(reg_df, val, hi, lo):
+        reg_df[hi] = np.right_shift(val, 4)
+        reg_df[lo] = val & 15
+
+    def set_voice(reg_df, v):
+        vb = (v - 1) * 7
+        freq_lo = reg_df[vb]
+        freq_hi = np.left_shift(reg_df[vb + 1].astype(np.uint16), 8)
+        reg_df['freq%u' % v] = freq_hi + freq_lo
+        pwduty_lo = reg_df[vb + 2]
+        pwduty_hi = np.left_shift(reg_df[vb + 3].astype(np.uint16) & 15, 8)
+        reg_df['pwduty%u' % v] = pwduty_hi + pwduty_lo
+        control = reg_df[vb + 4]
+        for b, name in enumerate(
+                ['gate', 'sync', 'ring', 'test', 'tri', 'saw', 'pulse', 'noise']):
+            set_bit(reg_df, control, b, '%s%u' % (name, v))
+        set_hi_lo_nib(reg_df, reg_df[vb + 5], 'atk%u' % v, 'dec%u' % v)
+        set_hi_lo_nib(reg_df, reg_df[vb + 6], 'sus%u' % v, 'rel%u' % v)
+
+    def set_common(reg_df):
+        main = reg_df[24]
+        reg_df['vol'] = main & 15
+        set_bits(reg_df, main, ['fltlo', 'fltband', 'flthi', 'mute3'], start=4)
+        filter_route = reg_df[23]
+        set_bits(reg_df, filter_route, ['flt1', 'flt2', 'flt3', 'fltext'])
+        reg_df['fltres'] = np.right_shift(filter_route, 4)
+        filter_cutoff_lo = reg_df[21] & 7
+        filter_cutoff_hi = np.left_shift(reg_df[22].astype(np.uint16), 3)
+        reg_df['fltcoff'] = filter_cutoff_hi + filter_cutoff_lo
+
+    def decode_regs(df):
+        max_reg = max(24, df['reg'].max())
+        reg_df = df.pivot(columns='reg', values='val').fillna(
+            method='ffill').fillna(0).astype(np.uint8)
+        all_regs = [c for c in range(max_reg + 1)]
+        for reg in all_regs:
+            if reg not in reg_df.columns:
+                reg_df[reg] = 0
+        for v in (1, 2, 3):
+            set_voice(reg_df, v)
+        set_common(reg_df)
+        return reg_df.drop(all_regs, axis=1)
+
+    df = compress_writes()
+    reg_df = decode_regs(df)
+    df = df.drop(['reg', 'val'], axis=1).join(reg_df, on='clock')
     return df
 
 
-def add_clock_offset(df):
-    df['clock_offset'] = df['clock'].sub(df['clock'].shift(1))
-    df['clock_offset'] = df['clock_offset'].fillna(0)
-    df = df.astype({'clock_offset': np.uint64})
-    return df
+def split_vdf(df):
+    fltcols = [col for col in df.columns if col.startswith('flt') and not col[-1].isdigit()]
+    v_dfs = {}
+
+    def v_cols(v):
+        sync_map = {
+           1: 3,
+           2: 1,
+           3: 2,
+        }
+
+        def append_voicenum(cols, v):
+            return ['%s%u' % (col, v) for col in cols]
+
+        cols = [col for col in df.columns if not col[-1].isdigit() or (col[-1] == str(v) and col != 'mute3')]
+        cols.extend(append_voicenum(['freq', 'test'], sync_map[v]))
+        return cols
+
+    def renamed_cols(v, cols):
+        if v == 1:
+            return cols
+        new_cols = []
+        for col in cols:
+            prefix, suffix = col[:-1], col[-1]
+            if suffix.isdigit():
+                if int(suffix) == v:
+                    suffix = str(1)
+                else:
+                    suffix = str(3)
+                col = ''.join((prefix, suffix))
+            new_cols.append(col)
+        return new_cols
+
+    for v in (1, 2, 3):
+        cols = v_cols(v)
+        v_df = df[cols].copy().astype(pd.Int32Dtype())
+        v_df.columns = renamed_cols(v, cols)
+        col = 'gate1'
+        diff_gate_on = 'diff_on_%s' % col
+        v_df[diff_gate_on] = v_df[col].astype(np.int8).diff(periods=1).fillna(0).astype(pd.Int8Dtype())
+        v_df['ssf'] = v_df[diff_gate_on]
+        v_df.loc[v_df['ssf'] != 1, ['ssf']] = 0
+        v_df['ssf'] = v_df['ssf'].cumsum()
+        v_df.loc[(v_df['test1'] == 1) & (v_df['pulse1'] != 1), ['freq1', 'sync1', 'ring1', 'tri1', 'saw1', 'pulse1', 'noise1', 'pwduty1', 'freq3', 'test3']] = pd.NA
+        v_df.loc[~((v_df['sync1'] == 1) | ((v_df['ring1'] == 1) & (v_df['tri1'] == 1))), ['freq3', 'test3']] = pd.NA
+        v_df.loc[v_df['gate1'] == 0, ['atk1', 'dec1', 'sus1', 'rel1']] = pd.NA
+        v_df.loc[v_df['flt1'] != 1, fltcols] = pd.NA
+        v_df.loc[v_df['pulse1'] != 1, ['pwduty1']] = pd.NA
+        v_df = v_df.drop([diff_gate_on], axis=1)
+        diff_cols = list(v_df.columns)
+        diff_cols.remove('frame')
+        v_df = v_df.loc[(v_df[diff_cols].shift() != v_df[diff_cols]).any(axis=1)]
+        v_df = v_df[v_df.groupby('ssf')['vol'].transform('max') > 0]
+        v_df = v_df[v_df.groupby('ssf')['test1'].transform('min') < 1]
+        v_df['ssf_size'] = v_df.groupby(['ssf'])['ssf'].transform('size')
+        v_dfs[v] = v_df
+    return v_dfs
 
 
-def write_reg_writes(snd_log_name, reg_writes):
-    reg_writes = add_clock_offset(reg_writes)
-    reg_writes = reg_writes[['clock_offset', 'reg', 'val']]
-    reg_writes.to_csv(snd_log_name, header=0, index=False)
+def jittermatch_df(df1, df2, jitter_col, jitter_max):
+    if len(df1) != len(df2):
+        return False
+    df1_col = df1[jitter_col].astype(pd.Int64Dtype())
+    df2_col = df2[jitter_col].astype(pd.Int64Dtype())
+    diff = df1_col - df2_col
+    diff_max = diff.abs().max()
+    return pd.notna(diff_max) and diff_max < jitter_max
 
 
-def debug_raw_reg_writes(reg_writes):
-    state = SidRegState()
-    for row in reg_writes.itertuples():
-        regevent = state.set(row.reg, row.val)
-        if regevent:
-            regs = [state.mainreg] + [state.voices[i] for i in state.voices]
-            regdumps = tuple([reg.regdump() for reg in regs])
-            active_voices = ','.join((str(voicenum) for voicenum in sorted(state.gates_on())))
-            yield (row.clock, row.reg, row.val) + (active_voices,) + regdumps + (regevent,)
+def split_ssf(v_dfs):
+    ssf_log = []
+    ssf_dfs = {}
+    ssf_count = defaultdict(int)
+
+    remap_ssf_dfs = {}
+    ssf_noclock_dfs = {}
+
+    for v, v_df in v_dfs.items():
+        for _, group_ssf_df in v_df.groupby(['ssf_size', 'ssf']):
+            ssf_df = group_ssf_df.drop(['ssf', 'ssf_size'], axis=1).copy()
+            ssf_df.reset_index(level=0, inplace=True)
+            orig_clock = ssf_df['clock'].min()
+            ssf_df['clock'] -= ssf_df['clock'].min()
+            ssf_df['frame'] -= ssf_df['frame'].min()
+            hashid = hash_df(ssf_df)
+            if hashid not in ssf_dfs:
+                if hashid in remap_ssf_dfs:
+                    remapped_hashid = remap_ssf_dfs[hashid]
+                    hashid = remapped_hashid
+                else:
+                    ssf_noclock_df = ssf_df.drop(['clock'], axis=1)
+                    hashid_noclock = hash_df(ssf_noclock_df)
+                    remapped_hashid = ssf_noclock_dfs.get(hashid_noclock, None)
+                    if remapped_hashid is not None and jittermatch_df(ssf_dfs[remapped_hashid], ssf_df, 'clock', 512):
+                        remap_ssf_dfs[hashid] = remapped_hashid
+                        hashid = remapped_hashid
+                    else:
+                        ssf_dfs[hashid] = ssf_df
+                        ssf_noclock_dfs[hashid_noclock] = hashid
+
+            ssf_count[hashid] += 1
+            ssf_log.append({'clock': orig_clock, 'hashid': hashid, 'voice': v})
+    return ssf_log, ssf_dfs, ssf_count
 
 
-def debug_reg_writes(sid, reg_writes, consolidate_mb_clock=18):
-    # TODO: fix consolidate_mb_clock
-    for regevents in debug_raw_reg_writes(reg_writes):
-        clock, reg, val, active_voices, main_regdump, voice1_regdump, voice2_regdump, voice3_regdump, regevent = regevents
-        if isinstance(regevent, SidRegEvent):
-            descr = regevent.descr
-        line_items = (
-            '%9u' % clock,
-            '%6.2f' % sid.clock_to_s(clock),
-            '%2u' % reg,
-            '%3u' % val,
-            '%6s' % active_voices,
-            '%s' % main_regdump,
-            '%s' % voice1_regdump,
-            '%s' % voice2_regdump,
-            '%s' % voice3_regdump,
-            descr,
-        )
-        yield '\t'.join([str(i) for i in line_items])
+def state2ssfs(df, sid):
+    v_dfs = split_vdf(df)
+    ssf_log, ssf_dfs, ssf_count = split_ssf(v_dfs)
 
+    for hashid, count in ssf_count.items():
+        ssf_dfs[hashid]['count'] = count
+        ssf_dfs[hashid]['hashid'] = hashid
 
-def get_events(reg_writes):
-    state = SidRegState()
-    for row in reg_writes.itertuples():
-        regevent = state.set(row.reg, row.val)
-        if regevent:
-            frozen_state = frozen_sid_state_factory(state)
-            yield (row.clock, row.frame, regevent, frozen_state)
-
-
-# consolidate events across multiple byte writes (e.g. collapse update of voice freq to one event)
-def get_consolidated_changes(reg_writes, reg_write_clock_timeout):
-    pendingevent = []
-    for event in get_events(reg_writes):
-        clock, frame, regevent, _state = event
-        if pendingevent:
-            pendingclock, _frame, pendingregevent, _pendingstate = pendingevent
-            age = clock - pendingclock
-            if age > reg_write_clock_timeout:
-                yield pendingevent
-                pendingevent = None
-            elif regevent.otherreg == pendingregevent.reg:
-                if age < reg_write_clock_timeout:
-                    yield event
-                    pendingevent = None
-                    continue
-            else:
-                yield pendingevent
-                pendingevent = None
-        if regevent.otherreg is not None:
-            pendingevent = event
-            continue
-        yield event
-
-
-# bracket voice events by gate status changes.
-def get_gate_events(reg_writes, reg_write_clock_timeout=64):
-    voiceeventstack = defaultdict(list)
-
-    def despool_events(voicenum):
-        despooled = None
-        if voiceeventstack[voicenum]:
-            first_event = voiceeventstack[voicenum][0]
-            _, _, first_state = first_event
-            if first_state.voices[voicenum].gate:
-                despooled = (voicenum, voiceeventstack[voicenum])
-            voiceeventstack[voicenum] = []
-        return despooled
-
-    def append_event(voicenum, clock, frame, state):
-        voiceeventstack[voicenum].append((clock, frame, state))
-
-    for event in get_consolidated_changes(reg_writes, reg_write_clock_timeout):
-        clock, frame, regevent, state = event
-        voicenum = regevent.voicenum
-        if voicenum is None:
-            for voicenum in voiceeventstack:
-                append_event(voicenum, clock, frame, state)
-        else:
-            last_voiceevent = None
-            last_gate = None
-            if voiceeventstack[voicenum]:
-                last_voiceevent = voiceeventstack[voicenum][-1]
-                _, _, last_state = last_voiceevent
-                last_gate = last_state.voices[voicenum].gate
-            voice_state = state.voices[voicenum]
-            gate = voice_state.gate
-            if last_gate is not None and last_gate != gate:
-                if gate:
-                    despooled = despool_events(voicenum)
-                    if despooled:
-                        yield despooled
-                append_event(voicenum, clock, frame, state)
-                continue
-            if gate or voice_state.in_rel():
-                append_event(voicenum, clock, frame, state)
-
-    for voicenum in voiceeventstack:
-        despooled = despool_events(voicenum)
-        if despooled:
-            yield despooled
+    if ssf_log:
+        ssf_log_df = pd.DataFrame(
+            ssf_log, dtype=pd.Int64Dtype()).set_index('clock').sort_index()
+        ssf_df = pd.concat([
+            ssf_dfs[hashid] for hashid, count in sorted(ssf_count.items(), key=lambda x: x[1], reverse=True)]).set_index('hashid')
+        return ssf_log_df, ssf_df
+    return None, None
