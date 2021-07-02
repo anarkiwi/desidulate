@@ -217,7 +217,7 @@ def split_vdf(df):
         v_df[diff_gate_on] = v_df[col].astype(np.int8).diff(periods=1).fillna(0).astype(pd.Int8Dtype())
         v_df['ssf'] = v_df[diff_gate_on]
         v_df.loc[v_df['ssf'] != 1, ['ssf']] = 0
-        v_df['ssf'] = v_df['ssf'].cumsum()
+        v_df['ssf'] = v_df['ssf'].cumsum().astype(np.uint64)
         v_df.loc[(v_df['test1'] == 1) & (v_df['pulse1'] != 1), ['freq1', 'sync1', 'ring1', 'tri1', 'saw1', 'pulse1', 'noise1', 'pwduty1', 'freq3', 'test3']] = pd.NA
         v_df.loc[~((v_df['sync1'] == 1) | ((v_df['ring1'] == 1) & (v_df['tri1'] == 1))), ['freq3', 'test3']] = pd.NA
         v_df.loc[v_df['gate1'] == 0, ['atk1', 'dec1', 'sus1', 'rel1']] = pd.NA
@@ -229,7 +229,7 @@ def split_vdf(df):
         v_df = v_df.loc[(v_df[diff_cols].shift() != v_df[diff_cols]).any(axis=1)]
         v_df = v_df[v_df.groupby('ssf', sort=False)['vol'].transform('max') > 0]
         v_df = v_df[v_df.groupby('ssf', sort=False)['test1'].transform('min') < 1]
-        v_df['ssf_size'] = v_df.groupby(['ssf'], sort=False)['ssf'].transform('size')
+        v_df['ssf_size'] = v_df.groupby(['ssf'], sort=False)['ssf'].transform('size').astype(np.uint64)
         v_dfs[v] = v_df
     return v_dfs
 
