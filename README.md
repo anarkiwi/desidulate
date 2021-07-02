@@ -39,7 +39,7 @@ This intermediate step, identifies all SSFs (see below) and writes them to `mytu
 3. Generate SMF MIDI file.
 
 ```
-$ ./ssf2mid.py mytune.log.xz
+$ ./ssf2midi.py mytune.log.xz
 ```
 
 This re-renders the `ssf` and `log` files into a SMF `mid` file, `mytune.mid`
