@@ -34,7 +34,7 @@ $ mv vicesnd.sid mytune.dump
 $ ./reg2ssf.py mytune.dump
 ```
 
-This intermediate step, identifies all SSFs and writes them to `mytune.ssf.xz`, and also writes a log file `mytune.log.xz`, which logs when SSFs are played (in CPU clock cycles).
+This intermediate step, identifies all SSFs (see below) and writes them to `mytune.ssf.xz`, and also writes a log file `mytune.log.xz`, which logs when SSFs are played (in CPU clock cycles).
 
 3. Generate SMF MIDI file.
 
