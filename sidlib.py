@@ -211,9 +211,9 @@ def split_vdf(df):
         diff_cols = list(v_df.columns)
         diff_cols.remove('frame')
         v_df = v_df.loc[(v_df[diff_cols].shift() != v_df[diff_cols]).any(axis=1)]
-        v_df = v_df[v_df.groupby('ssf')['vol'].transform('max') > 0]
-        v_df = v_df[v_df.groupby('ssf')['test1'].transform('min') < 1]
-        v_df['ssf_size'] = v_df.groupby(['ssf'])['ssf'].transform('size')
+        v_df = v_df[v_df.groupby('ssf', sort=False)['vol'].transform('max') > 0]
+        v_df = v_df[v_df.groupby('ssf', sort=False)['test1'].transform('min') < 1]
+        v_df['ssf_size'] = v_df.groupby(['ssf'], sort=False)['ssf'].transform('size')
         v_dfs[v] = v_df
     return v_dfs
 
@@ -233,34 +233,34 @@ def split_ssf(v_dfs):
     ssf_dfs = {}
     ssf_count = defaultdict(int)
 
-    remap_ssf_dfs = {}
-    ssf_noclock_dfs = {}
-
     for v, v_df in v_dfs.items():
-        for _, group_ssf_df in v_df.groupby(['ssf_size', 'ssf']):
-            ssf_df = group_ssf_df.drop(['ssf', 'ssf_size'], axis=1).copy()
-            ssf_df.reset_index(level=0, inplace=True)
-            orig_clock = ssf_df['clock'].min()
-            ssf_df['clock'] -= ssf_df['clock'].min()
-            ssf_df['frame'] -= ssf_df['frame'].min()
-            hashid = hash_df(ssf_df)
-            if hashid not in ssf_dfs:
-                if hashid in remap_ssf_dfs:
-                    remapped_hashid = remap_ssf_dfs[hashid]
-                    hashid = remapped_hashid
-                else:
-                    ssf_noclock_df = ssf_df.drop(['clock'], axis=1)
-                    hashid_noclock = hash_df(ssf_noclock_df)
-                    remapped_hashid = ssf_noclock_dfs.get(hashid_noclock, None)
-                    if remapped_hashid is not None and jittermatch_df(ssf_dfs[remapped_hashid], ssf_df, 'clock', 512):
-                        remap_ssf_dfs[hashid] = remapped_hashid
+        for _, size_ssf_df in v_df.groupby(['ssf_size'], sort=False):
+            remap_ssf_dfs = {}
+            ssf_noclock_dfs = {}
+            for _, group_ssf_df in size_ssf_df.drop(['ssf_size'], axis=1).groupby(['ssf'], sort=False):
+                ssf_df = group_ssf_df.drop(['ssf'], axis=1).copy()
+                ssf_df.reset_index(level=0, inplace=True)
+                orig_clock = ssf_df['clock'].min()
+                ssf_df['clock'] -= ssf_df['clock'].min()
+                ssf_df['frame'] -= ssf_df['frame'].min()
+                hashid = hash_df(ssf_df)
+                if hashid not in ssf_dfs:
+                    if hashid in remap_ssf_dfs:
+                        remapped_hashid = remap_ssf_dfs[hashid]
                         hashid = remapped_hashid
                     else:
-                        ssf_dfs[hashid] = ssf_df
-                        ssf_noclock_dfs[hashid_noclock] = hashid
+                        ssf_noclock_df = ssf_df.drop(['clock'], axis=1)
+                        hashid_noclock = hash_df(ssf_noclock_df)
+                        remapped_hashid = ssf_noclock_dfs.get(hashid_noclock, None)
+                        if remapped_hashid is not None and jittermatch_df(ssf_dfs[remapped_hashid], ssf_df, 'clock', 512):
+                            remap_ssf_dfs[hashid] = remapped_hashid
+                            hashid = remapped_hashid
+                        else:
+                            ssf_dfs[hashid] = ssf_df
+                            ssf_noclock_dfs[hashid_noclock] = hashid
 
-            ssf_count[hashid] += 1
-            ssf_log.append({'clock': orig_clock, 'hashid': hashid, 'voice': v})
+                ssf_count[hashid] += 1
+                ssf_log.append({'clock': orig_clock, 'hashid': hashid, 'voice': v})
     return ssf_log, ssf_dfs, ssf_count
 
 

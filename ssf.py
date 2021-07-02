@@ -118,6 +118,6 @@ class SidSoundFragmentParser:
     def read_patches(self):
         patch_log = out_path(self.logfile, 'ssf.xz')
         ssfs_df = pd.read_csv(patch_log, dtype=pd.Int64Dtype())
-        for hashid, ssf_df in ssfs_df.groupby('hashid'):
+        for hashid, ssf_df in ssfs_df.groupby('hashid', sort=False):
             self.patch_count[hashid] = ssf_df['count'].max()
             self.ssf_dfs[hashid] = ssf_df.drop(['hashid', 'count'], axis=1).astype(pd.UInt64Dtype())
