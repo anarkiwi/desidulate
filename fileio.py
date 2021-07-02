@@ -4,8 +4,6 @@
 
 ## The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 
-import gzip
-import lzma
 import os
 
 
@@ -34,12 +32,3 @@ def wav_path(snd_log_name, hashid=None):
     if hashid:
         return out_path(snd_log_name, '%d.wav' % hashid)
     return out_path(snd_log_name, 'wav')
-
-
-def file_reader(snd_log_name):
-    snd_log_name = os.path.expanduser(snd_log_name)
-    if snd_log_name.endswith('.gz'):
-        return gzip.open(snd_log_name, 'rb')
-    if snd_log_name.endswith('.xz'):
-        return lzma.open(snd_log_name, 'rb')
-    return open(snd_log_name)
