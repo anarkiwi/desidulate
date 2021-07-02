@@ -34,13 +34,13 @@ smf = SidMidiFile(sid, args.bpm)
 parser = SidSoundFragmentParser(args.ssflogfile, args.percussion, sid)
 parser.read_patches()
 
-events_df = pd.read_csv(args.ssflogfile, dtype=pd.Int64Dtype())
+ssf_log_df = pd.read_csv(args.ssflogfile, dtype=pd.Int64Dtype())
 ssf_cache = {}
-for row in events_df.itertuples():
-    ssf_df = parser.ssf_dfs[row.ssf]
-    if row.ssf not in ssf_cache:
-        ssf_cache[row.ssf] = SidSoundFragment(args.percussion, sid, smf, ssf_df)
-    ssf = ssf_cache[row.ssf]
+for row in ssf_log_df.itertuples():
+    if row.hashid not in ssf_cache:
+        ssf_df = parser.ssf_dfs[row.hashid]
+        ssf_cache[row.hashid] = SidSoundFragment(args.percussion, sid, smf, ssf_df)
+    ssf = ssf_cache[row.hashid]
     ssf.smf_transcribe(smf, row.clock, row.voice)
 
 midifile = args.midifile
