@@ -14,6 +14,19 @@ from pyresidfp import SoundInterfaceDevice
 from pyresidfp.sound_interface_device import ChipModel
 
 
+def set_sid_dtype(df):
+    df.dtype = pd.UInt64Dtype()
+    for col in df.columns:
+        if col.startswith('freq') or col.startswith('pwduty') or col == 'fltcoff':
+            col_type = pd.UInt16Dtype()
+        elif col[-1].isdigit() or col.startswith('flt'):
+            col_type = pd.UInt8Dtype()
+        else:
+            continue
+        df[col] = df[col].astype(col_type)
+    return df
+
+
 class SidWrap:
 
     release_ms = {
@@ -76,14 +89,15 @@ def hash_df(df):
 
 
 # Read a VICE "-sounddev dump" register dump (emulator or vsid)
-def reg2state(sid, snd_log_name):
+def reg2state(sid, snd_log_name, nrows=1e6):
 
     def compress_writes():
         df = pd.read_csv(
             snd_log_name,
             sep=' ',
             names=['clock_offset', 'reg', 'val'],
-            dtype={'clock_offset': np.uint64, 'reg': np.uint8, 'val': np.uint8})
+            dtype={'clock_offset': np.uint64, 'reg': np.uint8, 'val': np.uint8},
+            nrows=nrows)
         df['clock'] = df['clock_offset'].cumsum()
         df['frame'] = df['clock'].floordiv(int(sid.clockq))
         assert df['reg'].min() >= 0
@@ -98,13 +112,11 @@ def reg2state(sid, snd_log_name):
         df = pd.concat(reg_dfs)
         df['clock'] -= df['clock'].min()
         df['frame'] -= df['frame'].min()
-        df = df.set_index('clock')
-        df = df.sort_index()
+        df = df.set_index('clock').sort_index()
         return df
 
     def set_bit(df, val, b, bit_name):
-        df[bit_name] = val & 2**b
-        df[bit_name] = df[bit_name].clip(0, 1)
+        df[bit_name] = np.uint8(val & 2**b).clip(0, 1)
 
     def set_bits(reg_df, val, names, start=0):
         for b, name in enumerate(names, start=start):
@@ -118,10 +130,10 @@ def reg2state(sid, snd_log_name):
         vb = (v - 1) * 7
         freq_lo = reg_df[vb]
         freq_hi = np.left_shift(reg_df[vb + 1].astype(np.uint16), 8)
-        reg_df['freq%u' % v] = freq_hi + freq_lo
+        reg_df['freq%u' % v] = np.uint16(freq_hi + freq_lo)
         pwduty_lo = reg_df[vb + 2]
         pwduty_hi = np.left_shift(reg_df[vb + 3].astype(np.uint16) & 15, 8)
-        reg_df['pwduty%u' % v] = pwduty_hi + pwduty_lo
+        reg_df['pwduty%u' % v] = np.uint16(pwduty_hi + pwduty_lo)
         control = reg_df[vb + 4]
         for b, name in enumerate(
                 ['gate', 'sync', 'ring', 'test', 'tri', 'saw', 'pulse', 'noise']):
@@ -138,7 +150,7 @@ def reg2state(sid, snd_log_name):
         reg_df['fltres'] = np.right_shift(filter_route, 4)
         filter_cutoff_lo = reg_df[21] & 7
         filter_cutoff_hi = np.left_shift(reg_df[22].astype(np.uint16), 3)
-        reg_df['fltcoff'] = filter_cutoff_hi + filter_cutoff_lo
+        reg_df['fltcoff'] = np.uint16(filter_cutoff_hi + filter_cutoff_lo)
 
     def decode_regs(df):
         max_reg = max(24, df['reg'].max())
@@ -194,9 +206,13 @@ def split_vdf(df):
 
     for v in (1, 2, 3):
         cols = v_cols(v)
-        v_df = df[cols].copy().astype(pd.Int32Dtype())
+        v_df = df[cols].copy()
         v_df.columns = renamed_cols(v, cols)
+        v_df = set_sid_dtype(v_df)
         col = 'gate1'
+        # voice is not used.
+        if v_df[col].max() == 0:
+            continue
         diff_gate_on = 'diff_on_%s' % col
         v_df[diff_gate_on] = v_df[col].astype(np.int8).diff(periods=1).fillna(0).astype(pd.Int8Dtype())
         v_df['ssf'] = v_df[diff_gate_on]
@@ -249,10 +265,10 @@ def split_ssf(v_dfs):
                         remapped_hashid = remap_ssf_dfs[hashid]
                         hashid = remapped_hashid
                     else:
-                        ssf_noclock_df = ssf_df.drop(['clock'], axis=1)
+                        ssf_noclock_df = ssf_df.drop(['clock', 'frame'], axis=1)
                         hashid_noclock = hash_df(ssf_noclock_df)
                         remapped_hashid = ssf_noclock_dfs.get(hashid_noclock, None)
-                        if remapped_hashid is not None and jittermatch_df(ssf_dfs[remapped_hashid], ssf_df, 'clock', 512):
+                        if remapped_hashid is not None and jittermatch_df(ssf_dfs[remapped_hashid], ssf_df, 'clock', 1024):
                             remap_ssf_dfs[hashid] = remapped_hashid
                             hashid = remapped_hashid
                         else:
