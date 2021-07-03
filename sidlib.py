@@ -55,6 +55,7 @@ class SidWrap:
         else:
             self.clock_freq = SoundInterfaceDevice.NTSC_CLOCK_FREQUENCY
             self.int_freq = 60.0
+        self.freq_scaler = self.clock_freq / 16777216
         self.resid = SoundInterfaceDevice(
             model=model, clock_frequency=self.clock_freq,
             sampling_frequency=sampling_frequency)
@@ -73,7 +74,7 @@ class SidWrap:
 
     def real_sid_freq(self, freq_reg):
         # http://www.sidmusic.org/sid/sidtech2.html
-        return freq_reg * self.clock_freq / 16777216
+        return freq_reg * self.freq_scaler
 
     def add_samples(self, offset):
         timeoffset_seconds = offset / self.clock_freq

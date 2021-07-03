@@ -174,7 +174,7 @@ class SidMidiFile:
                     sounding = True
                 else:
                     continue
-            sid_f = sid.real_sid_freq(row.freq1)
+            sid_f = row.real_freq
             _, closest_midi_n = self.closest_midi(sid_f)
             velocity = self.sid_adsr_to_velocity(row)
             # TODO: add pitch bend if significantly different to canonical note.
