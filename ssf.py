@@ -10,6 +10,7 @@
 # http://www.ucapps.de/howto_sid_wavetables_1.html
 
 from collections import Counter, defaultdict
+from itertools import groupby
 import pandas as pd
 from fileio import out_path
 from sidmidi import ELECTRIC_SNARE, BASS_DRUM, LOW_TOM, PEDAL_HIHAT, CLOSED_HIHAT, OPEN_HIHAT, ACCOUSTIC_SNARE, CRASH_CYMBAL1
@@ -38,13 +39,8 @@ class SidSoundFragment:
             self.total_duration = sum(duration for _, _, duration, _, _ in self.midi_notes)
             self.max_midi_note = max(self.midi_pitches)
             self.min_midi_note = min(self.midi_pitches)
-        self.waveforms = set()
-        self.waveform_order = []
-        for row_waveforms in waveform_states:
-            self.waveforms = self.waveforms.union(row_waveforms)
-            if ((self.waveform_order and self.waveform_order[-1] != row_waveforms) or
-                  (not self.waveform_order and row_waveforms)):
-                self.waveform_order.append(row_waveforms)
+        self.waveform_order = [frozenset(i[0]) for i in groupby(waveform_states)]
+        self.waveforms = frozenset().union(*self.waveform_order)
         self.noisephases = len([waveforms for waveforms in self.waveform_order if 'noise' in waveforms])
         self.all_noise = self.waveforms == {'noise'}
         self.initial_pitch_drop = False
