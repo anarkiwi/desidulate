@@ -16,33 +16,32 @@ from fileio import out_path
 from sidmidi import ELECTRIC_SNARE, BASS_DRUM, LOW_TOM, PEDAL_HIHAT, CLOSED_HIHAT, OPEN_HIHAT, ACCOUSTIC_SNARE, CRASH_CYMBAL1
 
 
-def waveform_state(ssf):
-    return [frozenset(
-        waveform[:-1] for waveform in ('noise1', 'pulse1', 'tri1', 'saw1') if pd.notna(getattr(row, waveform)) and getattr(row, waveform) > 0) for row in  ssf.itertuples()]
-
-
 class SidSoundFragment:
+
+    @staticmethod
+    def _waveform_state(ssf):
+        return [frozenset(
+            waveform[:-1] for waveform in ('noise1', 'pulse1', 'tri1', 'saw1') if pd.notna(getattr(row, waveform)) and getattr(row, waveform) > 0) for row in ssf.itertuples()]
 
     def __init__(self, percussion, sid, smf, df):
         self.df = df.fillna(method='ffill')
         self.percussion = percussion
-        waveform_states = waveform_state(self.df)
+        waveform_states = self._waveform_state(self.df)
+        self.waveform_order = tuple([frozenset(i[0]) for i in groupby(waveform_states)])
+        self.waveforms = frozenset().union(*self.waveform_order)
+        self.noisephases = len([waveforms for waveforms in self.waveform_order if 'noise' in waveforms])
+        self.all_noise = self.waveforms == {'noise'}
         self.midi_notes = tuple(smf.get_midi_notes_from_events(zip(self.df.itertuples(), waveform_states)))
-        self.midi_pitches = []
+        self.midi_pitches = tuple([midi_note[1] for midi_note in self.midi_notes])
         self.total_duration = 0
         self.max_midi_note = 0
         self.min_midi_note = 0
         self.initial_midi_pitches = []
         if self.midi_notes:
-            self.midi_pitches = tuple([midi_note[1] for midi_note in self.midi_notes])
             self.initial_midi_pitches = tuple([midi_note[1] for midi_note in self.midi_notes if midi_note[0] < 2 * 1e5])
             self.total_duration = sum(duration for _, _, duration, _, _ in self.midi_notes)
             self.max_midi_note = max(self.midi_pitches)
             self.min_midi_note = min(self.midi_pitches)
-        self.waveform_order = [frozenset(i[0]) for i in groupby(waveform_states)]
-        self.waveforms = frozenset().union(*self.waveform_order)
-        self.noisephases = len([waveforms for waveforms in self.waveform_order if 'noise' in waveforms])
-        self.all_noise = self.waveforms == {'noise'}
         self.initial_pitch_drop = False
         if len(self.initial_midi_pitches) > 2:
             first_pitch = self.initial_midi_pitches[0]
