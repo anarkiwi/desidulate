@@ -25,7 +25,7 @@ class SidSoundFragment:
     def __init__(self, percussion, sid, smf, df):
         self.df = df.fillna(method='ffill')
         self.percussion = percussion
-        waveform_states = waveform_state(df)
+        waveform_states = waveform_state(self.df)
         self.midi_notes = tuple(smf.get_midi_notes_from_events(zip(self.df.itertuples(), waveform_states)))
         self.midi_pitches = []
         self.total_duration = 0
@@ -38,18 +38,13 @@ class SidSoundFragment:
             self.total_duration = sum(duration for _, _, duration, _, _ in self.midi_notes)
             self.max_midi_note = max(self.midi_pitches)
             self.min_midi_note = min(self.midi_pitches)
-        last_clock = 0
-        self.waveforms = defaultdict(int)
+        self.waveforms = set()
         self.waveform_order = []
-        for row, row_waveforms in zip(self.df.itertuples(), waveform_states):
-            rel_clock = row.clock - last_clock
-            for waveform in row_waveforms:
-                self.waveforms[waveform] += rel_clock
+        for row_waveforms in waveform_states:
+            self.waveforms = self.waveforms.union(row_waveforms)
             if ((self.waveform_order and self.waveform_order[-1] != row_waveforms) or
                   (not self.waveform_order and row_waveforms)):
                 self.waveform_order.append(row_waveforms)
-            last_clock = row.clock
-        self.waveforms = frozenset(self.waveforms.keys())
         self.noisephases = len([waveforms for waveforms in self.waveform_order if 'noise' in waveforms])
         self.all_noise = self.waveforms == {'noise'}
         self.initial_pitch_drop = False
