@@ -182,9 +182,9 @@ class SidMidiFile:
             last_clock = row.clock
         return notes_starts, last_clock
 
+    @lru_cache
     def get_duration(self, clock, next_clock):
-        duration = next_clock - clock
-        return round(duration / self.sid.clockq) * self.sid.clockq
+        return round((next_clock - clock) / self.sid.clockq) * self.sid.clockq
 
     def get_notes(self, notes_starts, last_clock):
         notes = []
