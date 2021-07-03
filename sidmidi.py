@@ -147,7 +147,6 @@ class SidMidiFile:
         assert duration > 0, duration
         self.drum_pitches[voicenum].append((clock, duration, pitch, velocity))
 
-    @lru_cache
     def sid_adsr_to_velocity(self, row):
         vel_nib = row.sus1
         if pd.isna(vel_nib):
