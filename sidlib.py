@@ -85,7 +85,8 @@ def get_sid(pal):
 
 
 def hash_df(df):
-    return hash(tuple(df.itertuples(index=False, name=None)))
+    rows_hash = pd.Series((hash(r) for r in df.itertuples(index=False, name=None)))
+    return hash(tuple(rows_hash))
 
 
 # Read a VICE "-sounddev dump" register dump (emulator or vsid)
@@ -206,14 +207,13 @@ def split_vdf(df):
         return new_cols
 
     for v in (1, 2, 3):
+        if df['gate%u' % v].max() == 0:
+            continue
         cols = v_cols(v)
         v_df = df[cols].copy()
         v_df.columns = renamed_cols(v, cols)
         v_df = set_sid_dtype(v_df)
         col = 'gate1'
-        # voice is not used.
-        if v_df[col].max() == 0:
-            continue
         diff_gate_on = 'diff_on_%s' % col
         v_df[diff_gate_on] = v_df[col].astype(np.int8).diff(periods=1).fillna(0).astype(pd.Int8Dtype())
         v_df['ssf'] = v_df[diff_gate_on]
