@@ -16,10 +16,8 @@ from sidmidi import ELECTRIC_SNARE, BASS_DRUM, LOW_TOM, PEDAL_HIHAT, CLOSED_HIHA
 
 
 def waveform_state(ssf):
-    for row in ssf.itertuples():
-        waveforms = frozenset(
-            waveform[:-1] for waveform in ('noise1', 'pulse1', 'tri1', 'saw1') if pd.notna(getattr(row, waveform)) and getattr(row, waveform) > 0)
-        yield (row, waveforms)
+    return [frozenset(
+        waveform[:-1] for waveform in ('noise1', 'pulse1', 'tri1', 'saw1') if pd.notna(getattr(row, waveform)) and getattr(row, waveform) > 0) for row in  ssf.itertuples()]
 
 
 class SidSoundFragment:
@@ -27,7 +25,8 @@ class SidSoundFragment:
     def __init__(self, percussion, sid, smf, df):
         self.df = df.fillna(method='ffill')
         self.percussion = percussion
-        self.midi_notes = tuple(smf.get_midi_notes_from_events(waveform_state(self.df)))
+        waveform_states = waveform_state(df)
+        self.midi_notes = tuple(smf.get_midi_notes_from_events(zip(self.df.itertuples(), waveform_states)))
         self.midi_pitches = []
         self.total_duration = 0
         self.max_midi_note = 0
@@ -42,7 +41,7 @@ class SidSoundFragment:
         last_clock = 0
         self.waveforms = defaultdict(int)
         self.waveform_order = []
-        for row, row_waveforms in waveform_state(self.df):
+        for row, row_waveforms in zip(self.df.itertuples(), waveform_states):
             rel_clock = row.clock - last_clock
             for waveform in row_waveforms:
                 self.waveforms[waveform] += rel_clock
