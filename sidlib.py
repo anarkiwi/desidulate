@@ -116,7 +116,8 @@ def reg2state(sid, snd_log_name, nrows=(10 * 1e6)):
         return df
 
     def set_bit(df, val, b, bit_name):
-        df[bit_name] = np.uint8(val & 2**b).clip(0, 1)
+        df[bit_name] = np.uint8(val & 2**b)
+        df[bit_name] = df[bit_name].clip(0, 1)
 
     def set_bits(reg_df, val, names, start=0):
         for b, name in enumerate(names, start=start):
