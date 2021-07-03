@@ -160,15 +160,12 @@ class SidMidiFile:
         velocity = int(vel_nib / 15 * 127)
         return velocity
 
-    # Convert gated voice events into possibly many MIDI notes
-    def get_midi_notes_from_events(self, row_states):
+    def get_note_starts(self, row_states):
         last_midi_n = None
         notes_starts = []
         last_clock = None
         sounding = False
         for row, row_waveforms in row_states:
-            if last_clock is not None:
-                assert row.clock > last_clock, (row.clock, last_clock)
             if not sounding:
                 if row_waveforms and row.vol and not row.test1:
                     sounding = True
@@ -176,12 +173,20 @@ class SidMidiFile:
                     continue
             sid_f = row.real_freq
             _, closest_midi_n = self.closest_midi(sid_f)
-            velocity = self.sid_adsr_to_velocity(row)
             # TODO: add pitch bend if significantly different to canonical note.
-            if closest_midi_n != last_midi_n and row_waveforms and velocity:
-                notes_starts.append((closest_midi_n, row.clock, sid_f, velocity))
-                last_midi_n = closest_midi_n
+            if closest_midi_n != last_midi_n and row_waveforms:
+                velocity = self.sid_adsr_to_velocity(row)
+                if velocity:
+                    notes_starts.append((closest_midi_n, row.clock, sid_f, velocity))
+                    last_midi_n = closest_midi_n
             last_clock = row.clock
+        return notes_starts, last_clock
+
+    def get_duration(self, clock, next_clock):
+        duration = next_clock - clock
+        return round(duration / self.sid.clockq) * self.sid.clockq
+
+    def get_notes(self, notes_starts, last_clock):
         notes = []
         for i, note_clocks in enumerate(notes_starts):
             note, clock, sid_f, velocity = note_clocks
@@ -189,10 +194,13 @@ class SidMidiFile:
                 next_clock = notes_starts[i + 1][1]
             except IndexError:
                 next_clock = last_clock
-            duration = next_clock - clock
-            assert duration >= 0, (duration, next_clock, clock)
-            duration = round(duration / self.sid.clockq) * self.sid.clockq
-            if not duration:
-                continue
-            notes.append((clock, note, duration, velocity, sid_f))
+            duration = self.get_duration(clock, next_clock)
+            if duration:
+                notes.append((clock, note, duration, velocity, sid_f))
+        return notes
+
+    # Convert gated voice events into possibly many MIDI notes
+    def get_midi_notes_from_events(self, row_states):
+        notes_starts, last_clock = self.get_note_starts(row_states)
+        notes = self.get_notes(notes_starts, last_clock)
         return notes
