@@ -170,14 +170,15 @@ class SidMidiFile:
                     sounding = True
                 else:
                     continue
-            sid_f = row.real_freq
-            _, closest_midi_n = self.closest_midi(sid_f)
-            # TODO: add pitch bend if significantly different to canonical note.
-            if closest_midi_n != last_midi_n and row_waveforms:
-                velocity = self.sid_adsr_to_velocity(row)
-                if velocity:
-                    notes_starts.append((closest_midi_n, row.clock, sid_f, velocity))
-                    last_midi_n = closest_midi_n
+            if row_waveforms:
+                sid_f = row.real_freq
+                _, closest_midi_n = self.closest_midi(sid_f)
+                # TODO: add pitch bend if significantly different to canonical note.
+                if closest_midi_n != last_midi_n:
+                    velocity = self.sid_adsr_to_velocity(row)
+                    if velocity:
+                        notes_starts.append((closest_midi_n, row.clock, sid_f, velocity))
+                        last_midi_n = closest_midi_n
             last_clock = row.clock
         return notes_starts, last_clock
 
