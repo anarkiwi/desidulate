@@ -161,7 +161,7 @@ class SidMidiFile:
         return velocity
 
     # Convert gated voice events into possibly many MIDI notes
-    def get_midi_notes_from_events(self, sid, row_states):
+    def get_midi_notes_from_events(self, row_states):
         last_midi_n = None
         notes_starts = []
         last_clock = None

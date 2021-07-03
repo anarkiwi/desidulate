@@ -27,7 +27,7 @@ class SidSoundFragment:
     def __init__(self, percussion, sid, smf, df):
         self.df = df.fillna(method='ffill')
         self.percussion = percussion
-        self.midi_notes = tuple(smf.get_midi_notes_from_events(sid, waveform_state(self.df)))
+        self.midi_notes = tuple(smf.get_midi_notes_from_events(waveform_state(self.df)))
         self.midi_pitches = []
         self.total_duration = 0
         self.max_midi_note = 0
