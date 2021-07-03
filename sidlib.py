@@ -89,7 +89,7 @@ def hash_df(df):
 
 
 # Read a VICE "-sounddev dump" register dump (emulator or vsid)
-def reg2state(sid, snd_log_name, nrows=1e6):
+def reg2state(sid, snd_log_name, nrows=(10 * 1e6)):
 
     def compress_writes():
         df = pd.read_csv(
