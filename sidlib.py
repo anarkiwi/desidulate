@@ -231,8 +231,7 @@ def split_vdf(df):
         v_df = v_df[v_df.groupby('ssf', sort=False)['vol'].transform('max') > 0]
         v_df = v_df[v_df.groupby('ssf', sort=False)['test1'].transform('min') < 1]
         v_df['ssf_size'] = v_df.groupby(['ssf'], sort=False)['ssf'].transform('size').astype(np.uint64)
-        v_dfs[v] = v_df
-    return v_dfs
+        yield (v, v_df)
 
 
 def jittermatch_df(df1, df2, jitter_col, jitter_max):
@@ -245,12 +244,12 @@ def jittermatch_df(df1, df2, jitter_col, jitter_max):
     return pd.notna(diff_max) and diff_max < jitter_max
 
 
-def split_ssf(v_dfs):
+def split_ssf(df):
     ssf_log = []
     ssf_dfs = {}
     ssf_count = defaultdict(int)
 
-    for v, v_df in v_dfs.items():
+    for v, v_df in split_vdf(df):
         for _, size_ssf_df in v_df.groupby(['ssf_size'], sort=False):
             remap_ssf_dfs = {}
             ssf_noclock_dfs = {}
@@ -282,8 +281,7 @@ def split_ssf(v_dfs):
 
 
 def state2ssfs(df, sid):
-    v_dfs = split_vdf(df)
-    ssf_log, ssf_dfs, ssf_count = split_ssf(v_dfs)
+    ssf_log, ssf_dfs, ssf_count = split_ssf(df)
 
     for hashid, count in ssf_count.items():
         ssf_dfs[hashid]['count'] = count
