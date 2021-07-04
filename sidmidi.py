@@ -158,10 +158,13 @@ class SidMidiFile:
         if row.gate1:
             attack_clock = self.sid.attack_clock[row.atk1]
             if row.clock < attack_clock:
-                return self.vel_scale(row.clock, attack_clock)
-            decay_clock = self.sid.decay_release_clock[row.dec1]
-            if row.clock < attack_clock + decay_clock:
-                return self.neg_vel_scale(row.clock - attack_clock, decay_clock)
+                if row.atk1 and not row.sus1:
+                    return self.vel_scale(row.clock, attack_clock)
+            else:
+                if row.dec1 and not row.sus1:
+                    decay_clock = self.sid.decay_release_clock[row.dec1]
+                    if row.clock < attack_clock + decay_clock:
+                        return self.neg_vel_scale(row.clock - attack_clock, decay_clock)
             return self.sid_velocity[row.sus1]
         rel_clock = self.sid.decay_release_clock[last_rel]
         if row.clock - last_gate_clock <= rel_clock:
@@ -183,6 +186,7 @@ class SidMidiFile:
                 # https://github.com/magenta/magenta/issues/1902
                 if row.closest_note != last_note:
                     velocity = self.sid_adsr_to_velocity(row, last_rel, last_gate_clock)
+                    assert velocity >= 0 and velocity <= 127, (velocity, row)
                     if velocity:
                         notes_starts.append((row.clock, int(row.closest_note), velocity, row.real_freq))
                         last_note = row.closest_note
