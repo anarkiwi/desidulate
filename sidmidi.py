@@ -168,25 +168,17 @@ class SidMidiFile:
             return self.neg_vel_scale(row.clock - last_gate_clock, rel_clock)
         return 0
 
-    def get_sounding(self, row_states):
-        for row, row_waveforms in row_states:
-            if row_waveforms and row.vol and not row.test1:
-                yield (row, row_waveforms)
-                break
-        for row, row_waveforms in row_states:
-            yield (row, row_waveforms)
-
     def get_note_starts(self, row_states):
         last_note = None
         last_clock = None
         last_rel = None
         last_gate_clock = None
         notes_starts = []
-        for row, row_waveforms in self.get_sounding(row_states):
+        for row, row_waveforms in row_states:
             if row.gate1:
                 last_rel = row.rel1
                 last_gate_clock = row.clock
-            if row_waveforms:
+            if row_waveforms and not row.test1:
                 # TODO: add pitch bend if significantly different to canonical note.
                 # https://github.com/magenta/magenta/issues/1902
                 if row.closest_note != last_note:
