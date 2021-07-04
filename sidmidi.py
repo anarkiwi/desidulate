@@ -166,9 +166,10 @@ class SidMidiFile:
                     if row.clock < attack_clock + decay_clock:
                         return self.neg_vel_scale(row.clock - attack_clock, decay_clock)
             return self.sid_velocity[row.sus1]
-        rel_clock = self.sid.decay_release_clock[last_rel]
-        if row.clock - last_gate_clock <= rel_clock:
-            return self.neg_vel_scale(row.clock - last_gate_clock, rel_clock)
+        if last_gate_clock is not None:
+            rel_clock = self.sid.decay_release_clock[last_rel]
+            if row.clock - last_gate_clock <= rel_clock:
+                 return self.neg_vel_scale(row.clock - last_gate_clock, rel_clock)
         return 0
 
     def get_note_starts(self, row_states):
