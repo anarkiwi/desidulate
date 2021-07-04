@@ -163,22 +163,22 @@ class SidMidiFile:
                 yield (row, row_waveforms)
                 break
         for row, row_waveforms in row_states:
-            if row_waveforms:
-                yield (row, row_waveforms)
+            yield (row, row_waveforms)
 
     def get_note_starts(self, row_states):
         last_note = None
         last_clock = None
         notes_starts = []
         for row, row_waveforms in self.get_sounding(row_states):
-            sid_f = row.real_freq
-            _, note = self.closest_midi(sid_f)
-            # TODO: add pitch bend if significantly different to canonical note.
-            if note != last_note:
-                velocity = self.sid_adsr_to_velocity(row)
-                if velocity:
-                    notes_starts.append((row.clock, note, velocity, sid_f))
-                    last_note = note
+            if row_waveforms:
+                sid_f = row.real_freq
+                _, note = self.closest_midi(sid_f)
+                # TODO: add pitch bend if significantly different to canonical note.
+                if note != last_note:
+                    velocity = self.sid_adsr_to_velocity(row)
+                    if velocity:
+                        notes_starts.append((row.clock, note, velocity, sid_f))
+                        last_note = note
             last_clock = row.clock
         notes_starts.append((last_clock, None, None, None))
         return notes_starts
