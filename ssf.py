@@ -9,11 +9,12 @@
 # https://codebase64.org/doku.php?id=base:building_a_music_routine
 # http://www.ucapps.de/howto_sid_wavetables_1.html
 
-from collections import Counter, defaultdict
+from collections import Counter
 from itertools import groupby
 import pandas as pd
 from fileio import out_path
-from sidmidi import ELECTRIC_SNARE, BASS_DRUM, LOW_TOM, PEDAL_HIHAT, CLOSED_HIHAT, OPEN_HIHAT, ACCOUSTIC_SNARE, CRASH_CYMBAL1
+from sidlib import set_sid_dtype
+from sidmidi import ELECTRIC_SNARE, BASS_DRUM, LOW_TOM, PEDAL_HIHAT, CLOSED_HIHAT, OPEN_HIHAT, ACCOUSTIC_SNARE, CRASH_CYMBAL1, closest_midi
 
 
 class SidSoundFragment:
@@ -95,6 +96,17 @@ class SidSoundFragment:
             smf.add_drum_pitch(voicenum, first_clock + clock, duration, pitch, velocity)
 
 
+def add_freq_notes_df(sid, ssfs_df):
+    real_freqs = {freq: freq * sid.freq_scaler for freq in ssfs_df['freq1'].unique() if pd.notna(freq)}
+    closest_notes = {real_freq: closest_midi(real_freq)[1] for real_freq in real_freqs.values()}
+    freq_map = [(freq, real_freq, closest_notes[real_freq]) for freq, real_freq in real_freqs.items()]
+    freq_map.extend([(pd.NA, pd.NA, pd.NA)])
+    freq_notes_df = pd.DataFrame.from_records(freq_map, columns=['freq1', 'real_freq', 'closest_note']).astype(pd.Float64Dtype())
+    freq_notes_df['freq1'] = freq_notes_df['freq1'].astype(pd.UInt16Dtype())
+    freq_notes_df['closest_note'] = freq_notes_df['closest_note'].astype(pd.UInt8Dtype())
+    return set_sid_dtype(ssfs_df).merge(freq_notes_df, how='left', on='freq1')
+
+
 class SidSoundFragmentParser:
 
     def __init__(self, logfile, percussion, sid):
@@ -106,8 +118,7 @@ class SidSoundFragmentParser:
 
     def read_patches(self):
         patch_log = out_path(self.logfile, 'ssf.xz')
-        ssfs_df = pd.read_csv(patch_log, dtype=pd.Int64Dtype())
-        ssfs_df['real_freq'] = ssfs_df['freq1'] * self.sid.freq_scaler
+        ssfs_df = add_freq_notes_df(self.sid, pd.read_csv(patch_log, dtype=pd.Int64Dtype()))
         for hashid, ssf_df in ssfs_df.groupby('hashid', sort=False):
             self.patch_count[hashid] = ssf_df['count'].max()
-            self.ssf_dfs[hashid] = ssf_df.drop(['hashid', 'count'], axis=1).astype(pd.UInt64Dtype())
+            self.ssf_dfs[hashid] = ssf_df.drop(['hashid', 'count'], axis=1)

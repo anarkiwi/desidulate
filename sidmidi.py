@@ -4,7 +4,6 @@
 
 ## The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 
-import pandas as pd
 from collections import defaultdict
 from functools import lru_cache
 from music21 import midi
@@ -26,6 +25,10 @@ LOW_TOM = 45
 ACCOUSTIC_SNARE = 38
 ELECTRIC_SNARE = 40
 CRASH_CYMBAL1 = 49
+
+def closest_midi(sid_f):
+    closest_midi_f = min(MIDI_N_TO_F.values(), key=lambda x: abs(x - sid_f))
+    return (closest_midi_f, MIDI_F_TO_N[closest_midi_f])
 
 
 class SidMidiFile:
@@ -135,11 +138,6 @@ class SidMidiFile:
         smf.open(file_name, 'wb')
         smf.write()
 
-    @lru_cache
-    def closest_midi(self, sid_f):
-        closest_midi_f = min(MIDI_N_TO_F.values(), key=lambda x: abs(x - sid_f))
-        return (closest_midi_f, MIDI_F_TO_N[closest_midi_f])
-
     def add_pitch(self, voicenum, clock, duration, pitch, velocity):
         assert duration > 0, duration
         self.pitches[voicenum].append((clock, duration, pitch, velocity))
@@ -171,14 +169,12 @@ class SidMidiFile:
         notes_starts = []
         for row, row_waveforms in self.get_sounding(row_states):
             if row_waveforms:
-                sid_f = row.real_freq
-                _, note = self.closest_midi(sid_f)
                 # TODO: add pitch bend if significantly different to canonical note.
-                if note != last_note:
+                if row.closest_note != last_note:
                     velocity = self.sid_adsr_to_velocity(row)
                     if velocity:
-                        notes_starts.append((row.clock, note, velocity, sid_f))
-                        last_note = note
+                        notes_starts.append((row.clock, int(row.closest_note), velocity, row.real_freq))
+                        last_note = row.closest_note
             last_clock = row.clock
         notes_starts.append((last_clock, None, None, None))
         return notes_starts

@@ -6,7 +6,7 @@ import unittest
 import pandas as pd
 from sidlib import get_sid, reg2state, state2ssfs
 from sidmidi import SidMidiFile
-from ssf import SidSoundFragment
+from ssf import SidSoundFragment, add_freq_notes_df
 
 
 class SSFTestCase(unittest.TestCase):
@@ -21,7 +21,7 @@ class SSFTestCase(unittest.TestCase):
     def _df2ssf(self, df, percussion=True):
         sid = get_sid(pal=True)
         smf = SidMidiFile(sid, 125)
-        df['real_freq'] = df['freq1'] * sid.freq_scaler
+        df = add_freq_notes_df(sid, df)
         return SidSoundFragment(percussion=percussion, sid=sid, smf=smf, df=df)
 
     def test_notest_ssf(self):
@@ -60,7 +60,7 @@ class SSFTestCase(unittest.TestCase):
         ssf_log_df, ssf_df = state2ssfs(reg2state(sid, test_log), sid)
         ssf_log_df.reset_index(level=0, inplace=True)
         ssf_df.reset_index(level=0, inplace=True)
-        ssf_df['real_freq'] = ssf_df['freq1'] * sid.freq_scaler
+        ssf_df = add_freq_notes_df(sid, ssf_df)
         for row in ssf_log_df.itertuples():
             ssf = SidSoundFragment(percussion=True, sid=sid, smf=smf, df=ssf_df[ssf_df['hashid'] == row.hashid])
             if ssf and row.clock == 103:
