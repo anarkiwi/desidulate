@@ -38,6 +38,7 @@ class SidMidiFile:
         self.pitches = defaultdict(list)
         self.drum_pitches = defaultdict(list)
         self.tpqn = 960
+        self.sid_velocity = {i: int(i / 15 * 127) for i in range(16)}
 
     def make_event(self, track, event_type, channel):
         event = midi.MidiEvent(track)
@@ -149,15 +150,12 @@ class SidMidiFile:
 
     def sid_adsr_to_velocity(self, row):
         vel_nib = row.sus1
-        if pd.isna(vel_nib):
-            vel_nib = 15
         # Sustain approximates velocity, but if it's 0, then go with dec.
         # TODO: could use time in atk?
         if vel_nib == 0:
             # assert voice_state.atk == 0
             vel_nib = row.dec1
-        velocity = int(vel_nib / 15 * 127)
-        return velocity
+        return self.sid_velocity[vel_nib]
 
     def get_note_starts(self, row_states):
         last_midi_n = None
