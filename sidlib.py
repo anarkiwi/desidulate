@@ -29,7 +29,26 @@ def set_sid_dtype(df):
 
 class SidWrap:
 
-    release_ms = {
+    ATTACK_MS = {
+        0: 2,
+        1: 8,
+        2: 16,
+        3: 24,
+        4: 38,
+        5: 56,
+        6: 68,
+        7: 80,
+        8: 100,
+        9: 250,
+        10: 500,
+        11: 800,
+        12: 1000,
+        13: 3000,
+        14: 5000,
+        15: 8000,
+    }
+
+    DECAY_RELEASE_MS = {
         0: 6,
         1: 24,
         2: 48,
@@ -60,8 +79,10 @@ class SidWrap:
             model=model, clock_frequency=self.clock_freq,
             sampling_frequency=sampling_frequency)
         self.clockq = int(round(self.clock_freq / self.int_freq))
-        self.release_clock = {
-            k: int(v / 1e3 * self.clock_freq) for k, v in self.release_ms.items()}
+        self.attack_clock = {
+            k: int(v / 1e3 * self.clock_freq) for k, v in self.ATTACK_MS.items()}
+        self.decay_release_clock = {
+            k: int(v / 1e3 * self.clock_freq) for k, v in self.DECAY_RELEASE_MS.items()}
 
     def clock_to_s(self, clock):
         return clock / self.clock_freq

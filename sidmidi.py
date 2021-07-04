@@ -4,6 +4,7 @@
 
 ## The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 
+import math
 from collections import defaultdict
 from functools import lru_cache
 from music21 import midi
@@ -146,14 +147,27 @@ class SidMidiFile:
         assert duration > 0, duration
         self.drum_pitches[voicenum].append((clock, duration, pitch, velocity))
 
-    def sid_adsr_to_velocity(self, row):
-        vel_nib = row.sus1
-        # Sustain approximates velocity, but if it's 0, then go with dec.
-        # TODO: could use time in atk?
-        if vel_nib == 0:
-            # assert voice_state.atk == 0
-            vel_nib = row.dec1
-        return self.sid_velocity[vel_nib]
+    @lru_cache
+    def vel_scale(self, x, x_max):
+        return int((x / x_max) * 127)
+
+    @lru_cache
+    def neg_vel_scale(self, x, x_max):
+        return int((1.0 - (x / x_max)) * 127)
+
+    def sid_adsr_to_velocity(self, row, last_rel, last_gate_clock):
+        if row.gate1:
+            attack_clock = self.sid.attack_clock[row.atk1]
+            if row.clock < attack_clock:
+                return self.vel_scale(row.clock, attack_clock)
+            decay_clock = self.sid.decay_release_clock[row.dec1]
+            if row.clock < attack_clock + decay_clock:
+                return self.neg_vel_scale(row.clock - attack_clock, decay_clock)
+            return self.sid_velocity[row.sus1]
+        rel_clock = self.sid.decay_release_clock[last_rel]
+        if row.clock - last_gate_clock <= rel_clock:
+            return self.neg_vel_scale(row.clock - last_gate_clock, rel_clock)
+        return 0
 
     def get_sounding(self, row_states):
         for row, row_waveforms in row_states:
@@ -166,12 +180,17 @@ class SidMidiFile:
     def get_note_starts(self, row_states):
         last_note = None
         last_clock = None
+        last_rel = None
+        last_gate_clock = None
         notes_starts = []
         for row, row_waveforms in self.get_sounding(row_states):
+            if row.gate1:
+                last_rel = row.rel1
+                last_gate_clock = row.clock
             if row_waveforms:
                 # TODO: add pitch bend if significantly different to canonical note.
                 if row.closest_note != last_note:
-                    velocity = self.sid_adsr_to_velocity(row)
+                    velocity = self.sid_adsr_to_velocity(row, last_rel, last_gate_clock)
                     if velocity:
                         notes_starts.append((row.clock, int(row.closest_note), velocity, row.real_freq))
                         last_note = row.closest_note
