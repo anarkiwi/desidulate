@@ -69,7 +69,7 @@ desidulate can generate a WAV file from a ReSID based SID simulation directly fr
 
 ## Ongoing work
 
-* Pitchbending for following small pitch changes ([Magenta](https://github.com/magenta/magenta/issues/1902) does not use pitchbends as of March 2021)
+* Pitchbending for following small pitch changes.
 * Export to [defMON](https://www.vandervecken.com/defmon)
 
 ## References
