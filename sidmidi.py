@@ -180,6 +180,7 @@ class SidMidiFile:
                 last_gate_clock = row.clock
             if row_waveforms and not row.test1:
                 # TODO: add pitch bend if significantly different to canonical note.
+                # https://github.com/magenta/magenta/issues/1902
                 if row.closest_note != last_note:
                     velocity = self.sid_adsr_to_velocity(row, last_rel, last_gate_clock)
                     if velocity:
