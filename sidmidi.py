@@ -174,7 +174,7 @@ class SidMidiFile:
     def get_note_starts(self, row_states):
         last_note = None
         last_clock = None
-        last_rel = None
+        last_rel = 0
         last_gate_clock = None
         notes_starts = []
         for row, row_waveforms in row_states:
