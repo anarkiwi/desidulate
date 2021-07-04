@@ -4,7 +4,6 @@
 
 ## The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 
-import math
 from collections import defaultdict
 from functools import lru_cache
 from music21 import midi
