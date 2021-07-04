@@ -167,40 +167,38 @@ class SidMidiFile:
                 yield (row, row_waveforms)
 
     def get_note_starts(self, row_states):
-        last_midi_n = None
-        notes_starts = []
+        last_note = None
         last_clock = None
+        notes_starts = []
         for row, row_waveforms in self.get_sounding(row_states):
             sid_f = row.real_freq
-            _, closest_midi_n = self.closest_midi(sid_f)
+            _, note = self.closest_midi(sid_f)
             # TODO: add pitch bend if significantly different to canonical note.
-            if closest_midi_n != last_midi_n:
+            if note != last_note:
                 velocity = self.sid_adsr_to_velocity(row)
                 if velocity:
-                    notes_starts.append((closest_midi_n, row.clock, sid_f, velocity))
-                    last_midi_n = closest_midi_n
+                    notes_starts.append((row.clock, note, velocity, sid_f))
+                    last_note = note
             last_clock = row.clock
-        return notes_starts, last_clock
+        notes_starts.append((last_clock, None, None, None))
+        return notes_starts
 
     @lru_cache
-    def get_duration(self, clock, next_clock):
-        return round((next_clock - clock) / self.sid.clockq) * self.sid.clockq
+    def get_duration(self, clocks):
+        return round(clocks / self.sid.clockq) * self.sid.clockq
 
-    def get_notes(self, notes_starts, last_clock):
+    def get_notes(self, notes_starts):
         notes = []
-        for i, note_clocks in enumerate(notes_starts):
-            note, clock, sid_f, velocity = note_clocks
-            try:
-                next_clock = notes_starts[i + 1][1]
-            except IndexError:
-                next_clock = last_clock
-            duration = self.get_duration(clock, next_clock)
+        for i, note_clocks in enumerate(notes_starts[:-1]):
+            clock, note, velocity, sid_f = note_clocks
+            next_clock = notes_starts[i + 1][0]
+            duration = self.get_duration(next_clock - clock)
             if duration:
                 notes.append((clock, note, duration, velocity, sid_f))
         return notes
 
     # Convert gated voice events into possibly many MIDI notes
     def get_midi_notes_from_events(self, row_states):
-        notes_starts, last_clock = self.get_note_starts(row_states)
-        notes = self.get_notes(notes_starts, last_clock)
+        notes_starts = self.get_note_starts(row_states)
+        notes = self.get_notes(notes_starts)
         return notes
