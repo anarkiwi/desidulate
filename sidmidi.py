@@ -157,26 +157,28 @@ class SidMidiFile:
             vel_nib = row.dec1
         return self.sid_velocity[vel_nib]
 
+    def get_sounding(self, row_states):
+        for row, row_waveforms in row_states:
+            if row_waveforms and row.vol and not row.test1:
+                yield (row, row_waveforms)
+                break
+        for row, row_waveforms in row_states:
+            if row_waveforms:
+                yield (row, row_waveforms)
+
     def get_note_starts(self, row_states):
         last_midi_n = None
         notes_starts = []
         last_clock = None
-        sounding = False
-        for row, row_waveforms in row_states:
-            if not sounding:
-                if row_waveforms and row.vol and not row.test1:
-                    sounding = True
-                else:
-                    continue
-            if row_waveforms:
-                sid_f = row.real_freq
-                _, closest_midi_n = self.closest_midi(sid_f)
-                # TODO: add pitch bend if significantly different to canonical note.
-                if closest_midi_n != last_midi_n:
-                    velocity = self.sid_adsr_to_velocity(row)
-                    if velocity:
-                        notes_starts.append((closest_midi_n, row.clock, sid_f, velocity))
-                        last_midi_n = closest_midi_n
+        for row, row_waveforms in self.get_sounding(row_states):
+            sid_f = row.real_freq
+            _, closest_midi_n = self.closest_midi(sid_f)
+            # TODO: add pitch bend if significantly different to canonical note.
+            if closest_midi_n != last_midi_n:
+                velocity = self.sid_adsr_to_velocity(row)
+                if velocity:
+                    notes_starts.append((closest_midi_n, row.clock, sid_f, velocity))
+                    last_midi_n = closest_midi_n
             last_clock = row.clock
         return notes_starts, last_clock
 
