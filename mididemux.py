@@ -21,9 +21,9 @@ LEADCHAN = 2
 PARTITIONBARS = 2
 NOTE_SPLIT = 60
 TRACK_TYPES = {
-  1: BASSCHAN,
-  2: LEADCHAN,
-  10: DRUMCHAN,
+  BASSCHAN: 'bass,
+  LEADCHAN: 'lead',
+  DRUMCHAN: 'drum',
 }
 
 in_midi = sys.argv[1]
