@@ -66,6 +66,24 @@ def track_zero():
     return track_zero
 
 
+def write_midi(file_name, tpqn, tracks):
+    smf = midi.MidiFile()
+    smf.ticksPerQuarterNote = tpqn
+    smf.tracks.append(track_zero())
+    for track in tracks:
+        smf.tracks.append(track)
+    smf.open(file_name, 'wb')
+    smf.write()
+    smf.close()
+
+
+def read_midi(file_name):
+    input_mf = midi.MidiFile()
+    input_mf.open(file_name)
+    input_mf.read()
+    input_mf.close()
+    return input_mf
+
 
 class SidMidiFile:
 
@@ -134,22 +152,19 @@ class SidMidiFile:
             if voice_pitch_data:
                 tracks += 1
                 drummap[voicenum] = tracks
-        smf = midi.MidiFile()
-        smf.ticksPerQuarterNote = self.tpqn
-        smf.tracks.append(track_zero())
+        tracks = []
         for voicenum, voice_pitch_data in self.pitches.items():
             if voice_pitch_data:
                 channel = trackmap[voicenum]
                 smf_track = channel - 1
-                smf.tracks.append(self.write_pitches(
+                tracks.append(self.write_pitches(
                     smf_track, channel, self.program, voice_pitch_data))
         for voicenum, voice_pitch_data in self.drum_pitches.items():
             if voice_pitch_data:
                 smf_track = drummap[voicenum] - 1
-                smf.tracks.append(self.write_pitches(
+                tracks.append(self.write_pitches(
                     smf_track, DRUM_CHANNEL, self.drum_program, voice_pitch_data))
-        smf.open(file_name, 'wb')
-        smf.write()
+        write_midi(file_name, self.tpqn, tracks)
 
     def add_pitch(self, voicenum, clock, duration, pitch, velocity):
         assert duration > 0, duration

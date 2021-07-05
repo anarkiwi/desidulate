@@ -11,7 +11,7 @@ import os
 import sys
 from collections import defaultdict
 from music21 import midi
-from sidmidi import track_zero, add_end_of_track, add_event
+from sidmidi import track_zero, add_end_of_track, add_event, write_midi, read_midi
 
 
 TSGRAN = 10
@@ -23,10 +23,7 @@ if not in_midi or not os.path.exists(in_midi):
 in_midi = os.path.realpath(in_midi)
 out_midi = in_midi.replace('.mid', '')
 
-input_mf = midi.MidiFile()
-input_mf.open(in_midi)
-input_mf.read()
-input_mf.close()
+input_mf = read_midi(in_midi)
 
 track_channel = {}
 input_track_events = defaultdict(list)
@@ -122,12 +119,7 @@ def events_to_track(index, channel, events):
 
 
 def write_track(basename, track_type, index, tpqn, track):
-    output_mf = midi.MidiFile()
-    output_mf.open('%s-%s-%u.mid' % (basename, track_type, index), 'wb')
-    output_mf.ticksPerQuarterNote = tpqn
-    output_mf.tracks.append(track_zero())
-    output_mf.tracks.append(track)
-    output_mf.write()
+    write_midi('%s-%s-%u.mid' % (basename, track_type, index), tpqn, [track])
 
 
 tpqn = input_mf.ticksPerQuarterNote
