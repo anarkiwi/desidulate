@@ -11,11 +11,15 @@ import os
 import sys
 from collections import defaultdict
 from music21 import midi
-from sidmidi import track_zero, add_end_of_track, add_event, write_midi, read_midi
+from sidmidi import add_end_of_track, add_event, write_midi, read_midi
 
 
 TSGRAN = 10
 DRUMCHAN = 10
+BASSCHAN = 1
+LEADCHAN = 2
+PARTITIONBARS = 2
+NOTE_SPLIT = 60
 
 in_midi = sys.argv[1]
 if not in_midi or not os.path.exists(in_midi):
@@ -24,6 +28,7 @@ in_midi = os.path.realpath(in_midi)
 out_midi = in_midi.replace('.mid', '')
 
 input_mf = read_midi(in_midi)
+tpqn = input_mf.ticksPerQuarterNote
 
 track_channel = {}
 input_track_events = defaultdict(list)
@@ -55,7 +60,8 @@ for track in sorted(input_mf.tracks, key=lambda t: t.index):
     track_channel[index] = channel
     clock = 0
     offsets = set()
-    for event in track.events:
+    assert track.events[-1].type == midi.MetaEvents.END_OF_TRACK, track.events[-1]
+    for event in track.events[:-1]:
         if event.isDeltaTime():
             offset = round(event.time / TSGRAN) * TSGRAN
             offsets.add(offset)
@@ -63,8 +69,6 @@ for track in sorted(input_mf.tracks, key=lambda t: t.index):
         else:
             assert event.time == 0
             event.channel = channel
-            if event.type == midi.MetaEvents.END_OF_TRACK:
-                continue
             input_track_events[index].append((clock, event))
             if event.isNoteOn() and event.pitch:
                 track_notes[index].add(event.pitch)
@@ -74,27 +78,18 @@ output_track_events = defaultdict(list)
 for index, events in input_track_events.items():
     notes = sorted(track_notes[index])
     if notes and track_channel[index] != DRUMCHAN:
-        last_note = notes[0]
-        note_split = last_note
-        note_diff = 0
-        track_channel[1] = 1
-        track_channel[2] = 2
-        note_split = 60
-        #for note in notes:
-        #    if note - last_note > note_diff and note >= 60:
-        #        note_split = note
-        #        note_diff = note - last_note
-        #    last_note = note
+        track_channel[BASSCHAN] = BASSCHAN
+        track_channel[LEADCHAN] = LEADCHAN
         for clock, event in events:
             if event.isNoteOn() or event.isNoteOff():
-                if event.pitch <= note_split:
-                    output_track_events[1].append((clock, event))
+                if event.pitch <= NOTE_SPLIT:
+                    chans = [BASSCHAN]
                 else:
-                    output_track_events[2].append((clock, event))
+                    chans = [LEADCHAN]
             else:
-                output_track_events[1].append((clock, event))
-                output_track_events[2].append((clock, event))
-
+                chans = [BASSCHAN, LEADCHAN]
+            for chan in chans:
+                output_track_events[chan].append((clock, event))
     else:
         output_track_events[index] = events
 
@@ -103,44 +98,33 @@ for index in output_track_events:
 
 
 def events_to_track(index, channel, events):
-
     track = midi.MidiTrack(index=index)
     last_clock = 0
-    note_events = 0
     for clock, event in sorted(events, key=lambda t: t[0]):
-        if event.type == midi.MetaEvents.END_OF_TRACK:
-            continue
         delta_clock = clock - last_clock
         last_clock = clock
-        note_events += add_event(track, event, delta_clock, channel)
+        add_event(track, event, delta_clock, channel)
 
     add_end_of_track(track, channel)
-    return track, note_events
+    return track
 
 
-def write_track(basename, track_type, index, tpqn, track):
+def write_track(basename, track_type, index, track):
     write_midi('%s-%s-%u.mid' % (basename, track_type, index), tpqn, [track])
 
-
-tpqn = input_mf.ticksPerQuarterNote
-gapbars = 2
 
 for index, events in output_track_events.items():
     if index:
         channel = track_channel[index]
         if channel == DRUMCHAN:
             track_type = 'drum'
-        elif channel == 1:
+        elif channel == BASSCHAN:
             track_type = 'bass'
-        else:
+        elif channel == LEADCHAN:
             track_type = 'lead'
-
-        non_notes = []
-        for clock, event in events:
-            if event.isNoteOn() or event.isNoteOff():
-                break
-            non_notes.append((clock, event))
-
+        else:
+            raise
+        non_notes = [(clock, event) for clock, event in events if not (event.isNoteOn() or event.isNoteOff())]
         partitions = []
         notes_playing = set()
         last_clock = events[0][0]
@@ -148,8 +132,9 @@ for index, events in output_track_events.items():
         firstnoteclock = None
         for i, pair in enumerate(events):
             clock, event = pair
-            event_gap = (clock - last_clock) / 960 / 4
-            if not notes_playing and noteevents and (event_gap > gapbars):
+            # assume 4/4
+            event_gap = (clock - last_clock) / tpqn / 4
+            if not notes_playing and noteevents and (event_gap > PARTITIONBARS):
                 partitions.append(i)
             last_clock = clock
             if event.isNoteOn():
@@ -171,11 +156,9 @@ for index, events in output_track_events.items():
                 else:
                     partevents = non_notes + [(x - firstnoteclock, y) for x, y in partevents if x]
                 lasti = i
-                track, note_events = events_to_track(index, channel, partevents)
-                if note_events:
-                    write_track(out_midi, track_type, n, tpqn, track)
+                track = events_to_track(index, channel, partevents)
+                write_track(out_midi, track_type, n, track)
         else:
             events = non_notes + [(x - firstnoteclock, y) for x, y in events if x]
-            track, note_events = events_to_track(index, channel, events)
-            if note_events:
-                write_track(out_midi, track_type, 0, tpqn, track)
+            track = events_to_track(index, channel, events)
+            write_track(out_midi, track_type, 0, track)
