@@ -11,6 +11,8 @@ import os
 import sys
 from collections import defaultdict
 from music21 import midi
+from sidmidi import track_zero
+
 
 TSGRAN = 10
 DRUMCHAN = 10
@@ -136,16 +138,15 @@ def events_to_track(index, channel, events):
     return track, note_events
 
 
-def write_track(basename, track_type, index, track_zero, tpqn, track):
+def write_track(basename, track_type, index, tpqn, track):
     output_mf = midi.MidiFile()
     output_mf.open('%s-%s-%u.mid' % (basename, track_type, index), 'wb')
     output_mf.ticksPerQuarterNote = tpqn
-    output_mf.tracks.append(track_zero)
+    output_mf.tracks.append(track_zero())
     output_mf.tracks.append(track)
     output_mf.write()
 
 
-track_zero = input_mf.tracks[0]
 tpqn = input_mf.ticksPerQuarterNote
 gapbars = 2
 
@@ -197,9 +198,9 @@ for index, events in output_track_events.items():
                 lasti = i
                 track, note_events = events_to_track(index, channel, partevents)
                 if note_events:
-                    write_track(out_midi, track_type, n, track_zero, tpqn, track)
+                    write_track(out_midi, track_type, n, tpqn, track)
         else:
             events = non_notes + [(x - firstnoteclock, y) for x, y in events if x]
             track, note_events = events_to_track(index, channel, events)
             if note_events:
-                write_track(out_midi, track_type, 0, track_zero, tpqn, track)
+                write_track(out_midi, track_type, 0, tpqn, track)
