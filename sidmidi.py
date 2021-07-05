@@ -123,7 +123,9 @@ class SidMidiFile:
                 drummap[voicenum] = tracks
         smf = midi.MidiFile()
         smf.ticksPerQuarterNote = self.tpqn
-        smf.tracks.append(midi.MidiTrack(0))
+        track_zero = midi.MidiTrack(0)
+        self.add_end_of_track(track_zero, 0)
+        smf.tracks.append(track_zero)
         for voicenum, voice_pitch_data in self.pitches.items():
             if voice_pitch_data:
                 channel = trackmap[voicenum]
