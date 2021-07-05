@@ -48,6 +48,9 @@ def add_event(track, event, delta_clock, channel):
     track.events.append(dt)
     event.channel = channel
     track.events.append(event)
+    if event.isNoteOn() or event.isNoteOff():
+        return 1
+    return 0
 
 
 def add_end_of_track(track, channel):

@@ -11,7 +11,7 @@ import os
 import sys
 from collections import defaultdict
 from music21 import midi
-from sidmidi import track_zero, add_end_of_track
+from sidmidi import track_zero, add_end_of_track, add_event
 
 
 TSGRAN = 10
@@ -107,17 +107,6 @@ for index in output_track_events:
 
 def events_to_track(index, channel, events):
 
-    def add_event(track, event, delta_clock, channel):
-        dt = midi.DeltaTime(track)
-        dt.time = delta_clock
-        dt.channel = channel
-        track.events.append(dt)
-        event.channel = channel
-        track.events.append(event)
-        if event.isNoteOn() or event.isNoteOff():
-            return 1
-        return 0
-
     track = midi.MidiTrack(index=index)
     last_clock = 0
     note_events = 0
@@ -127,7 +116,6 @@ def events_to_track(index, channel, events):
         delta_clock = clock - last_clock
         last_clock = clock
         note_events += add_event(track, event, delta_clock, channel)
-        dt = midi.DeltaTime(track)
 
     add_end_of_track(track, channel)
     return track, note_events
