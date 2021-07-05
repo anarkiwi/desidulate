@@ -11,7 +11,7 @@ import os
 import sys
 from collections import defaultdict
 from music21 import midi
-from sidmidi import track_zero
+from sidmidi import track_zero, add_end_of_track
 
 
 TSGRAN = 10
@@ -129,12 +129,7 @@ def events_to_track(index, channel, events):
         note_events += add_event(track, event, delta_clock, channel)
         dt = midi.DeltaTime(track)
 
-    eot = midi.MidiEvent(track)
-    eot.type = midi.MetaEvents.END_OF_TRACK
-    eot.channel = channel
-    eot.data = b''
-    add_event(track, eot, 0, channel)
-    track.updateEvents()
+    add_end_of_track(track, channel)
     return track, note_events
 
 
