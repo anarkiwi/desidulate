@@ -30,11 +30,38 @@ def closest_midi(sid_f):
     closest_midi_f = min(MIDI_N_TO_F.values(), key=lambda x: abs(x - sid_f))
     return (closest_midi_f, MIDI_F_TO_N[closest_midi_f])
 
+
 def make_event(track, event_type, channel):
     event = midi.MidiEvent(track)
     event.type = event_type
     event.channel = channel
     return event
+
+
+def add_event(track, event, delta_clock, channel):
+    dt = midi.DeltaTime(track)
+    if delta_clock < 0 and delta_clock > -1:
+        delta_clock = 0
+    assert delta_clock >= 0, (track, event, delta_clock, channel)
+    dt.time = round(delta_clock)
+    dt.channel = channel
+    track.events.append(dt)
+    event.channel = channel
+    track.events.append(event)
+
+
+def add_end_of_track(track, channel):
+    eot = make_event(track, midi.MetaEvents.END_OF_TRACK, channel)
+    eot.data = b''
+    add_event(track, eot, 0, channel)
+    track.updateEvents()
+
+
+def track_zero():
+    track_zero = midi.MidiTrack(0)
+    add_end_of_track(track_zero, 0)
+    return track_zero
+
 
 
 class SidMidiFile:
@@ -49,23 +76,6 @@ class SidMidiFile:
         self.tpqn = 960
         self.sid_velocity = {i: int(i / 15 * 127) for i in range(16)}
 
-    def add_event(self, track, event, delta_clock, channel):
-        dt = midi.DeltaTime(track)
-        if delta_clock < 0 and delta_clock > -1:
-            delta_clock = 0
-        assert delta_clock >= 0, (track, event, delta_clock, channel)
-        dt.time = round(delta_clock)
-        dt.channel = channel
-        track.events.append(dt)
-        event.channel = channel
-        track.events.append(event)
-
-    def add_end_of_track(self, track, channel):
-        eot = make_event(track, midi.MetaEvents.END_OF_TRACK, channel)
-        eot.data = b''
-        self.add_event(track, eot, 0, channel)
-        track.updateEvents()
-
     def clock_to_ticks(self, clock):
         return self.sid.clock_to_ticks(clock, self.bpm, self.tpqn)
 
@@ -73,17 +83,17 @@ class SidMidiFile:
         note_on = make_event(track, midi.ChannelVoiceMessages.NOTE_ON, channel)
         note_on.pitch = pitch
         note_on.velocity = velocity
-        self.add_event(track, note_on, self.clock_to_ticks(clock - last_clock), channel)
+        add_event(track, note_on, self.clock_to_ticks(clock - last_clock), channel)
         note_off = make_event(track, midi.ChannelVoiceMessages.NOTE_OFF, channel)
         note_off.pitch = pitch
         note_off.velocity = 0
-        self.add_event(track, note_off, self.clock_to_ticks(duration), channel)
+        add_event(track, note_off, self.clock_to_ticks(duration), channel)
         return clock + duration
 
     def add_program_change(self, track, channel, program):
         pc = make_event(track, midi.ChannelVoiceMessages.PROGRAM_CHANGE, channel)
         pc.data = program
-        self.add_event(track, pc, 0, channel)
+        add_event(track, pc, 0, channel)
 
     def write_pitches(self, smf_track, channel, program, voice_pitch_data):
         track = midi.MidiTrack(smf_track)
@@ -106,7 +116,7 @@ class SidMidiFile:
             clock, duration, pitch, velocity = pitch_data
             assert velocity
             last_clock = self.add_note(track, channel, pitch, velocity, last_clock, clock, duration)
-        self.add_end_of_track(track, channel)
+        add_end_of_track(track, channel)
         return track
 
     def write(self, file_name):
@@ -123,9 +133,7 @@ class SidMidiFile:
                 drummap[voicenum] = tracks
         smf = midi.MidiFile()
         smf.ticksPerQuarterNote = self.tpqn
-        track_zero = midi.MidiTrack(0)
-        self.add_end_of_track(track_zero, 0)
-        smf.tracks.append(track_zero)
+        smf.tracks.append(track_zero())
         for voicenum, voice_pitch_data in self.pitches.items():
             if voice_pitch_data:
                 channel = trackmap[voicenum]
