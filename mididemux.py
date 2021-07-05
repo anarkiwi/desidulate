@@ -20,6 +20,11 @@ BASSCHAN = 1
 LEADCHAN = 2
 PARTITIONBARS = 2
 NOTE_SPLIT = 60
+TRACK_TYPES = {
+  1: BASSCHAN,
+  2: LEADCHAN,
+  10: DRUMCHAN,
+}
 
 in_midi = sys.argv[1]
 if not in_midi or not os.path.exists(in_midi):
@@ -116,14 +121,7 @@ def write_track(basename, track_type, index, track):
 for index, events in output_track_events.items():
     if index:
         channel = track_channel[index]
-        if channel == DRUMCHAN:
-            track_type = 'drum'
-        elif channel == BASSCHAN:
-            track_type = 'bass'
-        elif channel == LEADCHAN:
-            track_type = 'lead'
-        else:
-            raise
+        track_type = TRACK_TYPES[channel]
         non_notes = [(clock, event) for clock, event in events if not (event.isNoteOn() or event.isNoteOff())]
         partitions = []
         notes_playing = set()
