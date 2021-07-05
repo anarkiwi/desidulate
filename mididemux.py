@@ -21,7 +21,7 @@ LEADCHAN = 2
 PARTITIONBARS = 2
 NOTE_SPLIT = 60
 TRACK_TYPES = {
-  BASSCHAN: 'bass,
+  BASSCHAN: 'bass',
   LEADCHAN: 'lead',
   DRUMCHAN: 'drum',
 }
