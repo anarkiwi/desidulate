@@ -112,15 +112,19 @@ def events_to_track(index, channel, events):
         track.events.append(dt)
         event.channel = channel
         track.events.append(event)
+        if event.isNoteOn() or event.isNoteOff():
+            return 1
+        return 0
 
     track = midi.MidiTrack(index=index)
     last_clock = 0
+    note_events = 0
     for clock, event in sorted(events, key=lambda t: t[0]):
         if event.type == midi.MetaEvents.END_OF_TRACK:
             continue
         delta_clock = clock - last_clock
         last_clock = clock
-        add_event(track, event, delta_clock, channel)
+        note_events += add_event(track, event, delta_clock, channel)
         dt = midi.DeltaTime(track)
 
     eot = midi.MidiEvent(track)
@@ -129,7 +133,7 @@ def events_to_track(index, channel, events):
     eot.data = b''
     add_event(track, eot, 0, channel)
     track.updateEvents()
-    return track
+    return track, note_events
 
 
 def write_track(basename, track_type, index, track_zero, tpqn, track):
@@ -191,9 +195,11 @@ for index, events in output_track_events.items():
                 else:
                     partevents = non_notes + [(x - firstnoteclock, y) for x, y in partevents if x]
                 lasti = i
-                track = events_to_track(index, channel, partevents)
-                write_track(out_midi, track_type, n, track_zero, tpqn, track)
+                track, note_events = events_to_track(index, channel, partevents)
+                if note_events:
+                    write_track(out_midi, track_type, n, track_zero, tpqn, track)
         else:
             events = non_notes + [(x - firstnoteclock, y) for x, y in events if x]
-            track = events_to_track(index, channel, events)
-            write_track(out_midi, track_type, 0, track_zero, tpqn, track)
+            track, note_events = events_to_track(index, channel, events)
+            if note_events:
+                write_track(out_midi, track_type, 0, track_zero, tpqn, track)
