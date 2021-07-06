@@ -271,7 +271,18 @@ def jittermatch_df(df1, df2, jitter_col, jitter_max):
     return pd.notna(diff_max) and diff_max < jitter_max
 
 
+def pulse_vol_ssf(ssf_df):
+    if ssf_df['vol'].unique() > 2:
+        notest_ssf_df = ssf_df[ssf_df['test1'] == 0]
+        if notest_ssf_df['pulse1'].max() == 1:
+            if notest_ssf_df['tri1'].max() == 0 and notest_ssf_df['saw1'] == 0 and notest_ssf_df['noise1'] == 0:
+                return True
+    return False
+
+
 def normalize_ssf(ssf_df, remap_ssf_dfs, ssf_noclock_dfs, ssf_dfs, ssf_count):
+    if pulse_vol_ssf(ssf_df):
+        return None
     hashid = hash_df(ssf_df)
     if hashid not in ssf_dfs:
         if hashid in remap_ssf_dfs:
@@ -279,7 +290,8 @@ def normalize_ssf(ssf_df, remap_ssf_dfs, ssf_noclock_dfs, ssf_dfs, ssf_count):
             hashid = remapped_hashid
         else:
             ssf_noclock_df = ssf_df.drop(['clock'], axis=1)
-            hashid_noclock = (hash_df(ssf_noclock_df), int(ssf_noclock_df['frame'].max() / 2) * 2)
+            even_frame = int(ssf_noclock_df['frame'].max() / 2) * 2
+            hashid_noclock = (hash_df(ssf_noclock_df), even_frame)
             remapped_hashid = ssf_noclock_dfs.get(hashid_noclock, None)
             if remapped_hashid is not None and jittermatch_df(ssf_dfs[remapped_hashid], ssf_df, 'clock', 1024):
                 remap_ssf_dfs[hashid] = remapped_hashid
@@ -309,7 +321,8 @@ def split_ssf(df):
                 ssf_df['clock'] -= ssf_df['clock'].min()
                 ssf_df['frame'] -= ssf_df['frame'].min()
                 hashid = normalize_ssf(ssf_df, remap_ssf_dfs, ssf_noclock_dfs, ssf_dfs, ssf_count)
-                ssf_log.append({'clock': orig_clock, 'hashid': hashid, 'voice': v})
+                if hashid:
+                    ssf_log.append({'clock': orig_clock, 'hashid': hashid, 'voice': v})
         for _, size_ssf_df in v_control_df.groupby(['ssf_size']):
             for _, group_ssf_df in size_ssf_df.drop(['ssf_size'], axis=1).groupby(['ssf']):
                 ssf_df = group_ssf_df.drop(['ssf'], axis=1).copy()
