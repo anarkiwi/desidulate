@@ -271,12 +271,12 @@ def jittermatch_df(df1, df2, jitter_col, jitter_max):
     return pd.notna(diff_max) and diff_max < jitter_max
 
 
+# http://sid.kubarth.com/articles/the_c64_digi.txt
 def pulse_vol_ssf(ssf_df):
     if len(ssf_df['vol'].unique()) > 2:
         notest_ssf_df = ssf_df[ssf_df['test1'] == 0]
-        if notest_ssf_df['pulse1'].max() == 1:
-            if notest_ssf_df['tri1'].max() == 0 and notest_ssf_df['saw1'].max() == 0 and notest_ssf_df['noise1'].max() == 0:
-                return True
+        if notest_ssf_df['tri1'].max() == 0 and notest_ssf_df['saw1'].max() == 0 and notest_ssf_df['noise1'].max() == 0:
+            return True
     return False
 
 
