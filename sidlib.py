@@ -272,7 +272,7 @@ def jittermatch_df(df1, df2, jitter_col, jitter_max):
 
 
 def pulse_vol_ssf(ssf_df):
-    if ssf_df['vol'].unique() > 2:
+    if len(ssf_df['vol'].unique()) > 2:
         notest_ssf_df = ssf_df[ssf_df['test1'] == 0]
         if notest_ssf_df['pulse1'].max() == 1:
             if notest_ssf_df['tri1'].max() == 0 and notest_ssf_df['saw1'].max() == 0 and notest_ssf_df['noise1'].max() == 0:
