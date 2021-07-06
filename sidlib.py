@@ -281,26 +281,12 @@ def mask_not_pulse(ssf_df):
     return ssf_df['tri1'].max() == 0 and ssf_df['saw1'].max() == 0 and ssf_df['noise1'].max() == 0
 
 
-# http://sid.kubarth.com/articles/the_c64_digi.txt
-def pulse_vol_ssf(ssf_df):
-    if ssf_df['volnunique'].max() > 4 and mask_not_pulse(ssf_df) and fast_update_ssf(ssf_df):
-        return True
-    return False
-
-
-# http://www.ffd2.com/fridge/chacking/c=hacking21.txt
-def pulse_pwm_ssf(ssf_df):
-    if ssf_df['pulse1'].min() == 1 and ssf_df['pwduty1nunique'].max() > 1:
-        if mask_not_pulse(ssf_df) and fast_update_ssf(ssf_df):
-            return True
-    return False
-
-
 def normalize_ssf(ssf_df, remap_ssf_dfs, ssf_noclock_dfs, ssf_dfs, ssf_count):
-    if pulse_vol_ssf(ssf_df):
-        return None
-    if pulse_pwm_ssf(ssf_df):
-        return None
+    if mask_not_pulse(ssf_df):
+        # http://sid.kubarth.com/articles/the_c64_digi.txt
+        # http://www.ffd2.com/fridge/chacking/c=hacking21.txt
+        if (ssf_df['volnunique'].max() > 4 or ssf_df['pwduty1nunique'].max() > 1) and fast_update_ssf(ssf_df):
+            return None
     hashid = hash_df(ssf_df)
     if hashid not in ssf_dfs:
         if hashid in remap_ssf_dfs:
