@@ -274,7 +274,7 @@ def jittermatch_df(df1, df2, jitter_col, jitter_max):
 
 
 def fast_update_ssf(ssf_df):
-    return ssf_df['frame'].max() > 2 and ssf_df['clock'].diff().max() < 2048 and ssf_df['clock'].diff().mean() < 128
+    return ssf_df['frame'].max() > 2 and ssf_df['clock'].diff().mean() < 128
 
 
 def mask_not_pulse(ssf_df):
