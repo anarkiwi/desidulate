@@ -107,7 +107,7 @@ def get_sid(pal):
 
 
 def hash_df(df):
-    rows_hash = pd.Series((hash(r) for r in df.itertuples(index=False, name=None)))
+    rows_hash = pd.Series((hash(r) for r in df.drop(['frame'], axis=1).itertuples(index=False, name=None)))
     return hash(tuple(rows_hash))
 
 
@@ -197,7 +197,6 @@ def reg2state(sid, snd_log_name, nrows=(10 * 1e6)):
 
 def split_vdf(df):
     fltcols = [col for col in df.columns if col.startswith('flt') and not col[-1].isdigit()]
-    v_dfs = {}
 
     def v_cols(v):
         sync_map = {
@@ -252,8 +251,14 @@ def split_vdf(df):
         v_df = v_df.loc[(v_df[diff_cols].shift() != v_df[diff_cols]).any(axis=1)]
         v_df = v_df[v_df.groupby('ssf', sort=False)['vol'].transform('max') > 0]
         v_df = v_df[v_df.groupby('ssf', sort=False)['test1'].transform('min') < 1]
+        control_ignore_diff_cols = ['freq1', 'freq3', 'pwduty1', 'fltcoff']
+        for col in control_ignore_diff_cols:
+            diff_cols.remove(col)
+        v_control_df = v_df.drop(control_ignore_diff_cols, axis=1).copy()
+        v_control_df = v_control_df.loc[(v_control_df[diff_cols].shift() != v_control_df[diff_cols]).any(axis=1)]
         v_df['ssf_size'] = v_df.groupby(['ssf'], sort=False)['ssf'].transform('size').astype(np.uint64)
-        yield (v, v_df)
+        v_control_df['ssf_size'] = v_control_df.groupby(['ssf'], sort=False)['ssf'].transform('size').astype(np.uint64)
+        yield (v, v_df, v_control_df)
 
 
 def jittermatch_df(df1, df2, jitter_col, jitter_max):
@@ -266,53 +271,74 @@ def jittermatch_df(df1, df2, jitter_col, jitter_max):
     return pd.notna(diff_max) and diff_max < jitter_max
 
 
+def normalize_ssf(ssf_df, remap_ssf_dfs, ssf_noclock_dfs, ssf_dfs, ssf_count):
+    hashid = hash_df(ssf_df)
+    if hashid not in ssf_dfs:
+        if hashid in remap_ssf_dfs:
+            remapped_hashid = remap_ssf_dfs[hashid]
+            hashid = remapped_hashid
+        else:
+            ssf_noclock_df = ssf_df.drop(['clock'], axis=1)
+            hashid_noclock = (hash_df(ssf_noclock_df), int(ssf_noclock_df['frame'].max() / 2) * 2)
+            remapped_hashid = ssf_noclock_dfs.get(hashid_noclock, None)
+            if remapped_hashid is not None and jittermatch_df(ssf_dfs[remapped_hashid], ssf_df, 'clock', 1024):
+                remap_ssf_dfs[hashid] = remapped_hashid
+                hashid = remapped_hashid
+            else:
+                ssf_dfs[hashid] = ssf_df
+                ssf_noclock_dfs[hashid_noclock] = hashid
+    ssf_count[hashid] +=1
+    return hashid
+
+
 def split_ssf(df):
     ssf_log = []
     ssf_dfs = {}
     ssf_count = defaultdict(int)
+    control_ssf_dfs = {}
+    control_ssf_count = defaultdict(int)
+    remap_ssf_dfs = {}
+    ssf_noclock_dfs = {}
 
-    for v, v_df in split_vdf(df):
-        for _, size_ssf_df in v_df.groupby(['ssf_size'], sort=False):
-            remap_ssf_dfs = {}
-            ssf_noclock_dfs = {}
-            for _, group_ssf_df in size_ssf_df.drop(['ssf_size'], axis=1).groupby(['ssf'], sort=False):
+    for v, v_df, v_control_df in split_vdf(df):
+        for _, size_ssf_df in v_df.groupby(['ssf_size']):
+            for _, group_ssf_df in size_ssf_df.drop(['ssf_size'], axis=1).groupby(['ssf']):
                 ssf_df = group_ssf_df.drop(['ssf'], axis=1).copy()
                 ssf_df.reset_index(level=0, inplace=True)
                 orig_clock = ssf_df['clock'].min()
                 ssf_df['clock'] -= ssf_df['clock'].min()
                 ssf_df['frame'] -= ssf_df['frame'].min()
-                hashid = hash_df(ssf_df)
-                if hashid not in ssf_dfs:
-                    if hashid in remap_ssf_dfs:
-                        remapped_hashid = remap_ssf_dfs[hashid]
-                        hashid = remapped_hashid
-                    else:
-                        ssf_noclock_df = ssf_df.drop(['clock', 'frame'], axis=1)
-                        hashid_noclock = hash_df(ssf_noclock_df)
-                        remapped_hashid = ssf_noclock_dfs.get(hashid_noclock, None)
-                        if remapped_hashid is not None and jittermatch_df(ssf_dfs[remapped_hashid], ssf_df, 'clock', 1024):
-                            remap_ssf_dfs[hashid] = remapped_hashid
-                            hashid = remapped_hashid
-                        else:
-                            ssf_dfs[hashid] = ssf_df
-                            ssf_noclock_dfs[hashid_noclock] = hashid
-
-                ssf_count[hashid] += 1
+                hashid = normalize_ssf(ssf_df, remap_ssf_dfs, ssf_noclock_dfs, ssf_dfs, ssf_count)
                 ssf_log.append({'clock': orig_clock, 'hashid': hashid, 'voice': v})
-    return ssf_log, ssf_dfs, ssf_count
+        for _, size_ssf_df in v_control_df.groupby(['ssf_size']):
+            for _, group_ssf_df in size_ssf_df.drop(['ssf_size'], axis=1).groupby(['ssf']):
+                ssf_df = group_ssf_df.drop(['ssf'], axis=1).copy()
+                ssf_df.reset_index(level=0, inplace=True)
+                ssf_df['clock'] -= ssf_df['clock'].min()
+                ssf_df['frame'] -= ssf_df['frame'].min()
+                normalize_ssf(ssf_df, remap_ssf_dfs, ssf_noclock_dfs, control_ssf_dfs, control_ssf_count)
+    return ssf_log, ssf_dfs, ssf_count, control_ssf_dfs, control_ssf_count
 
 
-def state2ssfs(df, sid):
-    ssf_log, ssf_dfs, ssf_count = split_ssf(df)
+def state2ssfs(df):
+    ssf_log, ssf_dfs, ssf_count, control_ssf_dfs, control_ssf_count = split_ssf(df)
 
-    for hashid, count in ssf_count.items():
-        ssf_dfs[hashid]['count'] = count
-        ssf_dfs[hashid]['hashid'] = hashid
+    for x, y in ((ssf_dfs, ssf_count),
+                 (control_ssf_dfs, control_ssf_count)):
+        for hashid, count in y.items():
+            x[hashid]['count'] = count
+            x[hashid]['hashid'] = hashid
 
+    def concat_dfs(x, y):
+        return pd.concat([
+            x[hashid] for hashid, count in sorted(y.items(), key=lambda i: i[1], reverse=True)]).set_index('hashid')
+
+    ssf_log_df = None
+    ssf_df = None
+    control_ssf_df = None
     if ssf_log:
         ssf_log_df = pd.DataFrame(
             ssf_log, dtype=pd.Int64Dtype()).set_index('clock').sort_index()
-        ssf_df = pd.concat([
-            ssf_dfs[hashid] for hashid, count in sorted(ssf_count.items(), key=lambda x: x[1], reverse=True)]).set_index('hashid')
-        return ssf_log_df, ssf_df
-    return None, None
+        ssf_df = concat_dfs(ssf_dfs, ssf_count)
+        control_ssf_df = concat_dfs(control_ssf_dfs, control_ssf_count)
+    return ssf_log_df, ssf_df, control_ssf_df
