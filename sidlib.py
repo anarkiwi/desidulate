@@ -251,6 +251,8 @@ def split_vdf(df):
         v_df = v_df.loc[(v_df[diff_cols].shift() != v_df[diff_cols]).any(axis=1)]
         v_df = v_df[v_df.groupby('ssf', sort=False)['vol'].transform('max') > 0]
         v_df = v_df[v_df.groupby('ssf', sort=False)['test1'].transform('min') < 1]
+        v_df['pwduty1nunique'] = v_df.groupby(['ssf'], sort=False)['pwduty1'].transform('nunique').astype(np.uint64)
+        v_df['volnunique'] = v_df.groupby(['ssf'], sort=False)['vol'].transform('nunique').astype(np.uint64)
         control_ignore_diff_cols = ['freq1', 'freq3', 'pwduty1', 'fltcoff']
         for col in control_ignore_diff_cols:
             diff_cols.remove(col)
@@ -281,14 +283,14 @@ def mask_not_pulse(ssf_df):
 
 # http://sid.kubarth.com/articles/the_c64_digi.txt
 def pulse_vol_ssf(ssf_df):
-    if len(ssf_df['vol'].unique()) > 4 and mask_not_pulse(ssf_df) and fast_update_ssf(ssf_df):
+    if ssf_df['volnunique'].max() > 4 and mask_not_pulse(ssf_df) and fast_update_ssf(ssf_df):
         return True
     return False
 
 
 # http://www.ffd2.com/fridge/chacking/c=hacking21.txt
 def pulse_pwm_ssf(ssf_df):
-    if ssf_df['pulse1'].min() == 1 and len(ssf_df['pwduty1'].unique()) > 1:
+    if ssf_df['pulse1'].min() == 1 and ssf_df['pwduty1nunique'] > 1:
         if mask_not_pulse(ssf_df) and fast_update_ssf(ssf_df):
             return True
     return False
