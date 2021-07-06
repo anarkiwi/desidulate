@@ -271,17 +271,33 @@ def jittermatch_df(df1, df2, jitter_col, jitter_max):
     return pd.notna(diff_max) and diff_max < jitter_max
 
 
+def fast_update_ssf(ssf_df):
+    return ssf_df['frame'].max() > 2 and ssf_df['clock'].diff().max() < 2048 and ssf_df['clock'].diff().mean() < 128
+
+
+def mask_not_pulse(ssf_df):
+    return ssf_df['tri1'].max() == 0 and ssf_df['saw1'].max() == 0 and ssf_df['noise1'].max() == 0
+
+
 # http://sid.kubarth.com/articles/the_c64_digi.txt
 def pulse_vol_ssf(ssf_df):
-    if len(ssf_df['vol'].unique()) > 2:
-        notest_ssf_df = ssf_df[ssf_df['test1'] == 0]
-        if notest_ssf_df['tri1'].max() == 0 and notest_ssf_df['saw1'].max() == 0 and notest_ssf_df['noise1'].max() == 0:
+    if len(ssf_df['vol'].unique()) > 4 and mask_not_pulse(ssf_df) and fast_update_ssf(ssf_df):
+        return True
+    return False
+
+
+# http://www.ffd2.com/fridge/chacking/c=hacking21.txt
+def pulse_pwm_ssf(ssf_df):
+    if ssf_df['pulse1'].min() == 1 and len(ssf_df['pwduty'].unique()) > 1:
+        if mask_not_pulse(ssf_df) and fast_update_ssf(ssf_df):
             return True
     return False
 
 
 def normalize_ssf(ssf_df, remap_ssf_dfs, ssf_noclock_dfs, ssf_dfs, ssf_count):
     if pulse_vol_ssf(ssf_df):
+        return None
+    if pulse_pwm_ssf(ssf_df):
         return None
     hashid = hash_df(ssf_df)
     if hashid not in ssf_dfs:
