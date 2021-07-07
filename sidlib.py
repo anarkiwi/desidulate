@@ -13,7 +13,10 @@ import numpy as np
 from pyresidfp import SoundInterfaceDevice
 from pyresidfp.sound_interface_device import ChipModel
 
-FAST_MOD_HZ = 256
+# SSFs with vol modulation > than this, rejected
+SKIP_VOL_MOD_HZ = 1000
+# SSFs with pwduty modulation > than this, rejected
+SKIP_PWDUTY_MOD_HZ = 256
 
 
 def set_sid_dtype(df):
@@ -283,29 +286,29 @@ def mask_not_pulse(ssf_df):
     return ssf_df['tri1'].max() == 0 and ssf_df['saw1'].max() == 0 and ssf_df['noise1'].max() == 0
 
 
-def calc_clock_diff(ssf_df):
-    return ssf_df['clock'].diff().astype(pd.UInt64Dtype()).mean()
+def fast_clock_diff(ssf_df, fast_mod_cycles):
+    diffs = ssf_df['clock'].diff()
+    if diffs.mean() < fast_mod_cycles:
+        return True
+    return diffs.quantile(0.95).mean() < fast_mod_cycles
 
 
-def skip_ssf(ssf_df, fast_mod_cycles):
+def skip_ssf(ssf_df, vol_mod_cycles, pwduty_mod_cycles):
     # Skip SSFs with sample playback.
-    if len(ssf_df) > 2 and ssf_df['frame'].nunique() > 2:
+    if len(ssf_df) > 2 and ssf_df['frame'].nunique() > 3:
         # https://codebase64.org/doku.php?id=base:vicious_sid_demo_routine_explained
         # http://www.ffd2.com/fridge/chacking/c=hacking21.txt
         # http://www.ffd2.com/fridge/chacking/c=hacking20.txt
-        # Skip SSFs with very high rate volume changes.
+        # Skip SSFs with high rate volume changes.
         if ssf_df['volnunique'].max() > 2:
             vol_ssf_df = squeeze_diffs(ssf_df[['clock', 'vol']], ['vol'])
-            clock_diff_mean = calc_clock_diff(vol_ssf_df)
-            if pd.notna(clock_diff_mean) and clock_diff_mean < fast_mod_cycles:
+            if fast_clock_diff(vol_ssf_df, vol_mod_cycles):
                 return True
-        # Skip SSFs with very high PW duty cycle changes, or high PW duty cycle changes with many values.
+        # Skip SSFs with high PW duty cycle changes
         elif mask_not_pulse(ssf_df) and ssf_df['pwduty1nunique'].max() > 1:
-            pwduty_clock_diffs = squeeze_diffs(ssf_df[['clock', 'pwduty1']], ['pwduty1'])
-            clock_diff_mean = calc_clock_diff(pwduty_clock_diffs)
-            if pd.notna(clock_diff_mean):
-                if clock_diff_mean < fast_mod_cycles:
-                    return True
+            pwduty_clock_df = squeeze_diffs(ssf_df[['clock', 'pwduty1']], ['pwduty1'])
+            if fast_clock_diff(pwduty_clock_df, pwduty_mod_cycles):
+                return True
     return False
 
 
@@ -340,7 +343,8 @@ def split_ssf(sid, df):
     remap_ssf_dfs = {}
     ssf_noclock_dfs = {}
     skip_hashids = {}
-    fast_mod_cycles = int(sid.clock_freq / FAST_MOD_HZ)
+    vol_mod_cycles = int(sid.clock_freq / SKIP_VOL_MOD_HZ)
+    pwduty_mod_cycles = int(sid.clock_freq / SKIP_PWDUTY_MOD_HZ)
 
     for v, v_df, v_control_df in split_vdf(df):
         skip_ssfs = set()
@@ -355,7 +359,7 @@ def split_ssf(sid, df):
                 hashid = normalize_ssf(ssf_df, remap_ssf_dfs, ssf_noclock_dfs, ssf_dfs, ssf_count)
                 if hashid:
                     if hashid not in skip_hashids:
-                        skip_hashids[hashid] = skip_ssf(ssf_df, fast_mod_cycles)
+                        skip_hashids[hashid] = skip_ssf(ssf_df, vol_mod_cycles, pwduty_mod_cycles)
                     if skip_hashids[hashid]:
                         skip_ssfs.add(ssf)
                     else:
