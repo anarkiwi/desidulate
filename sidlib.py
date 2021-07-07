@@ -284,7 +284,7 @@ def mask_not_pulse(ssf_df):
 def calc_clock_diff(ssf_df, cutoff):
     clock_diffs = ssf_df['clock'].diff().astype(pd.Float64Dtype())
     clock_diff_mean = clock_diffs.mean()
-    if clock_diff_mean < cutoff:
+    if pd.isna(clock_diff_mean) or clock_diff_mean < cutoff:
         return clock_diff_mean
     return clock_diffs.quantile(0.95).mean()
 
@@ -298,15 +298,17 @@ def normalize_ssf(ssf_df, remap_ssf_dfs, ssf_noclock_dfs, ssf_dfs, ssf_count, pw
         # Skip SSFs with very high rate volume changes.
         if ssf_df['volnunique'].max() > 2:
             vol_ssf_df = squeeze_diffs(ssf_df[['clock', 'vol']], ['vol'])
-            if calc_clock_diff(vol_ssf_df, 256) < 256:
+            clock_diff_mean = calc_clock_diff(vol_ssf_df, 256)
+            if pd.notna(clock_diff_mean) and clock_diff_mean < 256:
                 return None
         # Skip SSFs with very high PW duty cycle changes, or high PW duty cycle changes with many values.
         elif mask_not_pulse(ssf_df) and ssf_df['pwduty1nunique'].max() > 1:
             clock_diff_mean = calc_clock_diff(pwduty_clock_diffs, 256)
-            if clock_diff_mean < 256:
-                return None
-            if clock_diff_mean < 4096 and ssf_df['pwduty1nunique'].max() > 32:
-                return None
+            if pd.notna(clock_diff_mean):
+                if clock_diff_mean < 256:
+                    return None
+                if clock_diff_mean < 4096 and ssf_df['pwduty1nunique'].max() > 32:
+                    return None
 
     hashid = hash_df(ssf_df)
     if hashid not in ssf_dfs:
