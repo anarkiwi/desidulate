@@ -284,7 +284,7 @@ def normalize_ssf(ssf_df, remap_ssf_dfs, ssf_noclock_dfs, ssf_dfs, ssf_count):
         if (ssf_df['volnunique'].max() > 4 or ssf_df['pwduty1nunique'].max() > 1):
             clock_diffs = ssf_df['clock'].diff().astype(pd.Float64Dtype())
             clock_diff_mean = clock_diffs.mean()
-            if clock_diff_mean < 128:
+            if clock_diff_mean < 256:
                 return None
             clock_diff_mean = clock_diffs.quantile(0.95).mean()
             if clock_diff_mean < 256:
