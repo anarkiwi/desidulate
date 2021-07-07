@@ -288,6 +288,8 @@ def mask_not_pulse(ssf_df):
 
 def fast_clock_diff(ssf_df, fast_mod_cycles):
     diffs = ssf_df['clock'].diff()
+    if diffs.min() > fast_mod_cycles:
+        return False
     if diffs.mean() < fast_mod_cycles:
         return True
     return diffs.quantile(0.95).mean() < fast_mod_cycles
