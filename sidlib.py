@@ -376,8 +376,8 @@ def split_ssf(sid, df):
     for hashid in skip_hashids:
         skip_ssf_dfs[hashid] = ssf_dfs[hashid]
         skip_ssf_count[hashid] = ssf_count[hashid]
-        del skip_ssf_dfs[hashid]
-        del skip_ssf_count[hashid]
+        del ssf_dfs[hashid]
+        del ssf_count[hashid]
 
     for x, y in ((ssf_dfs, ssf_count),
                  (control_ssf_dfs, control_ssf_count),
