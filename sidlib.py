@@ -295,9 +295,9 @@ def normalize_ssf(ssf_df, remap_ssf_dfs, ssf_noclock_dfs, ssf_dfs, ssf_count):
                 return None
         elif mask_not_pulse(ssf_df) and ssf_df['pwduty1nunique'].max() > 1:
             clock_diff_mean = calc_clock_diff(ssf_df, 4096)
-            if calc_clock_diff < 256:
+            if clock_diff_mean < 256:
                 return None
-            if calc_clock_diff < 4096 and ssf_df['pwduty1nunique'].max() > 8:
+            if clock_diff_mean < 4096 and ssf_df['pwduty1nunique'].max() > 8:
                 return None
 
     hashid = hash_df(ssf_df)
