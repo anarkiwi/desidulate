@@ -13,6 +13,8 @@ import numpy as np
 from pyresidfp import SoundInterfaceDevice
 from pyresidfp.sound_interface_device import ChipModel
 
+FAST_MOD_HZ = 256
+
 
 def set_sid_dtype(df):
     df.dtype = pd.UInt64Dtype()
@@ -281,15 +283,11 @@ def mask_not_pulse(ssf_df):
     return ssf_df['tri1'].max() == 0 and ssf_df['saw1'].max() == 0 and ssf_df['noise1'].max() == 0
 
 
-def calc_clock_diff(ssf_df, cutoff):
-    clock_diffs = ssf_df['clock'].diff().astype(pd.Float64Dtype())
-    clock_diff_mean = clock_diffs.mean()
-    if pd.isna(clock_diff_mean) or clock_diff_mean < cutoff:
-        return clock_diff_mean
-    return clock_diffs.quantile(0.95).mean()
+def calc_clock_diff(ssf_df):
+    return ssf_df['clock'].diff().astype(pd.UInt64Dtype()).mean()
 
 
-def normalize_ssf(ssf_df, remap_ssf_dfs, ssf_noclock_dfs, ssf_dfs, ssf_count, pwduty_clock_diffs):
+def skip_ssf(ssf_df, fast_mod_cycles):
     # Skip SSFs with sample playback.
     if len(ssf_df) > 2 and ssf_df['frame'].nunique() > 2:
         # https://codebase64.org/doku.php?id=base:vicious_sid_demo_routine_explained
@@ -298,18 +296,20 @@ def normalize_ssf(ssf_df, remap_ssf_dfs, ssf_noclock_dfs, ssf_dfs, ssf_count, pw
         # Skip SSFs with very high rate volume changes.
         if ssf_df['volnunique'].max() > 2:
             vol_ssf_df = squeeze_diffs(ssf_df[['clock', 'vol']], ['vol'])
-            clock_diff_mean = calc_clock_diff(vol_ssf_df, 256)
-            if pd.notna(clock_diff_mean) and clock_diff_mean < 256:
-                return None
+            clock_diff_mean = calc_clock_diff(vol_ssf_df)
+            if pd.notna(clock_diff_mean) and clock_diff_mean < fast_mod_cycles:
+                return True
         # Skip SSFs with very high PW duty cycle changes, or high PW duty cycle changes with many values.
         elif mask_not_pulse(ssf_df) and ssf_df['pwduty1nunique'].max() > 1:
-            clock_diff_mean = calc_clock_diff(pwduty_clock_diffs, 256)
+            pwduty_clock_diffs = squeeze_diffs(ssf_df[['clock', 'pwduty1']], ['pwduty1'])
+            clock_diff_mean = calc_clock_diff(pwduty_clock_diffs)
             if pd.notna(clock_diff_mean):
-                if clock_diff_mean < 256:
-                    return None
-                if clock_diff_mean < 4096 and ssf_df['pwduty1nunique'].max() > 32:
-                    return None
+                if clock_diff_mean < fast_mod_cycles:
+                    return True
+    return False
 
+
+def normalize_ssf(ssf_df, remap_ssf_dfs, ssf_noclock_dfs, ssf_dfs, ssf_count):
     hashid = hash_df(ssf_df)
     if hashid not in ssf_dfs:
         if hashid in remap_ssf_dfs:
@@ -326,11 +326,12 @@ def normalize_ssf(ssf_df, remap_ssf_dfs, ssf_noclock_dfs, ssf_dfs, ssf_count, pw
             else:
                 ssf_dfs[hashid] = ssf_df
                 ssf_noclock_dfs[hashid_noclock] = hashid
+
     ssf_count[hashid] +=1
     return hashid
 
 
-def split_ssf(df):
+def split_ssf(sid, df):
     ssf_log = []
     ssf_dfs = {}
     ssf_count = defaultdict(int)
@@ -338,9 +339,12 @@ def split_ssf(df):
     control_ssf_count = defaultdict(int)
     remap_ssf_dfs = {}
     ssf_noclock_dfs = {}
-    pwduty_clock_diffs = {}
+    skip_hashids = {}
+    fast_mod_cycles = int(sid.clock_freq / FAST_MOD_HZ)
 
     for v, v_df, v_control_df in split_vdf(df):
+        skip_ssfs = set()
+
         for _, size_ssf_df in v_df.groupby(['ssf_size']):
             for ssf, group_ssf_df in size_ssf_df.drop(['ssf_size'], axis=1).groupby(['ssf']):
                 ssf_df = group_ssf_df.drop(['ssf'], axis=1).copy()
@@ -348,39 +352,57 @@ def split_ssf(df):
                 orig_clock = ssf_df['clock'].min()
                 ssf_df['clock'] -= ssf_df['clock'].min()
                 ssf_df['frame'] -= ssf_df['frame'].min()
-                pwduty_clock_diffs[ssf] = squeeze_diffs(ssf_df[['clock', 'pwduty1']], ['pwduty1'])
-                hashid = normalize_ssf(ssf_df, remap_ssf_dfs, ssf_noclock_dfs, ssf_dfs, ssf_count, pwduty_clock_diffs[ssf])
+                hashid = normalize_ssf(ssf_df, remap_ssf_dfs, ssf_noclock_dfs, ssf_dfs, ssf_count)
                 if hashid:
-                    ssf_log.append({'clock': orig_clock, 'hashid': hashid, 'voice': v})
+                    if hashid not in skip_hashids:
+                        skip_hashids[hashid] = skip_ssf(ssf_df, fast_mod_cycles)
+                    if skip_hashids[hashid]:
+                        skip_ssfs.add(ssf)
+                    else:
+                        ssf_log.append({'clock': orig_clock, 'hashid': hashid, 'voice': v})
         for _, size_ssf_df in v_control_df.groupby(['ssf_size']):
             for ssf, group_ssf_df in size_ssf_df.drop(['ssf_size'], axis=1).groupby(['ssf']):
+                if ssf in skip_ssfs:
+                    continue
                 ssf_df = group_ssf_df.drop(['ssf'], axis=1).copy()
                 ssf_df.reset_index(level=0, inplace=True)
                 ssf_df['clock'] -= ssf_df['clock'].min()
                 ssf_df['frame'] -= ssf_df['frame'].min()
-                normalize_ssf(ssf_df, remap_ssf_dfs, ssf_noclock_dfs, control_ssf_dfs, control_ssf_count, pwduty_clock_diffs[ssf])
-    return ssf_log, ssf_dfs, ssf_count, control_ssf_dfs, control_ssf_count
+                normalize_ssf(ssf_df, remap_ssf_dfs, ssf_noclock_dfs, control_ssf_dfs, control_ssf_count)
 
-
-def state2ssfs(df):
-    ssf_log, ssf_dfs, ssf_count, control_ssf_dfs, control_ssf_count = split_ssf(df)
+    skip_ssf_dfs = {}
+    skip_ssf_count = {}
+    skip_hashids = {hashid for hashid, skip in skip_hashids.items() if skip}
+    for hashid in skip_hashids:
+        skip_ssf_dfs[hashid] = ssf_dfs[hashid]
+        skip_ssf_count[hashid] = ssf_count[hashid]
+        del skip_ssf_dfs[hashid]
+        del skip_ssf_count[hashid]
 
     for x, y in ((ssf_dfs, ssf_count),
-                 (control_ssf_dfs, control_ssf_count)):
+                 (control_ssf_dfs, control_ssf_count),
+                 (skip_ssf_dfs, skip_ssf_count)):
         for hashid, count in y.items():
             x[hashid]['count'] = count
             x[hashid]['hashid'] = hashid
 
     def concat_dfs(x, y):
-        return pd.concat([
-            x[hashid] for hashid, count in sorted(y.items(), key=lambda i: i[1], reverse=True)]).set_index('hashid')
+        if x and y:
+            return pd.concat([
+                x[hashid] for hashid, count in sorted(y.items(), key=lambda i: i[1], reverse=True)]).set_index('hashid')
+        return pd.DataFrame()
 
-    ssf_log_df = None
-    ssf_df = None
-    control_ssf_df = None
+    ssf_log_df = pd.DataFrame()
     if ssf_log:
         ssf_log_df = pd.DataFrame(
             ssf_log, dtype=pd.Int64Dtype()).set_index('clock').sort_index()
-        ssf_df = concat_dfs(ssf_dfs, ssf_count)
-        control_ssf_df = concat_dfs(control_ssf_dfs, control_ssf_count)
-    return ssf_log_df, ssf_df, control_ssf_df
+
+    ssf_df = concat_dfs(ssf_dfs, ssf_count)
+    control_ssf_df = concat_dfs(control_ssf_dfs, control_ssf_count)
+    skip_ssf_df = concat_dfs(skip_ssf_dfs, skip_ssf_count)
+    return ssf_log_df, ssf_df, control_ssf_df, skip_ssf_df
+
+
+def state2ssfs(sid, df):
+    ssf_log_df, ssf_df, control_ssf_df, skip_ssf_df = split_ssf(sid, df)
+    return ssf_log_df, ssf_df, control_ssf_df, skip_ssf_df

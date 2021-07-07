@@ -24,9 +24,8 @@ args = parser.parse_args()
 
 sid = get_sid(args.pal)
 df = reg2state(sid, args.logfile, nrows=int(args.maxstates))
-ssf_log_df, ssf_df, control_ssf_df = state2ssfs(df)
-if ssf_log_df is not None and ssf_df is not None and control_ssf_df is not None:
-    ssf_log_df.to_csv(out_path(args.logfile, 'log.xz'))
-    ssf_df.to_csv(out_path(args.logfile, 'ssf.xz'))
-    control_ssf_df.to_csv(out_path(args.logfile, 'control_ssf.xz'))
-assert ssf_log_df is not None, 'no SSFs present: voiceless sample playback?'
+ssf_log_df, ssf_df, control_ssf_df, skip_ssf_df = state2ssfs(sid, df)
+ssf_log_df.to_csv(out_path(args.logfile, 'log.xz'))
+ssf_df.to_csv(out_path(args.logfile, 'ssf.xz'))
+control_ssf_df.to_csv(out_path(args.logfile, 'control_ssf.xz'))
+skip_ssf_df.to_csv(out_path(args.logfile, 'skip_ssf.xz'))

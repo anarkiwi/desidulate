@@ -57,7 +57,7 @@ class SSFTestCase(unittest.TestCase):
                 '1 13 255',
                 '100 11 129',
                 '100000 11 0')) + '\n')
-        ssf_log_df, ssf_df, _ = state2ssfs(reg2state(sid, test_log))
+        ssf_log_df, ssf_df, _, _ = state2ssfs(sid, reg2state(sid, test_log))
         ssf_log_df.reset_index(level=0, inplace=True)
         ssf_df.reset_index(level=0, inplace=True)
         ssf_df = add_freq_notes_df(sid, ssf_df)
