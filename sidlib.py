@@ -252,6 +252,7 @@ def split_vdf(df):
         v_df.loc[(v_df['test1'] == 1) & (v_df['pulse1'] != 1), ['freq1', 'sync1', 'ring1', 'tri1', 'saw1', 'pulse1', 'noise1', 'pwduty1', 'freq3', 'test3']] = pd.NA
         v_df.loc[~((v_df['sync1'] == 1) | ((v_df['ring1'] == 1) & (v_df['tri1'] == 1))), ['freq3', 'test3']] = pd.NA
         v_df.loc[v_df['gate1'] == 0, ['atk1', 'dec1', 'sus1', 'rel1']] = pd.NA
+        v_df.loc[(v_df['gate1'] == 0) & (v_df['tri1'] != 1) & (v_df['saw1'] != 1) & (v_df['noise1'] != 1) & (v_df['pulse1'] != 1), ['freq1']] = pd.NA
         v_df.loc[v_df['flt1'] != 1, fltcols] = pd.NA
         v_df.loc[v_df['pulse1'] != 1, ['pwduty1']] = pd.NA
         v_df = v_df.drop([diff_gate_on], axis=1)
