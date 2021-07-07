@@ -282,7 +282,7 @@ def normalize_ssf(ssf_df, remap_ssf_dfs, ssf_noclock_dfs, ssf_dfs, ssf_count):
         # http://sid.kubarth.com/articles/the_c64_digi.txt
         # http://www.ffd2.com/fridge/chacking/c=hacking21.txt
         if (ssf_df['volnunique'].max() > 4 or ssf_df['pwduty1nunique'].max() > 1):
-            clock_diff_mean = ssf_df['clock'].diff().mean()
+            clock_diff_mean = ssf_df['clock'].diff().astype(pd.Float64Dtype()).quantile(0.95).mean()
             if clock_diff_mean < 256:
                 return None
             if ssf_df['pwduty1nunique'].max() > 8 and clock_diff_mean < 4096:
