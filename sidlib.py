@@ -251,8 +251,8 @@ def split_vdf(df):
         v_df = v_df.loc[(v_df[diff_cols].shift() != v_df[diff_cols]).any(axis=1)]
         v_df = v_df[v_df.groupby('ssf', sort=False)['vol'].transform('max') > 0]
         v_df = v_df[v_df.groupby('ssf', sort=False)['test1'].transform('min') < 1]
-        v_df['pwduty1nunique'] = v_df.groupby(['ssf'], sort=False)['pwduty1'].transform('nunique').astype(np.uint64)
-        v_df['volnunique'] = v_df.groupby(['ssf'], sort=False)['vol'].transform('nunique').astype(np.uint64)
+        for ncol in ['freq1', 'pwduty1', 'vol']:
+            v_df['%snunique'] = v_df.groupby(['ssf'], sort=False)[ncol].transform('nunique').astype(np.uint64)
         control_ignore_diff_cols = ['freq1', 'freq3', 'pwduty1', 'fltcoff']
         for col in control_ignore_diff_cols:
             diff_cols.remove(col)
@@ -273,20 +273,21 @@ def jittermatch_df(df1, df2, jitter_col, jitter_max):
     return pd.notna(diff_max) and diff_max < jitter_max
 
 
-def fast_update_ssf(ssf_df):
-    return ssf_df['frame'].max() > 2 and ssf_df['clock'].diff().mean() < 128
-
-
 def mask_not_pulse(ssf_df):
     return ssf_df['tri1'].max() == 0 and ssf_df['saw1'].max() == 0 and ssf_df['noise1'].max() == 0
 
 
 def normalize_ssf(ssf_df, remap_ssf_dfs, ssf_noclock_dfs, ssf_dfs, ssf_count):
-    if mask_not_pulse(ssf_df):
+    if ssf_df['frame'].max() > 2 and mask_not_pulse(ssf_df):
         # http://sid.kubarth.com/articles/the_c64_digi.txt
         # http://www.ffd2.com/fridge/chacking/c=hacking21.txt
-        if (ssf_df['volnunique'].max() > 4 or ssf_df['pwduty1nunique'].max() > 1) and fast_update_ssf(ssf_df):
-            return None
+        if (ssf_df['volnunique'].max() > 4 or ssf_df['pwduty1nunique'].max() > 1):
+            clock_diff_mean = ssf_df['clock'].diff().mean()
+            if clock_diff_mean < 256:
+                return None
+            if ssf_df['pwduty1nunique'].max() > 8 and clock_diff_mean < 4096:
+                return None
+
     hashid = hash_df(ssf_df)
     if hashid not in ssf_dfs:
         if hashid in remap_ssf_dfs:
