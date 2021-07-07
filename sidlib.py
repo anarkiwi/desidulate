@@ -252,7 +252,7 @@ def split_vdf(df):
         v_df = v_df[v_df.groupby('ssf', sort=False)['vol'].transform('max') > 0]
         v_df = v_df[v_df.groupby('ssf', sort=False)['test1'].transform('min') < 1]
         for ncol in ['freq1', 'pwduty1', 'vol']:
-            v_df['%snunique'] = v_df.groupby(['ssf'], sort=False)[ncol].transform('nunique').astype(np.uint64)
+            v_df['%snunique' % ncol] = v_df.groupby(['ssf'], sort=False)[ncol].transform('nunique').astype(np.uint64)
         control_ignore_diff_cols = ['freq1', 'freq3', 'pwduty1', 'fltcoff']
         for col in control_ignore_diff_cols:
             diff_cols.remove(col)
