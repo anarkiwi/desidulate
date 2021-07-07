@@ -277,19 +277,27 @@ def mask_not_pulse(ssf_df):
     return ssf_df['tri1'].max() == 0 and ssf_df['saw1'].max() == 0 and ssf_df['noise1'].max() == 0
 
 
+def calc_clock_diff(ssf_df, cutoff):
+    clock_diffs = ssf_df['clock'].diff().astype(pd.Float64Dtype())
+    clock_diff_mean = clock_diffs.mean()
+    if clock_diff_mean < cutoff:
+        return clock_diff_mean
+    return clock_diffs.quantile(0.95).mean()
+
+
 def normalize_ssf(ssf_df, remap_ssf_dfs, ssf_noclock_dfs, ssf_dfs, ssf_count):
-    if ssf_df['frame'].max() > 2 and mask_not_pulse(ssf_df):
-        # http://sid.kubarth.com/articles/the_c64_digi.txt
+    if ssf_df['frame'].max() > 2:
+        # https://codebase64.org/doku.php?id=base:vicious_sid_demo_routine_explained
         # http://www.ffd2.com/fridge/chacking/c=hacking21.txt
-        if (ssf_df['volnunique'].max() > 4 or ssf_df['pwduty1nunique'].max() > 1):
-            clock_diffs = ssf_df['clock'].diff().astype(pd.Float64Dtype())
-            clock_diff_mean = clock_diffs.mean()
-            if clock_diff_mean < 256:
+        # http://www.ffd2.com/fridge/chacking/c=hacking20.txt
+        if ssf_df['volnunique'].max() > 4:
+            if calc_clock_diff(ssf_df, 256) < 256:
                 return None
-            clock_diff_mean = clock_diffs.quantile(0.95).mean()
-            if clock_diff_mean < 256:
+        elif mask_not_pulse(ssf_df) and ssf_df['pwduty1nunique'].max() > 1:
+            clock_diff_mean = calc_clock_diff(ssf_df, 4096)
+            if calc_clock_diff < 256:
                 return None
-            if ssf_df['pwduty1nunique'].max() > 8 and clock_diff_mean < 4096:
+            if calc_clock_diff < 4096 and ssf_df['pwduty1nunique'].max() > 8:
                 return None
 
     hashid = hash_df(ssf_df)
