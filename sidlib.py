@@ -115,11 +115,6 @@ def get_sid(pal):
     return SidWrap(pal)
 
 
-def hash_df(df):
-    rows_hash = pd.Series((hash(r) for r in df.drop(['frame'], axis=1).itertuples(index=False, name=None)))
-    return hash(tuple(rows_hash))
-
-
 # Read a VICE "-sounddev dump" register dump (emulator or vsid)
 def reg2state(sid, snd_log_name, nrows=(10 * 1e6)):
 
@@ -244,6 +239,8 @@ def split_vdf(df):
         v_df.columns = renamed_cols(v, cols)
         v_df = set_sid_dtype(v_df)
         col = 'gate1'
+        if v_df[col].max() != 1:
+            continue
         diff_gate_on = 'diff_on_%s' % col
         v_df[diff_gate_on] = v_df[col].astype(np.int8).diff(periods=1).fillna(0).astype(pd.Int8Dtype())
         v_df['ssf'] = v_df[diff_gate_on]
@@ -315,22 +312,31 @@ def skip_ssf(ssf_df, vol_mod_cycles, pwduty_mod_cycles):
     return False
 
 
+def hash_series(s):
+    n = s.to_numpy()
+    n.flags.writeable = False
+    return hash(n.tobytes())
+
+
 def normalize_ssf(ssf_df, remap_ssf_dfs, ssf_noclock_dfs, ssf_dfs, ssf_count):
-    hashid = hash_df(ssf_df)
+    hashid_noclock = hash_series(ssf_df['row_hash'])
+    hashid_clock = hash_series(ssf_df['clock'])
+    hashid = hash((hashid_clock, hashid_noclock))
+
     if hashid not in ssf_dfs:
         if hashid in remap_ssf_dfs:
             remapped_hashid = remap_ssf_dfs[hashid]
             hashid = remapped_hashid
         else:
-            ssf_noclock_df = ssf_df.drop(['clock'], axis=1)
+            ssf_noclock_df = ssf_df.drop(['clock', 'row_hash'], axis=1)
             even_frame = int(ssf_noclock_df['frame'].max() / 2) * 2
-            hashid_noclock = (hash_df(ssf_noclock_df), even_frame)
+            hashid_noclock = (hashid_noclock, even_frame)
             remapped_hashid = ssf_noclock_dfs.get(hashid_noclock, None)
             if remapped_hashid is not None and jittermatch_df(ssf_dfs[remapped_hashid], ssf_df, 'clock', 1024):
                 remap_ssf_dfs[hashid] = remapped_hashid
                 hashid = remapped_hashid
             else:
-                ssf_dfs[hashid] = ssf_df
+                ssf_dfs[hashid] = ssf_df.drop(['row_hash'], axis=1)
                 ssf_noclock_dfs[hashid_noclock] = hashid
 
     ssf_count[hashid] +=1
@@ -351,6 +357,8 @@ def split_ssf(sid, df):
 
     for v, v_df, v_control_df in split_vdf(df):
         skip_ssfs = set()
+        v_df['row_hash'] = v_df.drop(['frame', 'ssf', 'ssf_size'], axis=1).apply(lambda r: hash(tuple(r)), axis=1)
+        v_control_df['row_hash'] = v_control_df.drop(['frame', 'ssf', 'ssf_size'], axis=1).apply(lambda r: hash(tuple(r)), axis=1)
 
         for _, size_ssf_df in v_df.groupby(['ssf_size']):
             for ssf, group_ssf_df in size_ssf_df.drop(['ssf_size'], axis=1).groupby(['ssf']):
