@@ -314,7 +314,6 @@ def skip_ssf(ssf_df, vol_mod_cycles, pwduty_mod_cycles):
 
 def hash_series(s):
     n = s.to_numpy()
-    n.flags.writeable = False
     return hash(n.tobytes())
 
 
