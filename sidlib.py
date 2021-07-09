@@ -327,8 +327,8 @@ def normalize_ssf(ssf_df, remap_ssf_dfs, ssf_noclock_dfs, ssf_dfs, ssf_count):
             remapped_hashid = remap_ssf_dfs[hashid]
             hashid = remapped_hashid
         else:
-            ssf_noclock_df = ssf_df.drop(['clock', 'row_hash'], axis=1)
-            even_frame = int(ssf_noclock_df['frame'].max() / 2) * 2
+            ssf_df['frame'] -= ssf_df['frame'].min()
+            even_frame = int(ssf_df['frame'].max() / 2) * 2
             hashid_noclock = (hashid_noclock, even_frame)
             remapped_hashid = ssf_noclock_dfs.get(hashid_noclock, None)
             if remapped_hashid is not None and jittermatch_df(ssf_dfs[remapped_hashid], ssf_df, 'clock', 1024):
@@ -365,7 +365,6 @@ def split_ssf(sid, df):
                 ssf_df.reset_index(level=0, inplace=True)
                 orig_clock = ssf_df['clock'].min()
                 ssf_df['clock'] -= ssf_df['clock'].min()
-                ssf_df['frame'] -= ssf_df['frame'].min()
                 hashid = normalize_ssf(ssf_df, remap_ssf_dfs, ssf_noclock_dfs, ssf_dfs, ssf_count)
                 if hashid:
                     if hashid not in skip_hashids:
@@ -381,7 +380,6 @@ def split_ssf(sid, df):
                 ssf_df = group_ssf_df.drop(['ssf'], axis=1).copy()
                 ssf_df.reset_index(level=0, inplace=True)
                 ssf_df['clock'] -= ssf_df['clock'].min()
-                ssf_df['frame'] -= ssf_df['frame'].min()
                 normalize_ssf(ssf_df, remap_ssf_dfs, ssf_noclock_dfs, control_ssf_dfs, control_ssf_count)
 
     skip_ssf_dfs = {}
