@@ -350,23 +350,41 @@ def split_ssf(sid, df):
     control_ssf_count = defaultdict(int)
     remap_ssf_dfs = {}
     ssf_noclock_dfs = {}
+    control_remap_ssf_dfs = {}
+    control_ssf_noclock_dfs = {}
     skip_hashids = {}
     vol_mod_cycles = int(sid.clock_freq / SKIP_VOL_MOD_HZ)
     pwduty_mod_cycles = int(sid.clock_freq / SKIP_PWDUTY_MOD_HZ)
 
     for v, v_df, v_control_df in split_vdf(df):
+        print(v)
         skip_ssfs = set()
-        v_df['row_hash'] = v_df.drop(['frame', 'ssf', 'ssf_size'], axis=1).apply(lambda r: hash(tuple(r)), axis=1)
-        v_control_df['row_hash'] = v_control_df.drop(['frame', 'ssf', 'ssf_size'], axis=1).apply(lambda r: hash(tuple(r)), axis=1)
+
+        v_df.reset_index(level=0, inplace=True)
+        uniq = v_df.drop(['clock', 'frame', 'ssf', 'ssf_size'], axis=1).drop_duplicates(ignore_index=True)
+        uniq['row_hash'] = uniq.apply(lambda r: hash(tuple(r)), axis=1)
+        print(uniq)
+        merge_cols = list(uniq.columns)
+        merge_cols.remove('row_hash')
+        v_df = v_df.merge(uniq, how='left', on=merge_cols)
         v_df['ssf_hash'] = v_df.groupby(['ssf'], sort=False)['row_hash'].transform(hash_series).astype(np.uint64)
-        v_control_df['ssf_hash'] = v_control_df.groupby(['ssf'], sort=False)['row_hash'].transform(hash_series).astype(np.uint64)
         v_df.drop(['row_hash'], inplace=True, axis=1)
+
+        v_control_df.reset_index(level=0, inplace=True)
+        uniq = v_control_df.drop(['clock', 'frame', 'ssf', 'ssf_size'], axis=1).drop_duplicates(ignore_index=True)
+        uniq['row_hash'] = uniq.apply(lambda r: hash(tuple(r)), axis=1)
+        merge_cols = list(uniq.columns)
+        merge_cols.remove('row_hash')
+        v_control_df = v_control_df.merge(uniq, how='left', on=merge_cols)
+        v_control_df['ssf_hash'] = v_control_df.groupby(['ssf'], sort=False)['row_hash'].transform(hash_series).astype(np.uint64)
         v_control_df.drop(['row_hash'], inplace=True, axis=1)
+
+        print(v_df)
+        print(v_df.columns)
 
         for _, size_ssf_df in v_df.groupby(['ssf_size']):
             for ssf, group_ssf_df in size_ssf_df.drop(['ssf_size'], axis=1).groupby(['ssf']):
-                ssf_df = group_ssf_df.drop(['ssf'], axis=1).copy()
-                ssf_df.reset_index(level=0, inplace=True)
+                ssf_df = group_ssf_df.drop(['ssf'], axis=1).copy().reset_index(drop=True)
                 orig_clock = ssf_df['clock'].min()
                 ssf_df['clock'] -= ssf_df['clock'].min()
                 hashid = normalize_ssf(ssf_df, remap_ssf_dfs, ssf_noclock_dfs, ssf_dfs, ssf_count)
@@ -382,9 +400,8 @@ def split_ssf(sid, df):
                 if ssf in skip_ssfs:
                     continue
                 ssf_df = group_ssf_df.drop(['ssf'], axis=1).copy()
-                ssf_df.reset_index(level=0, inplace=True)
                 ssf_df['clock'] -= ssf_df['clock'].min()
-                normalize_ssf(ssf_df, remap_ssf_dfs, ssf_noclock_dfs, control_ssf_dfs, control_ssf_count)
+                normalize_ssf(ssf_df, control_remap_ssf_dfs, control_ssf_noclock_dfs, control_ssf_dfs, control_ssf_count)
 
     skip_ssf_dfs = {}
     skip_ssf_count = {}
