@@ -14,9 +14,9 @@ from pyresidfp import SoundInterfaceDevice
 from pyresidfp.sound_interface_device import ChipModel
 
 # SSFs with vol modulation > than this, rejected
-SKIP_VOL_MOD_HZ = 1000
+SKIP_VOL_MOD_HZ = 2000
 # SSFs with pwduty modulation > than this, rejected
-SKIP_PWDUTY_MOD_HZ = 256
+SKIP_PWDUTY_MOD_HZ = 2000
 
 
 def set_sid_dtype(df):
@@ -231,6 +231,17 @@ def split_vdf(df):
             new_cols.append(col)
         return new_cols
 
+    def hash_vdf(vdf):
+        vdf.reset_index(level=0, inplace=True)
+        uniq = vdf.drop(['clock', 'frame', 'ssf', 'ssf_size'], axis=1).drop_duplicates(ignore_index=True)
+        uniq['row_hash'] = uniq.apply(lambda r: hash(tuple(r)), axis=1)
+        merge_cols = list(uniq.columns)
+        merge_cols.remove('row_hash')
+        vdf = vdf.merge(uniq, how='left', on=merge_cols)
+        vdf['ssf_hash'] = vdf.groupby(['ssf'], sort=False)['row_hash'].transform(hash_series).astype(np.uint64)
+        vdf.drop(['row_hash'], inplace=True, axis=1)
+        return vdf
+
     for v in (1, 2, 3):
         if df['gate%u' % v].max() == 0:
             continue
@@ -267,7 +278,7 @@ def split_vdf(df):
         v_control_df = squeeze_diffs(v_control_df, diff_cols)
         v_df['ssf_size'] = v_df.groupby(['ssf'], sort=False)['ssf'].transform('size').astype(np.uint64)
         v_control_df['ssf_size'] = v_control_df.groupby(['ssf'], sort=False)['ssf'].transform('size').astype(np.uint64)
-        yield (v, v_df, v_control_df)
+        yield (v, hash_vdf(v_df), hash_vdf(v_control_df))
 
 
 def jittermatch_df(df1, df2, jitter_col, jitter_max):
@@ -356,22 +367,8 @@ def split_ssf(sid, df):
     vol_mod_cycles = int(sid.clock_freq / SKIP_VOL_MOD_HZ)
     pwduty_mod_cycles = int(sid.clock_freq / SKIP_PWDUTY_MOD_HZ)
 
-    def hash_vdf(vdf):
-        vdf.reset_index(level=0, inplace=True)
-        uniq = vdf.drop(['clock', 'frame', 'ssf', 'ssf_size'], axis=1).drop_duplicates(ignore_index=True)
-        uniq['row_hash'] = uniq.apply(lambda r: hash(tuple(r)), axis=1)
-        merge_cols = list(uniq.columns)
-        merge_cols.remove('row_hash')
-        vdf = vdf.merge(uniq, how='left', on=merge_cols)
-        vdf['ssf_hash'] = vdf.groupby(['ssf'], sort=False)['row_hash'].transform(hash_series).astype(np.uint64)
-        vdf.drop(['row_hash'], inplace=True, axis=1)
-        return vdf
-
     for v, v_df, v_control_df in split_vdf(df):
         skip_ssfs = set()
-        v_df = hash_vdf(v_df)
-        v_control_df = hash_vdf(v_control_df)
-
         for _, size_ssf_df in v_df.groupby(['ssf_size']):
             for ssf, group_ssf_df in size_ssf_df.drop(['ssf_size'], axis=1).groupby(['ssf']):
                 ssf_df = group_ssf_df.drop(['ssf'], axis=1).copy().reset_index(drop=True)
@@ -385,10 +382,10 @@ def split_ssf(sid, df):
                         skip_ssfs.add(ssf)
                     else:
                         ssf_log.append({'clock': orig_clock, 'hashid': hashid, 'voice': v})
+        if skip_ssfs:
+            v_control_df = v_control_df[~v_control_df['ssf'].isin(skip_ssfs)]
         for _, size_ssf_df in v_control_df.groupby(['ssf_size']):
             for ssf, group_ssf_df in size_ssf_df.drop(['ssf_size'], axis=1).groupby(['ssf']):
-                if ssf in skip_ssfs:
-                    continue
                 ssf_df = group_ssf_df.drop(['ssf'], axis=1).copy().reset_index(drop=True)
                 ssf_df['clock'] -= ssf_df['clock'].min()
                 normalize_ssf(ssf_df, control_remap_ssf_dfs, control_ssf_noclock_dfs, control_ssf_dfs, control_ssf_count)
