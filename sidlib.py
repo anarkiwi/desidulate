@@ -328,8 +328,7 @@ def hash_series(s):
     return hash(n.tobytes())
 
 
-def normalize_ssf(ssf_df, remap_ssf_dfs, ssf_noclock_dfs, ssf_dfs, ssf_count):
-    hashid_noclock = ssf_df['ssf_hash'].min()
+def normalize_ssf(hashid_noclock, ssf_df, remap_ssf_dfs, ssf_noclock_dfs, ssf_dfs, ssf_count):
     hashid_clock = hash_series(ssf_df['clock'])
     hashid = hash((hashid_clock, hashid_noclock))
 
@@ -346,7 +345,7 @@ def normalize_ssf(ssf_df, remap_ssf_dfs, ssf_noclock_dfs, ssf_dfs, ssf_count):
                 remap_ssf_dfs[hashid] = remapped_hashid
                 hashid = remapped_hashid
             else:
-                ssf_dfs[hashid] = ssf_df.drop(['ssf_hash'], axis=1)
+                ssf_dfs[hashid] = ssf_df
                 ssf_noclock_dfs[hashid_noclock] = hashid
 
     ssf_count[hashid] +=1
@@ -370,25 +369,27 @@ def split_ssf(sid, df):
     for v, v_df, v_control_df in split_vdf(df):
         skip_ssfs = set()
         for _, size_ssf_df in v_df.groupby(['ssf_size']):
-            for ssf, group_ssf_df in size_ssf_df.drop(['ssf_size'], axis=1).groupby(['ssf']):
-                ssf_df = group_ssf_df.drop(['ssf'], axis=1).copy().reset_index(drop=True)
-                orig_clock = ssf_df['clock'].min()
-                ssf_df['clock'] -= ssf_df['clock'].min()
-                hashid = normalize_ssf(ssf_df, remap_ssf_dfs, ssf_noclock_dfs, ssf_dfs, ssf_count)
-                if hashid:
-                    if hashid not in skip_hashids:
-                        skip_hashids[hashid] = skip_ssf(ssf_df, vol_mod_cycles, pwduty_mod_cycles)
-                    if skip_hashids[hashid]:
-                        skip_ssfs.add(ssf)
-                    else:
-                        ssf_log.append({'clock': orig_clock, 'hashid': hashid, 'voice': v})
+            for ssf_hash, ssf_hash_sf in size_ssf_df.drop(['ssf_size'], axis=1).groupby(['ssf_hash']):
+                for ssf, group_ssf_df in ssf_hash_sf.drop(['ssf_hash'], axis=1).groupby(['ssf']):
+                    ssf_df = group_ssf_df.drop(['ssf'], axis=1).copy().reset_index(drop=True)
+                    orig_clock = ssf_df['clock'].min()
+                    ssf_df['clock'] -= ssf_df['clock'].min()
+                    hashid = normalize_ssf(ssf_hash, ssf_df, remap_ssf_dfs, ssf_noclock_dfs, ssf_dfs, ssf_count)
+                    if hashid:
+                        if hashid not in skip_hashids:
+                            skip_hashids[hashid] = skip_ssf(ssf_df, vol_mod_cycles, pwduty_mod_cycles)
+                        if skip_hashids[hashid]:
+                            skip_ssfs.add(ssf)
+                        else:
+                            ssf_log.append({'clock': orig_clock, 'hashid': hashid, 'voice': v})
         if skip_ssfs:
             v_control_df = v_control_df[~v_control_df['ssf'].isin(skip_ssfs)]
         for _, size_ssf_df in v_control_df.groupby(['ssf_size']):
-            for ssf, group_ssf_df in size_ssf_df.drop(['ssf_size'], axis=1).groupby(['ssf']):
-                ssf_df = group_ssf_df.drop(['ssf'], axis=1).copy().reset_index(drop=True)
-                ssf_df['clock'] -= ssf_df['clock'].min()
-                normalize_ssf(ssf_df, control_remap_ssf_dfs, control_ssf_noclock_dfs, control_ssf_dfs, control_ssf_count)
+            for ssf_hash, ssf_hash_sf in size_ssf_df.drop(['ssf_size'], axis=1).groupby(['ssf_hash']):
+                for ssf, group_ssf_df in ssf_hash_sf.drop(['ssf_hash'], axis=1).groupby(['ssf']):
+                    ssf_df = group_ssf_df.drop(['ssf'], axis=1).copy().reset_index(drop=True)
+                    ssf_df['clock'] -= ssf_df['clock'].min()
+                    normalize_ssf(ssf_hash, ssf_df, control_remap_ssf_dfs, control_ssf_noclock_dfs, control_ssf_dfs, control_ssf_count)
 
     skip_ssf_dfs = {}
     skip_ssf_count = {}
