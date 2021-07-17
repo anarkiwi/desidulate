@@ -126,11 +126,18 @@ def state2samples(orig_df, sid):
         f(row)
 
     diff_cols = {}
+    diffs = ['diff_clock']
+    cols = ['clock']
     for col in df.columns:
         diff_col = 'diff_%s' % col
-        df[diff_col] = df[col].diff().astype(pd.Int32Dtype())
         if col in funcs:
             diff_cols[diff_col] = col
+            diffs.append(diff_col)
+            cols.append(col)
+    diff_df = df[cols].diff().astype(pd.Int32Dtype())
+    diff_df.columns = diffs
+    df = df.join(diff_df)
+
     for row in df[1:].itertuples():
         raw_samples.extend(sid.add_samples(row.diff_clock))
         diffs_funcs = [funcs[v] for k, v in diff_cols.items() if getattr(row, k) != 0]
