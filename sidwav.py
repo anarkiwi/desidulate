@@ -7,7 +7,23 @@
 import numpy as np
 import pandas as pd
 import scipy.io.wavfile
+from sox.transform import Transformer
 from pyresidfp import ControlBits, ModeVolBits, ResFiltBits, Voice
+
+
+def mostf(self, threshold=0.65):
+    transf = Transformer()
+    ps = transf.power_spectrum(self.wav_file_name)
+    e = {f: n for f, n in ps if n}
+    s = sum(e.values())
+    if not s:
+        return 0
+    t = 0
+    for f, n in sorted(e.items()):
+        t += (n / s)
+        if t >= threshold:
+            return f
+    return f
 
 
 def state2samples(orig_df, sid):
