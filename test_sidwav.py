@@ -51,7 +51,7 @@ class SidWavTestCase(unittest.TestCase):
         for i in range(1, 5):
             test_raw_freq = int(i * 2048)
             test_real_freq = sid.real_sid_freq(test_raw_freq)
-            df = self._make_wav([
+            df = self._make_wav_df([
                 {'hashid': 1, 'count': 1, 'clock': 0, 'freq1': test_raw_freq, 'sus1': 15, 'gate1': 1, 'tri1': 1, 'vol': 15},
                 {'hashid': 1, 'count': 1, 'clock': 1e6 * 10, 'gate1': 0}])
             write_wav(test_wav, sid, state2samples(df, sid))
