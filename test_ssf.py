@@ -4,9 +4,40 @@ import os
 import tempfile
 import unittest
 import pandas as pd
-from sidlib import get_sid, reg2state, state2ssfs
+from io import StringIO
+from sidlib import get_sid, jittermatch_df, reg2state, state2ssfs
 from sidmidi import SidMidiFile
 from ssf import SidSoundFragment, add_freq_notes_df
+
+
+class SIDLibTestCase(unittest.TestCase):
+
+    def test_jittermatch(self):
+        ssf1 = StringIO('''
+clock,frame,freq1,pwduty1,gate1,sync1,ring1,test1,tri1,saw1,pulse1,noise1,atk1,dec1,sus1,rel1,vol,fltlo,fltband,flthi,flt1,fltext,fltres,fltcoff,freq3,test3,freq1nunique,pwduty1nunique,volnunique
+0,0,,,1,,,1,,,,,0,0,5,5,15,0,0,1,1,0,15,128,,,1,0,1
+19346,1,,,1,,,1,,,,,0,0,5,5,15,0,0,1,1,0,15,640,,,1,0,1
+19636,1,50416,,1,0,0,0,0,0,0,1,0,0,5,5,15,0,0,1,1,0,15,640,,,1,0,1
+39225,2,50416,,1,0,0,0,0,0,0,1,0,15,5,5,15,0,0,1,1,0,15,640,,,1,0,1
+39234,2,50416,,1,0,0,0,0,0,0,1,0,15,0,0,15,0,0,1,1,0,15,640,,,1,0,1
+39283,2,50416,,0,0,0,0,0,0,0,1,,,,,15,0,0,1,1,0,15,640,,,1,0,1
+''')
+        ssf2 = StringIO('''
+clock,frame,freq1,pwduty1,gate1,sync1,ring1,test1,tri1,saw1,pulse1,noise1,atk1,dec1,sus1,rel1,vol,fltlo,fltband,flthi,flt1,fltext,fltres,fltcoff,freq3,test3,freq1nunique,pwduty1nunique,volnunique
+0,0,,,1,,,1,,,,,0,0,5,5,15,0,0,1,1,0,15,128,,,1,0,1
+19410,1,,,1,,,1,,,,,0,0,5,5,15,0,0,1,1,0,15,640,,,1,0,1
+19700,1,50416,,1,0,0,0,0,0,0,1,0,0,5,5,15,0,0,1,1,0,15,640,,,1,0,1
+39289,2,50416,,1,0,0,0,0,0,0,1,0,15,5,5,15,0,0,1,1,0,15,640,,,1,0,1
+39298,2,50416,,1,0,0,0,0,0,0,1,0,15,0,0,15,0,0,1,1,0,15,640,,,1,0,1
+39347,2,50416,,0,0,0,0,0,0,0,1,,,,,15,0,0,1,1,0,15,640,,,1,0,1
+''')
+        df1 = pd.read_csv(ssf1, dtype=pd.UInt64Dtype())
+        df2 = pd.read_csv(ssf2, dtype=pd.UInt64Dtype())
+        self.assertEqual(
+            df1.drop(['clock'], axis=1).to_string(),
+            df2.drop(['clock'], axis=1).to_string())
+        self.assertTrue(jittermatch_df(df1, df2, 'clock', 1024))
+        self.assertFalse(jittermatch_df(df1, df2, 'clock', 32))
 
 
 class SSFTestCase(unittest.TestCase):
