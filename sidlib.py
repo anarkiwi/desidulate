@@ -232,9 +232,13 @@ def split_vdf(df):
         return new_cols
 
     def hash_vdf(vdf):
+
+        def row_hash(r):
+            return hash(tuple(r))
+
         vdf.reset_index(level=0, inplace=True)
         uniq = vdf.drop(['clock', 'frame', 'ssf', 'ssf_size'], axis=1).drop_duplicates(ignore_index=True)
-        uniq['row_hash'] = uniq.apply(lambda r: hash(tuple(r)), axis=1)
+        uniq['row_hash'] = uniq.apply(row_hash, axis=1)
         merge_cols = list(uniq.columns)
         merge_cols.remove('row_hash')
         vdf = vdf.merge(uniq, how='left', on=merge_cols)
@@ -324,8 +328,7 @@ def skip_ssf(ssf_df, vol_mod_cycles, pwduty_mod_cycles):
 
 
 def hash_series(s):
-    n = s.to_numpy()
-    return hash(n.tobytes())
+    return hash(tuple(s))
 
 
 def normalize_ssf(hashid_noclock, ssf_df, remap_ssf_dfs, ssf_noclock_dfs, ssf_dfs, ssf_count):
