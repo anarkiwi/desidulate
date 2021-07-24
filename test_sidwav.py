@@ -81,7 +81,7 @@ class SidWavTestCase(unittest.TestCase):
         ])
         self._same_samples(df1, df2)
 
-    def test_sus_change_before_gateoff(self):
+    def test_dec_sus_change_before_gateoff(self):
         gateon = {'hashid': 1, 'clock': 0, 'freq1': 1000, 'dec': 2, 'sus1': 10, 'gate1': 1, 'tri1': 1, 'vol': 15}
         gateoff = {'hashid': 1, 'clock': 1e4 * 30, 'gate1': 0}
         end = {'hashid': 1, 'clock': 1e4 * 60, 'freq1': 0}
