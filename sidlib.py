@@ -268,10 +268,12 @@ def split_vdf(df):
         v_df.loc[v_df['pulse1'] != 1, ['pwduty1']] = pd.NA
         ads_df = v_df[v_df[diff_gate_on] == 1][['ssf', 'atk1', 'dec1', 'sus1']]
         r_df = v_df[v_df[diff_gate_on] == -1][['ssf', 'rel1']]
-        v_df = v_df.drop([diff_gate_on, 'atk1', 'dec1', 'sus1', 'rel1'], axis=1)
+        v_df = v_df.drop(['atk1', 'dec1', 'sus1', 'rel1'], axis=1)
         v_df = v_df.reset_index()
         v_df = v_df.merge(ads_df, on='ssf', right_index=False)
         v_df = v_df.merge(r_df, on='ssf', right_index=False)
+        v_df.loc[v_df[diff_gate_on] != 1, ['atk1', 'dec1', 'sus1', 'rel1']] = pd.NA
+        v_df = v_df.drop([diff_gate_on], axis=1)
         v_df = v_df.set_index('clock')
         diff_cols = list(v_df.columns)
         diff_cols.remove('frame')
