@@ -263,11 +263,16 @@ def split_vdf(df):
         v_df['ssf'] = v_df['ssf'].cumsum().astype(np.uint64)
         v_df.loc[(v_df['test1'] == 1) & (v_df['pulse1'] != 1), ['freq1', 'sync1', 'ring1', 'tri1', 'saw1', 'pulse1', 'noise1', 'pwduty1', 'freq3', 'test3']] = pd.NA
         v_df.loc[~((v_df['sync1'] == 1) | ((v_df['ring1'] == 1) & (v_df['tri1'] == 1))), ['freq3', 'test3']] = pd.NA
-        v_df.loc[v_df['gate1'] == 0, ['atk1', 'dec1', 'sus1', 'rel1']] = pd.NA
         v_df.loc[(v_df['gate1'] == 0) & (v_df['tri1'] != 1) & (v_df['saw1'] != 1) & (v_df['noise1'] != 1) & (v_df['pulse1'] != 1), ['freq1']] = pd.NA
         v_df.loc[v_df['flt1'] != 1, fltcols] = pd.NA
         v_df.loc[v_df['pulse1'] != 1, ['pwduty1']] = pd.NA
-        v_df = v_df.drop([diff_gate_on], axis=1)
+        ads_df = v_df[v_df[diff_gate_on] == 1][['ssf', 'atk1', 'dec1', 'sus1']]
+        r_df = v_df[v_df[diff_gate_on] == -1][['ssf', 'rel1']]
+        v_df = v_df.drop([diff_gate_on, 'atk1', 'dec1', 'sus1', 'rel1'], axis=1)
+        v_df = v_df.reset_index()
+        v_df = v_df.merge(ads_df, on='ssf', right_index=False)
+        v_df = v_df.merge(r_df, on='ssf', right_index=False)
+        v_df = v_df.set_index('clock')
         diff_cols = list(v_df.columns)
         diff_cols.remove('frame')
         v_df = squeeze_diffs(v_df, diff_cols)
