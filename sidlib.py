@@ -292,6 +292,7 @@ def split_vdf(df):
         v_control_df['ssf_size'] = v_control_df.groupby(['ssf'], sort=False)['ssf'].transform('size').astype(np.uint64)
         for ncol in ['freq1', 'pwduty1', 'vol']:
             v_df['%snunique' % ncol] = v_df.groupby(['ssf'], sort=False)[ncol].transform('nunique').astype(np.uint64)
+        v_df['frame'] = v_df.groupby(['ssf'], sort=False)['frame'].transform(lambda x: x - x.min())
         yield (v, v_df, v_control_df)
 
 
@@ -350,7 +351,6 @@ def normalize_ssf(hashid_noclock, ssf_df, remap_ssf_dfs, ssf_noclock_dfs, ssf_df
             remapped_hashid = remap_ssf_dfs[hashid]
             hashid = remapped_hashid
         else:
-            ssf_df['frame'] -= ssf_df['frame'].min()
             even_frame = int(ssf_df['frame'].max() / 2) * 2
             hashid_noclock = (hashid_noclock, even_frame)
             remapped_hashid = ssf_noclock_dfs.get(hashid_noclock, None)
