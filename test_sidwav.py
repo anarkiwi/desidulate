@@ -45,18 +45,40 @@ class SidWavTestCase(unittest.TestCase):
 
     def test_dec_change_before_gateoff(self):
         sid = get_sid(pal=True)
+        gateon = {'hashid': 1, 'clock': 0, 'freq1': 1000, 'dec': 2, 'sus1': 10, 'gate1': 1, 'tri1': 1, 'vol': 15}
         gateoff = {'hashid': 1, 'clock': 1e4 * 30, 'gate1': 0}
         end = {'hashid': 1, 'clock': 1e4 * 60, 'freq1': 0}
         df1 = self._make_wav_df([
-            {'hashid': 1, 'clock': 0, 'freq1': 1000, 'dec': 2, 'sus1': 10, 'gate1': 1, 'tri1': 1, 'vol': 15},
+            gateon,
             gateoff,
             end,
         ])
         raw_samples = state2samples(df1, sid)
         sid = get_sid(pal=True)
         df2 = self._make_wav_df([
-            {'hashid': 1, 'clock': 0, 'freq1': 1000, 'dec': 2, 'sus1': 10, 'gate1': 1, 'tri1': 1, 'vol': 15},
+            gateon,
             {'hashid': 1, 'clock': 1e4 * 10, 'dec': 15},
+            gateoff,
+            end,
+        ])
+        raw_samples2 = state2samples(df2, sid)
+        self.assertTrue(np.array_equal(raw_samples, raw_samples2))
+
+    def test_sus_change_before_gateoff(self):
+        sid = get_sid(pal=True)
+        gateon = {'hashid': 1, 'clock': 0, 'freq1': 1000, 'dec': 2, 'sus1': 10, 'gate1': 1, 'tri1': 1, 'vol': 15}
+        gateoff = {'hashid': 1, 'clock': 1e4 * 30, 'gate1': 0}
+        end = {'hashid': 1, 'clock': 1e4 * 60, 'freq1': 0}
+        df1 = self._make_wav_df([
+            gateon,
+            gateoff,
+            end,
+        ])
+        raw_samples = state2samples(df1, sid)
+        sid = get_sid(pal=True)
+        df2 = self._make_wav_df([
+            gateon,
+            {'hashid': 1, 'clock': 1e4 * 10, 'sus': 2},
             gateoff,
             end,
         ])
