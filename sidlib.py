@@ -6,6 +6,7 @@
 
 ## THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABL E FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+
 from collections import defaultdict
 from datetime import timedelta
 import pandas as pd
@@ -237,7 +238,7 @@ def split_vdf(df):
             return hash(tuple(r))
 
         vdf.reset_index(level=0, inplace=True)
-        uniq = vdf.drop(['clock', 'frame', 'ssf', 'ssf_size'], axis=1).drop_duplicates(ignore_index=True)
+        uniq = vdf.drop(['clock', 'frame', 'ssf'], axis=1).drop_duplicates(ignore_index=True)
         uniq['row_hash'] = uniq.apply(row_hash, axis=1)
         merge_cols = list(uniq.columns)
         merge_cols.remove('row_hash')
@@ -280,16 +281,18 @@ def split_vdf(df):
         v_df = squeeze_diffs(v_df, diff_cols)
         v_df = v_df[v_df.groupby('ssf', sort=False)['vol'].transform('max') > 0]
         v_df = v_df[v_df.groupby('ssf', sort=False)['test1'].transform('min') < 1]
-        for ncol in ['freq1', 'pwduty1', 'vol']:
-            v_df['%snunique' % ncol] = v_df.groupby(['ssf'], sort=False)[ncol].transform('nunique').astype(np.uint64)
         control_ignore_diff_cols = ['freq1', 'freq3', 'pwduty1', 'fltcoff']
         for col in control_ignore_diff_cols:
             diff_cols.remove(col)
         v_control_df = v_df.drop(control_ignore_diff_cols, axis=1).copy()
         v_control_df = squeeze_diffs(v_control_df, diff_cols)
+        v_df = hash_vdf(v_df)
+        v_control_df = hash_vdf(v_control_df)
         v_df['ssf_size'] = v_df.groupby(['ssf'], sort=False)['ssf'].transform('size').astype(np.uint64)
         v_control_df['ssf_size'] = v_control_df.groupby(['ssf'], sort=False)['ssf'].transform('size').astype(np.uint64)
-        yield (v, hash_vdf(v_df), hash_vdf(v_control_df))
+        for ncol in ['freq1', 'pwduty1', 'vol']:
+            v_df['%snunique' % ncol] = v_df.groupby(['ssf'], sort=False)[ncol].transform('nunique').astype(np.uint64)
+        yield (v, v_df, v_control_df)
 
 
 def jittermatch_df(df1, df2, jitter_col, jitter_max):
