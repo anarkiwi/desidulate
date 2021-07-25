@@ -254,40 +254,11 @@ def split_vdf(df):
         v_df = df[cols].copy()
         v_df.columns = renamed_cols(v, cols)
         v_df = set_sid_dtype(v_df)
-        col = 'gate1'
-        if v_df[col].max() != 1:
+        if v_df['gate1'].max() != 1:
             continue
 
-        # split on gate on transitions into SSFs
-        diff_gate_on = 'diff_on_%s' % col
-        v_df[diff_gate_on] = v_df[col].astype(np.int8).diff(periods=1).fillna(0).astype(pd.Int8Dtype())
-        v_df['ssf'] = v_df[diff_gate_on]
-        v_df.loc[v_df['ssf'] != 1, ['ssf']] = 0
-        v_df['ssf'] = v_df['ssf'].cumsum().astype(np.uint64)
-
-        # remove non-pulse waveform state, while test1 test
-        v_df.loc[(v_df['test1'] == 1) & (v_df['pulse1'] != 1), ['freq1', 'sync1', 'ring1', 'tri1', 'saw1', 'pulse1', 'noise1', 'pwduty1', 'freq3', 'test3']] = pd.NA
-        # remove modulator voice state while sync1/ring1 not set
-        v_df.loc[~((v_df['sync1'] == 1) | ((v_df['ring1'] == 1) & (v_df['tri1'] == 1))), ['freq3', 'test3']] = pd.NA
-        # remove freq1 state when no waveform and gate off.
-        v_df.loc[(v_df['gate1'] == 0) & (v_df['tri1'] != 1) & (v_df['saw1'] != 1) & (v_df['noise1'] != 1) & (v_df['pulse1'] != 1), ['freq1']] = pd.NA
-        # remove filter state when no filter.
-        v_df.loc[v_df['flt1'] != 1, fltcols] = pd.NA
-        # remove pwduty state when no pulse1 set.
-        v_df.loc[v_df['pulse1'] != 1, ['pwduty1']] = pd.NA
-
-        # select ADS from when gate on
-        ads_df = v_df[v_df[diff_gate_on] == 1][['ssf', 'atk1', 'dec1', 'sus1']]
-        # select R from when gate off
-        r_df = v_df[v_df[diff_gate_on] == -1][['ssf', 'rel1']]
-        v_df = v_df.drop(['atk1', 'dec1', 'sus1', 'rel1'], axis=1)
-        v_df = v_df.reset_index()
-        v_df = v_df.merge(ads_df, on='ssf', right_index=False)
-        v_df = v_df.merge(r_df, on='ssf', right_index=False)
-        v_df.loc[v_df[diff_gate_on] != 1, ['atk1', 'dec1', 'sus1', 'rel1']] = pd.NA
-        v_df = v_df.drop([diff_gate_on], axis=1)
-
         # coalesce two byte register writes within 64 cycles.
+        v_df = v_df.reset_index()
         drop_cols = ['clock_diff']
         v_df['clock_diff'] = v_df['clock'].astype(np.int64).diff(periods=-1).astype(pd.Int64Dtype())
         coalesce_cond = (v_df['clock_diff'] < 0) & (v_df['clock_diff'] > -64)
@@ -301,7 +272,35 @@ def split_vdf(df):
                if v_df[(v_df[b2_reg] != v_df[b2_shift]) & coalesce_cond].size:
                    continue
                break
-        v_df = v_df.drop(drop_cols, axis=1)
+        v_df = v_df.drop(drop_cols, axis=1).set_index('clock')
+
+        # remove non-pulse waveform state, while test1 test
+        v_df.loc[(v_df['test1'] == 1) & (v_df['pulse1'] != 1), ['freq1', 'sync1', 'ring1', 'tri1', 'saw1', 'pulse1', 'noise1', 'pwduty1', 'freq3', 'test3']] = pd.NA
+        # remove modulator voice state while sync1/ring1 not set
+        v_df.loc[~((v_df['sync1'] == 1) | ((v_df['ring1'] == 1) & (v_df['tri1'] == 1))), ['freq3', 'test3']] = pd.NA
+        # remove freq1 state when no waveform and gate off.
+        v_df.loc[(v_df['gate1'] == 0) & (v_df['tri1'] != 1) & (v_df['saw1'] != 1) & (v_df['noise1'] != 1) & (v_df['pulse1'] != 1), ['freq1']] = pd.NA
+        # remove filter state when no filter.
+        v_df.loc[v_df['flt1'] != 1, fltcols] = pd.NA
+        # remove pwduty state when no pulse1 set.
+        v_df.loc[v_df['pulse1'] != 1, ['pwduty1']] = pd.NA
+
+        # split on gate on transitions into SSFs
+        v_df['diff_gate1'] = v_df['gate1'].astype(np.int8).diff(periods=1).fillna(0).astype(pd.Int8Dtype())
+        v_df['ssf'] = v_df['diff_gate1']
+        v_df.loc[v_df['ssf'] != 1, ['ssf']] = 0
+        v_df['ssf'] = v_df['ssf'].cumsum().astype(np.uint64)
+
+        # select ADS from when gate on
+        ads_df = v_df[v_df['diff_gate1'] == 1][['ssf', 'atk1', 'dec1', 'sus1']]
+        # select R from when gate off
+        r_df = v_df[v_df['diff_gate1'] == -1][['ssf', 'rel1']]
+        v_df = v_df.drop(['atk1', 'dec1', 'sus1', 'rel1'], axis=1)
+        v_df = v_df.reset_index()
+        v_df = v_df.merge(ads_df, on='ssf', right_index=False)
+        v_df = v_df.merge(r_df, on='ssf', right_index=False)
+        v_df.loc[v_df['diff_gate1'] != 1, ['atk1', 'dec1', 'sus1', 'rel1']] = pd.NA
+        v_df = v_df.drop(['diff_gate1'], axis=1)
 
         # extract only changes
         v_df = v_df.set_index('clock')
@@ -327,11 +326,11 @@ def split_vdf(df):
         # normalize clock, calculate clock hashes
         for x_df in (v_df, v_control_df):
             x_df['clock_start'] = x_df.groupby(['ssf'], sort=False)['clock'].transform('min')
-            x_df['clock'] = x_df.groupby(['ssf'], sort=False)['clock'].transform(lambda x: x - x.iat[0])
+            x_df['clock'] = x_df.groupby(['ssf'], sort=False)['clock'].transform(lambda x: x - x.min())
             x_df['hashid_clock'] = x_df.groupby(['ssf'], sort=False)['clock'].transform(hash_series).astype(np.int64)
 
         # normalize frame
-        v_df['frame'] = v_df.groupby(['ssf'], sort=False)['frame'].transform(lambda x: x - x.iat[0])
+        v_df['frame'] = v_df.groupby(['ssf'], sort=False)['frame'].transform(lambda x: x - x.min())
 
         # add SSF metadata
         for ncol in ['freq1', 'pwduty1', 'vol']:
@@ -424,8 +423,8 @@ def split_ssf(sid, df):
 
     for v, v_df, v_control_df in split_vdf(df):
         skip_ssfs = set()
-        for hashid_noclock, hashid_noclock_df in v_df.groupby(['hashid_noclock']):
-            for ssf, ssf_df in hashid_noclock_df.groupby(['ssf']):
+        for hashid_noclock, hashid_noclock_df in v_df.groupby(['hashid_noclock'], sort=False):
+            for ssf, ssf_df in hashid_noclock_df.groupby(['ssf'], sort=False):
                 hashid_clock = ssf_df['hashid_clock'].iat[0]
                 hashid = normalize_ssf(hashid_clock, hashid_noclock, ssf_df, remap_ssf_dfs, ssf_noclock_dfs, ssf_dfs, ssf_count)
                 if hashid:
@@ -437,8 +436,8 @@ def split_ssf(sid, df):
                         ssf_log.append({'clock': ssf_df['clock_start'].iat[0], 'hashid': hashid, 'voice': v})
         if skip_ssfs:
             v_control_df = v_control_df[~v_control_df['ssf'].isin(skip_ssfs)]
-        for hashid_noclock, hashid_noclock_df in v_control_df.groupby(['hashid_noclock']):
-            for ssf, ssf_df in hashid_noclock_df.groupby(['ssf']):
+        for hashid_noclock, hashid_noclock_df in v_control_df.groupby(['hashid_noclock'], sort=False):
+            for ssf, ssf_df in hashid_noclock_df.groupby(['ssf'], sort=False):
                 hashid_clock = ssf_df['hashid_clock'].iat[0]
                 normalize_ssf(hashid_clock, hashid_noclock, ssf_df, control_remap_ssf_dfs, control_ssf_noclock_dfs, control_ssf_dfs, control_ssf_count)
 
