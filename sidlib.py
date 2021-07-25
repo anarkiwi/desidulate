@@ -382,14 +382,14 @@ def normalize_ssf(hashid_clock, hashid_noclock, ssf_df, remap_ssf_dfs, ssf_noclo
             hashid = remapped_hashid
         else:
             last_even_frame = ssf_df['frame'].iat[-1]
-            hashid_noclock = (last_even_frame, hashid_noclock)
-            remapped_hashid = ssf_noclock_dfs.get(hashid_noclock, None)
+            remap_hashid_noclock = (last_even_frame, hashid_noclock)
+            remapped_hashid = ssf_noclock_dfs.get(remap_hashid_noclock, None)
             if remapped_hashid is not None and jittermatch_df(ssf_dfs[remapped_hashid], ssf_df, 'clock', 1024):
                 remap_ssf_dfs[hashid] = remapped_hashid
                 hashid = remapped_hashid
             else:
                 ssf_dfs[hashid] = ssf_df.drop(['ssf', 'clock_start', 'hashid_clock', 'hashid_noclock'], axis=1).reset_index(drop=True)
-                ssf_noclock_dfs[hashid_noclock] = hashid
+                ssf_noclock_dfs[remap_hashid_noclock] = hashid
 
     ssf_count[hashid] +=1
     return hashid
