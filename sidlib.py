@@ -6,7 +6,7 @@
 
 ## THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABL E FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-
+import logging
 from collections import defaultdict
 from datetime import timedelta
 import pandas as pd
@@ -120,12 +120,14 @@ def get_sid(pal):
 def reg2state(sid, snd_log_name, nrows=(10 * 1e6)):
 
     def compress_writes():
+        logging.debug('reading %s', snd_log_name)
         df = pd.read_csv(
             snd_log_name,
             sep=' ',
             names=['clock_offset', 'reg', 'val'],
             dtype={'clock_offset': np.uint64, 'reg': np.uint8, 'val': np.uint8},
             nrows=nrows)
+        logging.debug('read %u rows from %s', len(df), snd_log_name)
         df['clock'] = df['clock_offset'].cumsum()
         assert df['reg'].min() >= 0
         df = df[['clock', 'reg', 'val']]
@@ -195,6 +197,7 @@ def reg2state(sid, snd_log_name, nrows=(10 * 1e6)):
     df = compress_writes()
     reg_df = decode_regs(df)
     df = df.drop(['reg', 'val'], axis=1).join(reg_df, on='clock')
+    logging.debug('%u rows from %s after compression', len(df), snd_log_name)
     return df
 
 
@@ -237,6 +240,7 @@ def split_vdf(sid, df):
         vdf.reset_index(level=0, inplace=True)
         uniq = vdf.drop(['clock', 'ssf'], axis=1).drop_duplicates(ignore_index=True)
         uniq['row_hash'] = uniq.apply(hash_tuple, axis=1)
+        logging.debug('%u unique voice states', len(uniq))
         merge_cols = list(uniq.columns)
         merge_cols.remove('row_hash')
         vdf = vdf.merge(uniq, how='left', on=merge_cols)
@@ -245,6 +249,7 @@ def split_vdf(sid, df):
         return vdf
 
     for v in (1, 2, 3):
+        logging.debug('splitting voice %u', v)
         if df['gate%u' % v].max() == 0:
             continue
         cols = v_cols(v)
@@ -252,23 +257,28 @@ def split_vdf(sid, df):
         v_df.columns = renamed_cols(v, cols)
         v_df = set_sid_dtype(v_df)
 
-        # coalesce two byte register writes within 64 cycles.
+        # coalesce two byte register writes within 16 cycles.
+        logging.debug('coalescing register writes to voice %u', v)
         v_df = v_df.reset_index()
         drop_cols = ['clock_diff']
         v_df['clock_diff'] = v_df['clock'].astype(np.int64).diff(periods=-1).astype(pd.Int64Dtype())
-        coalesce_cond = (v_df['clock_diff'] < 0) & (v_df['clock_diff'] > -64)
+        coalesce_cond = (v_df['clock_diff'] < 0) & (v_df['clock_diff'] > -32)
         for b2_reg in ('freq1', 'pwduty1', 'freq3', 'fltcoff'):
+            i = 0
             b2_shift = '%s_shift' % b2_reg
             drop_cols.append(b2_shift)
             v_df[b2_shift] = v_df[b2_reg].shift(-1)
             while True:
-               v_df.loc[coalesce_cond, [b2_reg]] = v_df[b2_shift]
-               v_df[b2_shift] = v_df[b2_reg].shift(-1)
-               if v_df[(v_df[b2_reg] != v_df[b2_shift]) & coalesce_cond].size:
-                   continue
-               break
+                i += 1
+                logging.debug('coalesce %s pass %u for voice %u', b2_reg, i, v)
+                v_df.loc[coalesce_cond, [b2_reg]] = v_df[b2_shift]
+                v_df[b2_shift] = v_df[b2_reg].shift(-1)
+                if len(v_df[(v_df[b2_reg] != v_df[b2_shift]) & coalesce_cond]):
+                    continue
+                break
         v_df = v_df.drop(drop_cols, axis=1).set_index('clock')
 
+        logging.debug('removing redundant state for voice %u', v)
         # remove non-pulse waveform state, while test1 test
         v_df.loc[(v_df['test1'] == 1) & (v_df['pulse1'] != 1), ['freq1', 'sync1', 'ring1', 'tri1', 'saw1', 'pulse1', 'noise1', 'pwduty1', 'freq3', 'test3']] = pd.NA
         # remove modulator voice state while sync1/ring1 not set
@@ -281,12 +291,14 @@ def split_vdf(sid, df):
         v_df.loc[v_df['pulse1'] != 1, ['pwduty1']] = pd.NA
 
         # split on gate on transitions into SSFs
+        logging.debug('splitting to SSFs for voice %u', v)
         v_df['diff_gate1'] = v_df['gate1'].astype(np.int8).diff(periods=1).fillna(0).astype(pd.Int8Dtype())
         v_df['ssf'] = v_df['diff_gate1']
         v_df.loc[v_df['ssf'] != 1, ['ssf']] = 0
         v_df['ssf'] = v_df['ssf'].cumsum().astype(np.uint64)
 
         # select ADS from when gate on
+        logging.debug('removing redundant ADSR for voice %u', v)
         ads_df = v_df[v_df['diff_gate1'] == 1][['ssf', 'atk1', 'dec1', 'sus1']]
         # select R from when gate off
         r_df = v_df[v_df['diff_gate1'] == -1][['ssf', 'rel1']]
@@ -298,15 +310,19 @@ def split_vdf(sid, df):
         v_df = v_df.drop(['diff_gate1'], axis=1)
 
         # extract only changes
+        logging.debug('extracting only state changes for voice %u (rows before %u)', v, len(v_df))
         v_df = v_df.set_index('clock')
         diff_cols = list(v_df.columns)
         v_df = squeeze_diffs(v_df, diff_cols)
+        logging.debug('extracted only state changes for voice %u (rows after %u)', v, len(v_df))
 
         # remove empty SSFs
+        logging.debug('removing empty SSFs for voice %u', v)
         v_df = v_df[v_df.groupby('ssf', sort=False)['vol'].transform('max') > 0]
         v_df = v_df[v_df.groupby('ssf', sort=False)['test1'].transform('min') < 1]
 
         # build control-only SSFs
+        logging.debug('building control only SSFs for voice %u', v)
         control_ignore_diff_cols = ['freq1', 'freq3', 'pwduty1', 'fltcoff']
         for col in control_ignore_diff_cols:
             diff_cols.remove(col)
@@ -314,10 +330,12 @@ def split_vdf(sid, df):
         v_control_df = squeeze_diffs(v_control_df, diff_cols)
 
         # calculate row hashes
+        logging.debug('calculating row hashes for voice %u', v)
         v_df = hash_vdf(v_df)
         v_control_df = hash_vdf(v_control_df)
 
         # normalize clock, calculate clock hashes
+        logging.debug('calculating clock/hashes for voice %u', v)
         for x_df in (v_df, v_control_df):
             x_df['clock_start'] = x_df.groupby(['ssf'], sort=False)['clock'].transform('min')
             x_df['clock'] = x_df.groupby(['ssf'], sort=False)['clock'].transform(lambda x: x - x.min())
@@ -325,6 +343,7 @@ def split_vdf(sid, df):
             x_df['frame'] = x_df['clock'].floordiv(int(sid.clockq))
 
         # add SSF metadata
+        logging.debug('adding SSF metadata for voice %u', v)
         for ncol in ['freq1', 'pwduty1', 'vol']:
             v_df['%snunique' % ncol] = v_df.groupby(['ssf'], sort=False)[ncol].transform('nunique').astype(np.uint64)
 
@@ -334,7 +353,7 @@ def split_vdf(sid, df):
 def jittermatch_df(df1, df2, jitter_col, jitter_max):
     df1_col = df1[jitter_col].reset_index(drop=True).astype(pd.Int64Dtype())
     df2_col = df2[jitter_col].reset_index(drop=True).astype(pd.Int64Dtype())
-    if df1_col.size == df2_col.size:
+    if len(df1_col) == len(df2_col):
         diff = df1_col - df2_col
         diff_max = diff.abs().max()
         return pd.notna(diff_max) and diff_max < jitter_max
@@ -356,7 +375,7 @@ def fast_clock_diff(ssf_df, fast_mod_cycles):
 
 def skip_ssf(ssf_df, vol_mod_cycles, pwduty_mod_cycles):
     # Skip SSFs with sample playback.
-    if ssf_df.size > 2 and ssf_df['frame'].nunique() > 3:
+    if len(ssf_df) > 2 and ssf_df['frame'].nunique() > 3:
         # https://codebase64.org/doku.php?id=base:vicious_sid_demo_routine_explained
         # http://www.ffd2.com/fridge/chacking/c=hacking21.txt
         # http://www.ffd2.com/fridge/chacking/c=hacking20.txt
@@ -410,6 +429,7 @@ def split_ssf(sid, df):
     pwduty_mod_cycles = int(sid.clock_freq / SKIP_PWDUTY_MOD_HZ)
 
     for v, v_df, v_control_df in split_vdf(sid, df):
+        logging.debug('splitting %u SSFs for voice %u', v_df['ssf'].max(), v)
         skip_ssfs = set()
         for hashid_noclock, hashid_noclock_df in v_df.groupby(['hashid_noclock'], sort=False):
             for ssf, ssf_df in hashid_noclock_df.groupby(['ssf'], sort=False):
@@ -459,6 +479,9 @@ def split_ssf(sid, df):
     ssf_df = concat_dfs(ssf_dfs, ssf_count)
     control_ssf_df = concat_dfs(control_ssf_dfs, control_ssf_count)
     skip_ssf_df = concat_dfs(skip_ssf_dfs, skip_ssf_count)
+
+    logging.debug('%u SSFs, %u control SSFs, %u skipped SSFs',
+        ssf_df.index.nunique(), control_ssf_df.index.nunique(), skip_ssf_df.index.nunique())
     return ssf_log_df, ssf_df, control_ssf_df, skip_ssf_df
 
 

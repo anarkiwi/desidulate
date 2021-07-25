@@ -10,8 +10,11 @@
 # http://www.ucapps.de/howto_sid_wavetables_1.html
 
 import argparse
+import logging
 from fileio import out_path
 from sidlib import get_sid, reg2state, state2ssfs
+
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(message)s')
 
 parser = argparse.ArgumentParser(description='Convert vicesnd.sid log into SSF log files')
 parser.add_argument('logfile', default='vicesnd.sid', help='log file to read')
