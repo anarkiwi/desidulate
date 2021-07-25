@@ -248,6 +248,28 @@ def split_vdf(sid, df):
         vdf.drop(['row_hash'], inplace=True, axis=1)
         return vdf
 
+    def coalesce_near_writes(vdf, near, v):
+        logging.debug('coalescing near %u register writes to voice %u', near, v)
+        vdf = vdf.reset_index()
+        drop_cols = ['clock_diff']
+        vdf['clock_diff'] = vdf['clock'].astype(np.int64).diff(periods=-1).astype(pd.Int64Dtype())
+        coalesce_cond = (vdf['clock_diff'] < 0) & (vdf['clock_diff'] > -near)
+        for b2_reg in ('freq1', 'pwduty1', 'freq3', 'fltcoff'):
+            i = 0
+            b2_shift = '%s_shift' % b2_reg
+            drop_cols.append(b2_shift)
+            vdf[b2_shift] = vdf[b2_reg].shift(-1)
+            while True:
+                i += 1
+                logging.debug('coalesce %s pass %u for voice %u', b2_reg, i, v)
+                vdf.loc[coalesce_cond, [b2_reg]] = vdf[b2_shift]
+                vdf[b2_shift] = vdf[b2_reg].shift(-1)
+                if len(vdf[(vdf[b2_reg] != vdf[b2_shift]) & coalesce_cond]):
+                    continue
+                break
+        vdf = vdf.drop(drop_cols, axis=1).set_index('clock')
+        return vdf
+
     for v in (1, 2, 3):
         logging.debug('splitting voice %u', v)
         if df['gate%u' % v].max() == 0:
@@ -257,26 +279,7 @@ def split_vdf(sid, df):
         v_df.columns = renamed_cols(v, cols)
         v_df = set_sid_dtype(v_df)
 
-        # coalesce two byte register writes within 16 cycles.
-        logging.debug('coalescing register writes to voice %u', v)
-        v_df = v_df.reset_index()
-        drop_cols = ['clock_diff']
-        v_df['clock_diff'] = v_df['clock'].astype(np.int64).diff(periods=-1).astype(pd.Int64Dtype())
-        coalesce_cond = (v_df['clock_diff'] < 0) & (v_df['clock_diff'] > -32)
-        for b2_reg in ('freq1', 'pwduty1', 'freq3', 'fltcoff'):
-            i = 0
-            b2_shift = '%s_shift' % b2_reg
-            drop_cols.append(b2_shift)
-            v_df[b2_shift] = v_df[b2_reg].shift(-1)
-            while True:
-                i += 1
-                logging.debug('coalesce %s pass %u for voice %u', b2_reg, i, v)
-                v_df.loc[coalesce_cond, [b2_reg]] = v_df[b2_shift]
-                v_df[b2_shift] = v_df[b2_reg].shift(-1)
-                if len(v_df[(v_df[b2_reg] != v_df[b2_shift]) & coalesce_cond]):
-                    continue
-                break
-        v_df = v_df.drop(drop_cols, axis=1).set_index('clock')
+        v_df = coalesce_near_writes(v_df, 16, v)
 
         logging.debug('removing redundant state for voice %u', v)
         # remove non-pulse waveform state, while test1 test
