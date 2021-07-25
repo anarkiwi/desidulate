@@ -389,8 +389,7 @@ def hash_series(s):
     return hash(tuple(s))
 
 
-def normalize_ssf(hashid_noclock, ssf_df, remap_ssf_dfs, ssf_noclock_dfs, ssf_dfs, ssf_count):
-    hashid_clock = ssf_df['clock_hash'].iat[0]
+def normalize_ssf(hashid_clock, hashid_noclock, ssf_df, remap_ssf_dfs, ssf_noclock_dfs, ssf_dfs, ssf_count):
     hashid = hash((hashid_clock, hashid_noclock))
 
     if hashid not in ssf_dfs:
@@ -429,9 +428,10 @@ def split_ssf(sid, df):
     for v, v_df, v_control_df in split_vdf(df):
         skip_ssfs = set()
         for _, size_ssf_df in v_df.groupby(['ssf_size']):
-            for ssf_hash, ssf_hash_sf in size_ssf_df.drop(['ssf_size'], axis=1).groupby(['ssf_hash']):
-                for ssf, ssf_df in ssf_hash_sf.drop(['ssf_hash'], axis=1).groupby(['ssf']):
-                    hashid = normalize_ssf(ssf_hash, ssf_df, remap_ssf_dfs, ssf_noclock_dfs, ssf_dfs, ssf_count)
+            for hashid_noclock, hashid_noclock_df in size_ssf_df.drop(['ssf_size'], axis=1).groupby(['ssf_hash']):
+                for ssf, ssf_df in hashid_noclock_df.drop(['ssf_hash'], axis=1).groupby(['ssf']):
+                    hashid_clock = ssf_df['clock_hash'].iat[0]
+                    hashid = normalize_ssf(hashid_clock, hashid_noclock, ssf_df, remap_ssf_dfs, ssf_noclock_dfs, ssf_dfs, ssf_count)
                     if hashid:
                         if hashid not in skip_hashids:
                             skip_hashids[hashid] = skip_ssf(ssf_df, vol_mod_cycles, pwduty_mod_cycles)
@@ -442,9 +442,10 @@ def split_ssf(sid, df):
         if skip_ssfs:
             v_control_df = v_control_df[~v_control_df['ssf'].isin(skip_ssfs)]
         for _, size_ssf_df in v_control_df.groupby(['ssf_size']):
-            for ssf_hash, ssf_hash_sf in size_ssf_df.drop(['ssf_size'], axis=1).groupby(['ssf_hash']):
-                for ssf, ssf_df in ssf_hash_sf.drop(['ssf_hash'], axis=1).groupby(['ssf']):
-                    normalize_ssf(ssf_hash, ssf_df, control_remap_ssf_dfs, control_ssf_noclock_dfs, control_ssf_dfs, control_ssf_count)
+            for hashid_noclock, hashid_noclock_df in size_ssf_df.drop(['ssf_size'], axis=1).groupby(['ssf_hash']):
+                for ssf, ssf_df in hashid_noclock_df.drop(['ssf_hash'], axis=1).groupby(['ssf']):
+                    hashid_clock = ssf_df['clock_hash'].iat[0]                    
+                    normalize_ssf(hashid_clock, hashid_noclock, ssf_df, control_remap_ssf_dfs, control_ssf_noclock_dfs, control_ssf_dfs, control_ssf_count)
 
     skip_ssf_dfs = {}
     skip_ssf_count = {}
