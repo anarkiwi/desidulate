@@ -301,13 +301,11 @@ def split_vdf(df):
 
 
 def jittermatch_df(df1, df2, jitter_col, jitter_max):
-    if len(df1) != len(df2):
-        return False
-    df1_col = df1[jitter_col].astype(pd.Int64Dtype())
-    df2_col = df2[jitter_col].astype(pd.Int64Dtype())
-    diff = df1_col - df2_col
-    diff_max = diff.abs().max()
-    return pd.notna(diff_max) and diff_max < jitter_max
+    if df1.size == df2.size:
+        diff = df1[jitter_col].astype(pd.Int64Dtype()) - df2[jitter_col].astype(pd.Int64Dtype())
+        diff_max = diff.abs().max()
+        return pd.notna(diff_max) and diff_max < jitter_max
+    return False
 
 
 def mask_not_pulse(ssf_df):
@@ -325,7 +323,7 @@ def fast_clock_diff(ssf_df, fast_mod_cycles):
 
 def skip_ssf(ssf_df, vol_mod_cycles, pwduty_mod_cycles):
     # Skip SSFs with sample playback.
-    if len(ssf_df) > 2 and ssf_df['frame'].nunique() > 3:
+    if ssf_df.size > 2 and ssf_df['frame'].nunique() > 3:
         # https://codebase64.org/doku.php?id=base:vicious_sid_demo_routine_explained
         # http://www.ffd2.com/fridge/chacking/c=hacking21.txt
         # http://www.ffd2.com/fridge/chacking/c=hacking20.txt
@@ -335,7 +333,7 @@ def skip_ssf(ssf_df, vol_mod_cycles, pwduty_mod_cycles):
             if fast_clock_diff(vol_ssf_df, vol_mod_cycles):
                 return True
         # Skip SSFs with high PW duty cycle changes
-        elif mask_not_pulse(ssf_df) and ssf_df['pwduty1nunique'].max() > 1:
+        elif ssf_df['pwduty1nunique'].max() > 1 and mask_not_pulse(ssf_df):
             pwduty_clock_df = squeeze_diffs(ssf_df[['clock', 'pwduty1']], ['pwduty1'])
             if fast_clock_diff(pwduty_clock_df, pwduty_mod_cycles):
                 return True
