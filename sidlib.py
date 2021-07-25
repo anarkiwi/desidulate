@@ -127,9 +127,8 @@ def reg2state(sid, snd_log_name, nrows=(10 * 1e6)):
             dtype={'clock_offset': np.uint64, 'reg': np.uint8, 'val': np.uint8},
             nrows=nrows)
         df['clock'] = df['clock_offset'].cumsum()
-        df['frame'] = df['clock'].floordiv(int(sid.clockq))
         assert df['reg'].min() >= 0
-        df = df[['clock', 'frame', 'reg', 'val']]
+        df = df[['clock', 'reg', 'val']]
         # remove consecutive repeated register writes
         reg_dfs = []
         reg_cols = ['reg', 'val']
@@ -139,7 +138,6 @@ def reg2state(sid, snd_log_name, nrows=(10 * 1e6)):
             reg_dfs.append(reg_df)
         df = pd.concat(reg_dfs)
         df['clock'] -= df['clock'].min()
-        df['frame'] -= df['frame'].min()
         df = df.set_index('clock').sort_index()
         return df
 
@@ -200,8 +198,11 @@ def reg2state(sid, snd_log_name, nrows=(10 * 1e6)):
     return df
 
 
-def split_vdf(df):
+def split_vdf(sid, df):
     fltcols = [col for col in df.columns if col.startswith('flt') and not col[-1].isdigit()]
+
+    def hash_tuple(s):
+        return hash(tuple(s))
 
     def v_cols(v):
         sync_map = {
@@ -233,17 +234,13 @@ def split_vdf(df):
         return new_cols
 
     def hash_vdf(vdf):
-
-        def row_hash(r):
-            return hash(tuple(r))
-
         vdf.reset_index(level=0, inplace=True)
-        uniq = vdf.drop(['clock', 'frame', 'ssf'], axis=1).drop_duplicates(ignore_index=True)
-        uniq['row_hash'] = uniq.apply(row_hash, axis=1)
+        uniq = vdf.drop(['clock', 'ssf'], axis=1).drop_duplicates(ignore_index=True)
+        uniq['row_hash'] = uniq.apply(hash_tuple, axis=1)
         merge_cols = list(uniq.columns)
         merge_cols.remove('row_hash')
         vdf = vdf.merge(uniq, how='left', on=merge_cols)
-        vdf['hashid_noclock'] = vdf.groupby(['ssf'], sort=False)['row_hash'].transform(hash_series).astype(np.int64)
+        vdf['hashid_noclock'] = vdf.groupby(['ssf'], sort=False)['row_hash'].transform(hash_tuple).astype(np.int64)
         vdf.drop(['row_hash'], inplace=True, axis=1)
         return vdf
 
@@ -303,7 +300,6 @@ def split_vdf(df):
         # extract only changes
         v_df = v_df.set_index('clock')
         diff_cols = list(v_df.columns)
-        diff_cols.remove('frame')
         v_df = squeeze_diffs(v_df, diff_cols)
 
         # remove empty SSFs
@@ -325,10 +321,8 @@ def split_vdf(df):
         for x_df in (v_df, v_control_df):
             x_df['clock_start'] = x_df.groupby(['ssf'], sort=False)['clock'].transform('min')
             x_df['clock'] = x_df.groupby(['ssf'], sort=False)['clock'].transform(lambda x: x - x.min())
-            x_df['hashid_clock'] = x_df.groupby(['ssf'], sort=False)['clock'].transform(hash_series).astype(np.int64)
-
-        # normalize frame
-        v_df['frame'] = v_df.groupby(['ssf'], sort=False)['frame'].transform(lambda x: x - x.min())
+            x_df['hashid_clock'] = x_df.groupby(['ssf'], sort=False)['clock'].transform(hash_tuple).astype(np.int64)
+            x_df['frame'] = x_df['clock'].floordiv(int(sid.clockq))
 
         # add SSF metadata
         for ncol in ['freq1', 'pwduty1', 'vol']:
@@ -379,10 +373,6 @@ def skip_ssf(ssf_df, vol_mod_cycles, pwduty_mod_cycles):
     return False
 
 
-def hash_series(s):
-    return hash(tuple(s))
-
-
 def normalize_ssf(hashid_clock, hashid_noclock, ssf_df, remap_ssf_dfs, ssf_noclock_dfs, ssf_dfs, ssf_count):
     hashid = hash((hashid_clock, hashid_noclock))
 
@@ -391,8 +381,8 @@ def normalize_ssf(hashid_clock, hashid_noclock, ssf_df, remap_ssf_dfs, ssf_noclo
             remapped_hashid = remap_ssf_dfs[hashid]
             hashid = remapped_hashid
         else:
-            even_frame = int(ssf_df['frame'].iat[-1] / 2) * 2
-            hashid_noclock = (hashid_noclock, even_frame)
+            last_even_frame = ssf_df['frame'].iat[-1]
+            hashid_noclock = (last_even_frame, hashid_noclock)
             remapped_hashid = ssf_noclock_dfs.get(hashid_noclock, None)
             if remapped_hashid is not None and jittermatch_df(ssf_dfs[remapped_hashid], ssf_df, 'clock', 1024):
                 remap_ssf_dfs[hashid] = remapped_hashid
@@ -419,7 +409,7 @@ def split_ssf(sid, df):
     vol_mod_cycles = int(sid.clock_freq / SKIP_VOL_MOD_HZ)
     pwduty_mod_cycles = int(sid.clock_freq / SKIP_PWDUTY_MOD_HZ)
 
-    for v, v_df, v_control_df in split_vdf(df):
+    for v, v_df, v_control_df in split_vdf(sid, df):
         skip_ssfs = set()
         for hashid_noclock, hashid_noclock_df in v_df.groupby(['hashid_noclock'], sort=False):
             for ssf, ssf_df in hashid_noclock_df.groupby(['ssf'], sort=False):
