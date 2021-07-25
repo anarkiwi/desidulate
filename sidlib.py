@@ -243,7 +243,7 @@ def split_vdf(df):
         merge_cols = list(uniq.columns)
         merge_cols.remove('row_hash')
         vdf = vdf.merge(uniq, how='left', on=merge_cols)
-        vdf['ssf_hash'] = vdf.groupby(['ssf'], sort=False)['row_hash'].transform(hash_series).astype(np.uint64)
+        vdf['ssf_hash'] = vdf.groupby(['ssf'], sort=False)['row_hash'].transform(hash_series).astype(np.int64)
         vdf.drop(['row_hash'], inplace=True, axis=1)
         return vdf
 
@@ -293,16 +293,18 @@ def split_vdf(df):
         for ncol in ['freq1', 'pwduty1', 'vol']:
             v_df['%snunique' % ncol] = v_df.groupby(['ssf'], sort=False)[ncol].transform('nunique').astype(np.uint64)
         v_df['clock_start'] = v_df.groupby(['ssf'], sort=False)['clock'].transform('min')
-        v_df['clock'] = v_df.groupby(['ssf'], sort=False)['clock'].transform(lambda x: x - x.min())
-        v_df['frame'] = v_df.groupby(['ssf'], sort=False)['frame'].transform(lambda x: x - x.min())
+        v_df['clock'] = v_df.groupby(['ssf'], sort=False)['clock'].transform(lambda x: x - x.iat[0])
+        v_df['clock_hash'] = v_df.groupby(['ssf'], sort=False)['clock'].transform(hash_series).astype(np.int64)
+        v_df['frame'] = v_df.groupby(['ssf'], sort=False)['frame'].transform(lambda x: x - x.iat[0])
         v_control_df['clock_start'] =  v_control_df.groupby(['ssf'], sort=False)['clock'].transform('min')
-        v_control_df['clock'] = v_control_df.groupby(['ssf'], sort=False)['clock'].transform(lambda x: x - x.min())
+        v_control_df['clock'] = v_control_df.groupby(['ssf'], sort=False)['clock'].transform(lambda x: x - x.iat[0])
+        v_control_df['clock_hash'] = v_control_df.groupby(['ssf'], sort=False)['clock'].transform(hash_series).astype(np.int64)
         yield (v, v_df, v_control_df)
 
 
 def jittermatch_df(df1, df2, jitter_col, jitter_max):
     if df1.size == df2.size:
-        diff = df1[jitter_col].astype(pd.Int64Dtype()) - df2[jitter_col].astype(pd.Int64Dtype())
+        diff = df1[jitter_col].astype(pd.Int64Dtype()).squeeze() - df2[jitter_col].astype(pd.Int64Dtype()).squeeze()
         diff_max = diff.abs().max()
         return pd.notna(diff_max) and diff_max < jitter_max
     return False
@@ -328,12 +330,12 @@ def skip_ssf(ssf_df, vol_mod_cycles, pwduty_mod_cycles):
         # http://www.ffd2.com/fridge/chacking/c=hacking21.txt
         # http://www.ffd2.com/fridge/chacking/c=hacking20.txt
         # Skip SSFs with high rate volume changes.
-        if ssf_df['volnunique'].max() > 2:
+        if ssf_df['volnunique'].iat[0] > 2:
             vol_ssf_df = squeeze_diffs(ssf_df[['clock', 'vol']], ['vol'])
             if fast_clock_diff(vol_ssf_df, vol_mod_cycles):
                 return True
         # Skip SSFs with high PW duty cycle changes
-        elif ssf_df['pwduty1nunique'].max() > 1 and mask_not_pulse(ssf_df):
+        elif ssf_df['pwduty1nunique'].iat[0] > 1 and mask_not_pulse(ssf_df):
             pwduty_clock_df = squeeze_diffs(ssf_df[['clock', 'pwduty1']], ['pwduty1'])
             if fast_clock_diff(pwduty_clock_df, pwduty_mod_cycles):
                 return True
@@ -345,7 +347,7 @@ def hash_series(s):
 
 
 def normalize_ssf(hashid_noclock, ssf_df, remap_ssf_dfs, ssf_noclock_dfs, ssf_dfs, ssf_count):
-    hashid_clock = hash_series(ssf_df['clock'])
+    hashid_clock = ssf_df['clock_hash'].iat[0]
     hashid = hash((hashid_clock, hashid_noclock))
 
     if hashid not in ssf_dfs:
@@ -353,8 +355,8 @@ def normalize_ssf(hashid_noclock, ssf_df, remap_ssf_dfs, ssf_noclock_dfs, ssf_df
             remapped_hashid = remap_ssf_dfs[hashid]
             hashid = remapped_hashid
         else:
-            ssf_df = ssf_df.drop(['ssf', 'clock_start'], axis=1).reset_index(drop=True)
-            even_frame = int(ssf_df['frame'].max() / 2) * 2
+            ssf_df = ssf_df.drop(['ssf', 'clock_start', 'clock_hash'], axis=1).reset_index(drop=True)
+            even_frame = int(ssf_df['frame'].iat[-1] / 2) * 2
             hashid_noclock = (hashid_noclock, even_frame)
             remapped_hashid = ssf_noclock_dfs.get(hashid_noclock, None)
             if remapped_hashid is not None and jittermatch_df(ssf_dfs[remapped_hashid], ssf_df, 'clock', 1024):
@@ -394,7 +396,7 @@ def split_ssf(sid, df):
                         if skip_hashids[hashid]:
                             skip_ssfs.add(ssf)
                         else:
-                            ssf_log.append({'clock': ssf_df['clock_start'].min(), 'hashid': hashid, 'voice': v})
+                            ssf_log.append({'clock': ssf_df['clock_start'].iat[0], 'hashid': hashid, 'voice': v})
         if skip_ssfs:
             v_control_df = v_control_df[~v_control_df['ssf'].isin(skip_ssfs)]
         for _, size_ssf_df in v_control_df.groupby(['ssf_size']):
