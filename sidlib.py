@@ -257,17 +257,28 @@ def split_vdf(df):
         col = 'gate1'
         if v_df[col].max() != 1:
             continue
+
+        # split on gate on transitions into SSFs
         diff_gate_on = 'diff_on_%s' % col
         v_df[diff_gate_on] = v_df[col].astype(np.int8).diff(periods=1).fillna(0).astype(pd.Int8Dtype())
         v_df['ssf'] = v_df[diff_gate_on]
         v_df.loc[v_df['ssf'] != 1, ['ssf']] = 0
         v_df['ssf'] = v_df['ssf'].cumsum().astype(np.uint64)
+
+        # remove non-pulse waveform state, while test1 test
         v_df.loc[(v_df['test1'] == 1) & (v_df['pulse1'] != 1), ['freq1', 'sync1', 'ring1', 'tri1', 'saw1', 'pulse1', 'noise1', 'pwduty1', 'freq3', 'test3']] = pd.NA
+        # remove modulator voice state while sync1/ring1 not set
         v_df.loc[~((v_df['sync1'] == 1) | ((v_df['ring1'] == 1) & (v_df['tri1'] == 1))), ['freq3', 'test3']] = pd.NA
+        # remove freq1 state when no waveform and gate off.
         v_df.loc[(v_df['gate1'] == 0) & (v_df['tri1'] != 1) & (v_df['saw1'] != 1) & (v_df['noise1'] != 1) & (v_df['pulse1'] != 1), ['freq1']] = pd.NA
+        # remove filter state when no filter.
         v_df.loc[v_df['flt1'] != 1, fltcols] = pd.NA
+        # remove pwduty state when no pulse1 set.
         v_df.loc[v_df['pulse1'] != 1, ['pwduty1']] = pd.NA
+
+        # select ADS from when gate on
         ads_df = v_df[v_df[diff_gate_on] == 1][['ssf', 'atk1', 'dec1', 'sus1']]
+        # select R from when gate off
         r_df = v_df[v_df[diff_gate_on] == -1][['ssf', 'rel1']]
         v_df = v_df.drop(['atk1', 'dec1', 'sus1', 'rel1'], axis=1)
         v_df = v_df.reset_index()
@@ -275,30 +286,60 @@ def split_vdf(df):
         v_df = v_df.merge(r_df, on='ssf', right_index=False)
         v_df.loc[v_df[diff_gate_on] != 1, ['atk1', 'dec1', 'sus1', 'rel1']] = pd.NA
         v_df = v_df.drop([diff_gate_on], axis=1)
+
+        # coalesce two byte register writes within 64 cycles.
+        drop_cols = ['clock_diff']
+        v_df['clock_diff'] = v_df['clock'].astype(np.int64).diff(periods=-1).astype(pd.Int64Dtype())
+        coalesce_cond = (v_df['clock_diff'] < 0) & (v_df['clock_diff'] > -64)
+        for b2_reg in ('freq1', 'pwduty1', 'freq3', 'fltcoff'):
+            b2_shift = '%s_shift' % b2_reg
+            drop_cols.append(b2_shift)
+            v_df[b2_shift] = v_df[b2_reg].shift(-1)
+            while True:
+               v_df.loc[coalesce_cond, [b2_reg]] = v_df[b2_shift]
+               v_df[b2_shift] = v_df[b2_reg].shift(-1)
+               if v_df[(v_df[b2_reg] != v_df[b2_shift]) & coalesce_cond].size:
+                   continue
+               break
+        v_df = v_df.drop(drop_cols, axis=1)
+
+        # extract only changes
         v_df = v_df.set_index('clock')
         diff_cols = list(v_df.columns)
         diff_cols.remove('frame')
         v_df = squeeze_diffs(v_df, diff_cols)
+
+        # remove empty SSFs
         v_df = v_df[v_df.groupby('ssf', sort=False)['vol'].transform('max') > 0]
         v_df = v_df[v_df.groupby('ssf', sort=False)['test1'].transform('min') < 1]
+
+        # build control-only SSFs
         control_ignore_diff_cols = ['freq1', 'freq3', 'pwduty1', 'fltcoff']
         for col in control_ignore_diff_cols:
             diff_cols.remove(col)
         v_control_df = v_df.drop(control_ignore_diff_cols, axis=1).copy()
         v_control_df = squeeze_diffs(v_control_df, diff_cols)
+
+        # calculate row hashes
         v_df = hash_vdf(v_df)
         v_control_df = hash_vdf(v_control_df)
-        v_df['ssf_size'] = v_df.groupby(['ssf'], sort=False)['ssf'].transform('size').astype(np.uint64)
-        v_control_df['ssf_size'] = v_control_df.groupby(['ssf'], sort=False)['ssf'].transform('size').astype(np.uint64)
+
+        # normalize clock, calculate clock hashes
+        for x_df in (v_df, v_control_df):
+            x_df['clock_start'] = x_df.groupby(['ssf'], sort=False)['clock'].transform('min')
+            x_df['clock'] = x_df.groupby(['ssf'], sort=False)['clock'].transform(lambda x: x - x.iat[0])
+            x_df['clock_hash'] = x_df.groupby(['ssf'], sort=False)['clock'].transform(hash_series).astype(np.int64)
+
+        # normalize frame
+        v_df['frame'] = v_df.groupby(['ssf'], sort=False)['frame'].transform(lambda x: x - x.iat[0])
+
+        # add SSF metadata
+        for x_df in (v_df, v_control_df):
+            x_df['ssf_size'] = x_df.groupby(['ssf'], sort=False)['ssf'].transform('size').astype(np.uint64)
+
         for ncol in ['freq1', 'pwduty1', 'vol']:
             v_df['%snunique' % ncol] = v_df.groupby(['ssf'], sort=False)[ncol].transform('nunique').astype(np.uint64)
-        v_df['clock_start'] = v_df.groupby(['ssf'], sort=False)['clock'].transform('min')
-        v_df['clock'] = v_df.groupby(['ssf'], sort=False)['clock'].transform(lambda x: x - x.iat[0])
-        v_df['clock_hash'] = v_df.groupby(['ssf'], sort=False)['clock'].transform(hash_series).astype(np.int64)
-        v_df['frame'] = v_df.groupby(['ssf'], sort=False)['frame'].transform(lambda x: x - x.iat[0])
-        v_control_df['clock_start'] =  v_control_df.groupby(['ssf'], sort=False)['clock'].transform('min')
-        v_control_df['clock'] = v_control_df.groupby(['ssf'], sort=False)['clock'].transform(lambda x: x - x.iat[0])
-        v_control_df['clock_hash'] = v_control_df.groupby(['ssf'], sort=False)['clock'].transform(hash_series).astype(np.int64)
+
         yield (v, v_df, v_control_df)
 
 
