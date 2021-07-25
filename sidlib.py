@@ -303,8 +303,10 @@ def split_vdf(df):
 
 
 def jittermatch_df(df1, df2, jitter_col, jitter_max):
-    if df1.size == df2.size:
-        diff = df1[jitter_col].astype(pd.Int64Dtype()).squeeze() - df2[jitter_col].astype(pd.Int64Dtype()).squeeze()
+    df1_col = df1[jitter_col].reset_index(drop=True).astype(pd.Int64Dtype())
+    df2_col = df2[jitter_col].reset_index(drop=True).astype(pd.Int64Dtype())
+    if df1_col.size == df2_col.size:
+        diff = df1_col - df2_col
         diff_max = diff.abs().max()
         return pd.notna(diff_max) and diff_max < jitter_max
     return False
@@ -355,7 +357,6 @@ def normalize_ssf(hashid_noclock, ssf_df, remap_ssf_dfs, ssf_noclock_dfs, ssf_df
             remapped_hashid = remap_ssf_dfs[hashid]
             hashid = remapped_hashid
         else:
-            ssf_df = ssf_df.drop(['ssf', 'clock_start', 'clock_hash'], axis=1).reset_index(drop=True)
             even_frame = int(ssf_df['frame'].iat[-1] / 2) * 2
             hashid_noclock = (hashid_noclock, even_frame)
             remapped_hashid = ssf_noclock_dfs.get(hashid_noclock, None)
@@ -363,7 +364,7 @@ def normalize_ssf(hashid_noclock, ssf_df, remap_ssf_dfs, ssf_noclock_dfs, ssf_df
                 remap_ssf_dfs[hashid] = remapped_hashid
                 hashid = remapped_hashid
             else:
-                ssf_dfs[hashid] = ssf_df
+                ssf_dfs[hashid] = ssf_df.drop(['ssf', 'clock_start', 'clock_hash'], axis=1).reset_index(drop=True)
                 ssf_noclock_dfs[hashid_noclock] = hashid
 
     ssf_count[hashid] +=1
