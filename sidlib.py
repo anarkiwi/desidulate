@@ -254,8 +254,6 @@ def split_vdf(df):
         v_df = df[cols].copy()
         v_df.columns = renamed_cols(v, cols)
         v_df = set_sid_dtype(v_df)
-        if v_df['gate1'].max() != 1:
-            continue
 
         # coalesce two byte register writes within 64 cycles.
         v_df = v_df.reset_index()
