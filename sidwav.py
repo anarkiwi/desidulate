@@ -156,7 +156,7 @@ def state2samples(orig_df, sid):
 
     for row in df[1:].itertuples():
         raw_samples.extend(sid.add_samples(row.diff_clock))
-        diffs_funcs = [funcs[v] for k, v in diff_cols.items() if getattr(row, k) != 0]
+        diffs_funcs = (funcs[v] for k, v in diff_cols.items() if getattr(row, k) != 0)
         for func in diffs_funcs:
             func(row)
 

@@ -7,12 +7,16 @@
 ## The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 
 import argparse
+import logging
 from fileio import wav_path
 from sidlib import get_sid, reg2state
 from sidwav import state2samples, write_wav
 
+logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
+
 parser = argparse.ArgumentParser(description='Convert vicesnd.sid log into a WAV file')
 parser.add_argument('logfile', default='vicesnd.sid', help='log file to read')
+parser.add_argument('--maxstates', default=int(10 * 1e6), help='maximum number of SID states to analyze')
 parser.add_argument('--wavfile', default='', help='WAV file to write')
 pal_parser = parser.add_mutually_exclusive_group(required=False)
 pal_parser.add_argument('--pal', dest='pal', action='store_true', help='Use PAL clock')
@@ -24,6 +28,6 @@ if not wavfile:
     wavfile = wav_path(args.logfile)
 
 sid = get_sid(pal=args.pal)
-df = reg2state(sid, args.logfile)
+df = reg2state(sid, args.logfile, nrows=int(args.maxstates))
 raw_samples = state2samples(df, sid)
 write_wav(wavfile, sid, raw_samples)
