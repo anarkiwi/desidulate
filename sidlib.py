@@ -326,7 +326,7 @@ def split_vdf(sid, df):
 
         # build control-only SSFs
         logging.debug('building control only SSFs for voice %u', v)
-        control_ignore_diff_cols = ['freq1', 'freq3', 'pwduty1', 'fltcoff']
+        control_ignore_diff_cols = ['freq1', 'freq3', 'pwduty1', 'fltcoff', 'atk1', 'dec1', 'sus1', 'rel1']
         for col in control_ignore_diff_cols:
             diff_cols.remove(col)
         v_control_df = v_df.drop(control_ignore_diff_cols, axis=1).copy()
