@@ -432,7 +432,10 @@ def split_ssf(sid, df):
     pwduty_mod_cycles = int(sid.clock_freq / SKIP_PWDUTY_MOD_HZ)
 
     for v, v_df, v_control_df in split_vdf(sid, df):
-        logging.debug('splitting %u SSFs for voice %u', v_df['ssf'].max(), v)
+        ssfs = v_df['ssf'].max()
+        if pd.isna(ssfs):
+            continue
+        logging.debug('splitting %u SSFs for voice %u', ssfs, v)
         skip_ssfs = set()
         for hashid_noclock, hashid_noclock_df in v_df.groupby(['hashid_noclock'], sort=False):
             for ssf, ssf_df in hashid_noclock_df.groupby(['ssf'], sort=False):
