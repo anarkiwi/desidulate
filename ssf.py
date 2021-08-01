@@ -37,10 +37,13 @@ class SidSoundFragment:
         self.total_duration = 0
         self.max_midi_note = 0
         self.min_midi_note = 0
+        self.initial_midi_notes = []
         self.initial_midi_pitches = []
         if self.midi_notes:
-            self.initial_midi_pitches = tuple([midi_note[2] for midi_note in self.midi_notes if midi_note[1] <= 2])
-            self.total_duration = sum(duration for _, _, _, duration, _, _ in self.midi_notes)
+            self.initial_midi_notes = tuple([midi_note for midi_note in self.midi_notes if midi_note[1] <= 2])
+            self.initial_midi_pitches = tuple([midi_note[2] for midi_note in self.initial_midi_notes])
+            self.total_duration = sum([midi_note[3] for midi_note in self.midi_notes])
+            self.initial_duration = sum([midi_note[3] for midi_note in self.initial_midi_notes])
             self.max_midi_note = max(self.midi_pitches)
             self.min_midi_note = min(self.midi_pitches)
         self.initial_pitch_drop = 0
