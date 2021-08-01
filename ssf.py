@@ -33,22 +33,25 @@ class SidSoundFragment:
         self.noisephases = len([waveforms for waveforms in self.waveform_order if 'noise' in waveforms])
         self.all_noise = self.waveforms == {'noise'}
         self.midi_notes = tuple(smf.get_midi_notes_from_events(zip(self.df.itertuples(), waveform_states)))
-        self.midi_pitches = tuple([midi_note[1] for midi_note in self.midi_notes])
+        self.midi_pitches = tuple([midi_note[2] for midi_note in self.midi_notes])
         self.total_duration = 0
         self.max_midi_note = 0
         self.min_midi_note = 0
         self.initial_midi_pitches = []
         if self.midi_notes:
-            self.initial_midi_pitches = tuple([midi_note[1] for midi_note in self.midi_notes if midi_note[0] < 2 * 1e5])
-            self.total_duration = sum(duration for _, _, duration, _, _ in self.midi_notes)
+            self.initial_midi_pitches = tuple([midi_note[2] for midi_note in self.midi_notes if midi_note[1] <= 2])
+            self.total_duration = sum(duration for _, _, _, duration, _, _ in self.midi_notes)
             self.max_midi_note = max(self.midi_pitches)
             self.min_midi_note = min(self.midi_pitches)
         self.initial_pitch_drop = False
         if len(self.initial_midi_pitches) > 2:
             first_pitch = self.initial_midi_pitches[0]
             last_pitch = self.initial_midi_pitches[-1]
-            if first_pitch > last_pitch and first_pitch - last_pitch > 12:
-                self.initial_pitch_drop = True
+            pitch_diff = round((first_pitch - last_pitch) / 12)
+            if (first_pitch > last_pitch and
+                    pitch_diff and
+                    tuple(sorted(self.initial_midi_pitches, reverse=True)) == self.initial_midi_pitches):
+                self.initial_pitch_drop = pitch_diff
         self.drum_pitches = []
         self.pitches = []
         self._set_pitches(sid)
@@ -65,7 +68,7 @@ class SidSoundFragment:
     def _set_pitches(self, sid):
         if not self.midi_notes:
             return
-        clock, _pitch, _duration, velocity, _ = self.midi_notes[0]
+        clock, _frame, _pitch, _duration, velocity, _ = self.midi_notes[0]
 
         if self.noisephases or self.initial_pitch_drop:
             if self.percussion:
@@ -84,7 +87,7 @@ class SidSoundFragment:
                         self.drum_pitches.append(
                             (clock, self.total_duration, LOW_TOM, velocity))
         else:
-            for clock, pitch, duration, velocity, _ in self.midi_notes:
+            for clock, _frame, pitch, duration, velocity, _ in self.midi_notes:
                 assert duration > 0, self.midi_notes
                 self.pitches.append(
                     (clock, duration, pitch, velocity))
