@@ -32,5 +32,5 @@ if not wavfile:
 
 df = pd.read_csv(args.ssffile, dtype=pd.Int64Dtype())
 hashid = np.int64(args.hashid)
-ssf_df = df[df['hashid'] == hashid].set_index('clock')
+ssf_df = df[df['hashid'] == hashid].fillna(method='ffill').set_index('clock')
 df2wav(ssf_df, sid, wavfile)
