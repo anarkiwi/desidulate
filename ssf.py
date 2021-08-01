@@ -70,27 +70,31 @@ class SidSoundFragment:
             return
         clock, _frame, _pitch, _duration, velocity, _ = self.midi_notes[0]
 
-        if self.noisephases or self.initial_pitch_drop:
-            if self.percussion:
-                if self.all_noise:
-                    self.drum_pitches.append(
-                        (clock, self.total_duration, self.drum_noise_duration(sid, self.total_duration), velocity))
-                elif self.noisephases > 1:
-                    self.drum_pitches.append(
-                        (clock, self.total_duration, ELECTRIC_SNARE, velocity))
-                else:
-                    if self.initial_pitch_drop:
-                        # http://www.ucapps.de/howto_sid_wavetables_1.html
-                        self.drum_pitches.append(
-                            (clock, self.total_duration, BASS_DRUM, velocity))
-                    else:
-                        self.drum_pitches.append(
-                            (clock, self.total_duration, LOW_TOM, velocity))
-        else:
+        if not (self.noisephases or self.initial_pitch_drop):
             for clock, _frame, pitch, duration, velocity, _ in self.midi_notes:
                 assert duration > 0, self.midi_notes
                 self.pitches.append(
                     (clock, duration, pitch, velocity))
+            return
+
+        if not self.percussion:
+            return
+
+        # TODO: pitched percussion.
+        if self.all_noise:
+            self.drum_pitches.append(
+                (clock, self.total_duration, self.drum_noise_duration(sid, self.total_duration), velocity))
+        elif self.noisephases > 1:
+            self.drum_pitches.append(
+                (clock, self.total_duration, ELECTRIC_SNARE, velocity))
+        else:
+            if self.initial_pitch_drop:
+                # http://www.ucapps.de/howto_sid_wavetables_1.html
+                self.drum_pitches.append(
+                    (clock, self.total_duration, BASS_DRUM, velocity))
+            else:
+                self.drum_pitches.append(
+                    (clock, self.total_duration, LOW_TOM, velocity))
 
     def smf_transcribe(self, smf, first_clock, voicenum):
         for clock, duration, pitch, velocity in self.pitches:
