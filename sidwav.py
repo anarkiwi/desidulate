@@ -11,7 +11,7 @@ from sox.transform import Transformer
 from pyresidfp import ControlBits, ModeVolBits, ResFiltBits, Voice
 
 
-def mostf(wave_file_name, threshold=0.65):
+def mostf(wav_file_name, threshold=0.65):
     transf = Transformer()
     ps = transf.power_spectrum(wav_file_name)
     assert ps
