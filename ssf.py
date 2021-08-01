@@ -43,7 +43,7 @@ class SidSoundFragment:
             self.total_duration = sum(duration for _, _, _, duration, _, _ in self.midi_notes)
             self.max_midi_note = max(self.midi_pitches)
             self.min_midi_note = min(self.midi_pitches)
-        self.initial_pitch_drop = False
+        self.initial_pitch_drop = 0
         if len(self.initial_midi_pitches) > 2:
             first_pitch = self.initial_midi_pitches[0]
             last_pitch = self.initial_midi_pitches[-1]
