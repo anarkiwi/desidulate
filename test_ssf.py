@@ -53,6 +53,7 @@ class SSFTestCase(unittest.TestCase):
         sid = get_sid(pal=True)
         smf = SidMidiFile(sid, 125)
         df = add_freq_notes_df(sid, df)
+        df['frame'] = df['clock'].floordiv(int(sid.clockq))
         return SidSoundFragment(percussion=percussion, sid=sid, smf=smf, df=df)
 
     def test_notest_ssf(self):
@@ -63,7 +64,7 @@ class SSFTestCase(unittest.TestCase):
         self.assertEqual(s.waveforms, {'tri'})
         self.assertEqual(s.midi_pitches, (35,))
         self.assertEqual(s.total_duration, 98525)
-        self.assertEqual(s.midi_notes, ((0, 35, 98525, 127, 60.134765625),))
+        self.assertEqual(s.midi_notes, ((0, 0, 35, 98525, 127, 60.134765625),))
 
     def test_test_ssf(self):
         df = pd.DataFrame(
@@ -74,7 +75,7 @@ class SSFTestCase(unittest.TestCase):
         self.assertEqual(s.waveforms, {'tri'})
         self.assertEqual(s.midi_pitches, (35,))
         self.assertEqual(s.total_duration, 78820)
-        self.assertEqual(s.midi_notes, ((20000, 35, 78820, 127, 60.134765625),))
+        self.assertEqual(s.midi_notes, ((20000, 1, 35, 78820, 127, 60.134765625),))
 
     def test_ssf_parser(self):
         sid = get_sid(pal=True)
