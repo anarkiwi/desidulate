@@ -59,8 +59,8 @@ class SidSoundFragment:
         self.pitches = []
         self._set_pitches(sid)
 
-   @staticmethod
-   def drum_noise_duration(sid, duration):
+    @staticmethod
+    def drum_noise_duration(sid, duration):
         max_duration = sid.clockq
         noise_pitch = None
         for noise_pitch in (PEDAL_HIHAT, CLOSED_HIHAT, OPEN_HIHAT, ACCOUSTIC_SNARE, CRASH_CYMBAL1):
