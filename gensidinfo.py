@@ -14,7 +14,7 @@ import subprocess
 import concurrent.futures
 import pandas as pd
 
-max_workers = 64
+MAX_WORKERS = 64
 fields_re = re.compile(r'^\|\s+([^:]+)\s+:\s+([^:]+)\s*$')
 subfields_re = re.compile(r'(.+)\s+\=\s+(.+)')
 
@@ -48,7 +48,7 @@ def scrape_sidinfo(sidfile):
     result['pal'] = 'PAL' in speed
     return result
 
-with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+with concurrent.futures.ThreadPoolExecutor(MAX_WORKERS=MAX_WORKERS) as executor:
     result_futures = map(lambda x: executor.submit(scrape_sidinfo, x), sidfiles)
     results = [future.result() for future in concurrent.futures.as_completed(result_futures)]
 
