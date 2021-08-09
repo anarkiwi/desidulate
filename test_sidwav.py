@@ -6,7 +6,7 @@ import tempfile
 import pandas as pd
 import numpy as np
 import sox
-from sidwav import state2samples, write_wav
+from sidwav import state2samples, write_wav, loudestf
 from sidlib import get_sid
 
 
@@ -106,9 +106,7 @@ class SidWavTestCase(unittest.TestCase):
                     {'hashid': 1, 'count': 1, 'clock': 0, 'freq1': test_raw_freq, 'sus1': 15, 'gate1': 1, 'tri1': 1, 'vol': 15},
                     {'hashid': 1, 'count': 1, 'clock': 1e6 * 10, 'gate1': 0}])
                 write_wav(test_wav, sid, state2samples(df, sid))
-                power_df = pd.DataFrame(transformer.power_spectrum(test_wav), columns=['freq', 'val'])
-                val_max = power_df['val'].max()
-                freq_max = power_df[power_df['val'] == val_max].iloc[0]['freq']
+                freq_max = loudestf(test_wav)
                 freq_diff = abs(freq_max - test_real_freq)
                 self.assertLessEqual(freq_diff, 3)
 

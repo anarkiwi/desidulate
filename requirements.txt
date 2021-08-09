@@ -4,4 +4,3 @@ pandas
 pyresidfp
 pytest
 scipy
-sox

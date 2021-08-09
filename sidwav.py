@@ -6,16 +6,21 @@
 
 import numpy as np
 import pandas as pd
-import scipy.io.wavfile
-from sox.transform import Transformer
+from scipy.io import wavfile
+from scipy.fft import rfft, rfftfreq
 from pyresidfp import ControlBits, ModeVolBits, ResFiltBits, Voice
 
 
+def psfromwav(wav_file_name):
+    samplerate, data = wavfile.read(wav_file_name)
+    y = np.abs(rfft(data))
+    x = rfftfreq(len(data), 1 / samplerate)
+    e = {f: n for f, n in zip(x, y) if n}
+    return e
+
+
 def mostf(wav_file_name, threshold=0.65):
-    transf = Transformer()
-    ps = transf.power_spectrum(wav_file_name)
-    assert ps
-    e = {f: n for f, n in ps if n}
+    e = psfromwav(wav_file_name)
     s = sum(e.values())
     if not s:
         return 0
@@ -25,6 +30,13 @@ def mostf(wav_file_name, threshold=0.65):
         if t >= threshold:
             return f
     return f
+
+
+def loudestf(wav_file_name):
+    e = psfromwav(wav_file_name)
+    for f, _ in sorted(e.items(), key=lambda x: x[1], reverse=True):
+        return f
+    return None
 
 
 def state2samples(orig_df, sid):
@@ -165,7 +177,7 @@ def state2samples(orig_df, sid):
 
 
 def write_wav(wav_file_name, sid, raw_samples):
-    scipy.io.wavfile.write(wav_file_name, int(sid.resid.sampling_frequency), raw_samples)
+    wavfile.write(wav_file_name, int(sid.resid.sampling_frequency), raw_samples)
 
 
 def df2wav(df, sid, wav_file_name):
