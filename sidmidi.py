@@ -58,12 +58,11 @@ def add_end_of_track(track, channel):
     eot.data = b''
     add_event(track, eot, 0, channel)
     track.updateEvents()
+    return track
 
 
 def track_zero():
-    track_zero = midi.MidiTrack(0)
-    add_end_of_track(track_zero, 0)
-    return track_zero
+    return add_end_of_track(midi.MidiTrack(0), 0)
 
 
 def write_midi(file_name, tpqn, tracks):

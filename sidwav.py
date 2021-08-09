@@ -139,7 +139,7 @@ def state2samples(orig_df, sid):
     raw_samples = []
 
     row = df.iloc[0]
-    for k, f in funcs.items():
+    for f in funcs.values():
         f(row)
 
     diff_cols = {}
