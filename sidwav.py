@@ -7,7 +7,7 @@
 import numpy as np
 import pandas as pd
 from scipy.io import wavfile
-from scipy.fft import rfft, rfftfreq
+from scipy.fft import rfft, rfftfreq  # pylint: disable=no-name-in-module
 from pyresidfp import ControlBits, ModeVolBits, ResFiltBits, Voice
 
 
