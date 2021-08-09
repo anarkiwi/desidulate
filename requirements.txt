@@ -1,6 +1,6 @@
 music21
-numpy
-pandas
+numpy>=1.21.1
+pandas>=1.3.1
 pyresidfp
 pytest
-scipy
+scipy>=1.7.1
