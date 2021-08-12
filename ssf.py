@@ -25,7 +25,7 @@ class SidSoundFragment:
             waveform[:-1] for waveform in ('noise1', 'pulse1', 'tri1', 'saw1') if pd.notna(getattr(row, waveform)) and getattr(row, waveform) > 0) for row in ssf.itertuples()]
 
     def __init__(self, percussion, sid, smf, df):
-        self.df = df.fillna(method='ffill')
+        self.df = df.fillna(method='ffill').set_index('clock')
         self.percussion = percussion
         waveform_states = self._waveform_state(self.df)
         self.waveform_order = tuple([frozenset(i[0]) for i in groupby(waveform_states)])

@@ -182,21 +182,22 @@ class SidMidiFile:
         return int((1.0 - (x / x_max)) * 127)
 
     def sid_adsr_to_velocity(self, row, last_rel, last_gate_clock):
+        clock = row.Index
         if row.gate1:
             attack_clock = self.sid.attack_clock[row.atk1]
-            if row.clock < attack_clock:
+            if clock < attack_clock:
                 if row.atk1 and not row.sus1:
-                    return self.vel_scale(row.clock, attack_clock)
+                    return self.vel_scale(clock, attack_clock)
             else:
                 if row.dec1 and not row.sus1:
                     decay_clock = self.sid.decay_release_clock[row.dec1]
-                    if row.clock < attack_clock + decay_clock:
-                        return self.neg_vel_scale(row.clock - attack_clock, decay_clock)
+                    if clock < attack_clock + decay_clock:
+                        return self.neg_vel_scale(clock - attack_clock, decay_clock)
             return self.sid_velocity[row.sus1]
         if last_gate_clock is not None:
             rel_clock = self.sid.decay_release_clock[last_rel]
-            if row.clock - last_gate_clock <= rel_clock:
-                return self.neg_vel_scale(row.clock - last_gate_clock, rel_clock)
+            if clock - last_gate_clock <= rel_clock:
+                return self.neg_vel_scale(clock - last_gate_clock, rel_clock)
         return 0
 
     def get_note_starts(self, row_states):
@@ -206,8 +207,9 @@ class SidMidiFile:
         last_gate_clock = None
         notes_starts = []
         for row, row_waveforms in row_states:
+            clock = row.Index
             if row.gate1:
-                last_gate_clock = row.clock
+                last_gate_clock = clock 
                 last_rel = row.rel1
             if row_waveforms and not row.test1:
                 # TODO: add pitch bend if significantly different to canonical note.
@@ -216,9 +218,9 @@ class SidMidiFile:
                     velocity = self.sid_adsr_to_velocity(row, last_rel, last_gate_clock)
                     assert velocity >= 0 and velocity <= 127, (velocity, row)
                     if velocity:
-                        notes_starts.append((row.clock, row.frame, int(row.closest_note), velocity, row.real_freq))
+                        notes_starts.append((clock, row.frame, int(row.closest_note), velocity, row.real_freq))
                         last_note = row.closest_note
-            last_clock = row.clock
+            last_clock = clock
         notes_starts.append((last_clock, None, None, None, None))
         return notes_starts
 
