@@ -11,7 +11,7 @@
 
 import argparse
 import pandas as pd
-from fileio import midi_path
+from fileio import midi_path, out_path
 from sidlib import get_sid
 from sidmidi import SidMidiFile
 from ssf import SidSoundFragment, SidSoundFragmentParser
@@ -36,12 +36,19 @@ parser.read_patches()
 
 ssf_log_df = pd.read_csv(args.ssflogfile, dtype=pd.Int64Dtype())
 ssf_cache = {}
+ssf_instruments = []
 for row in ssf_log_df.itertuples():
-    if row.hashid not in ssf_cache:
+    ssf = ssf_cache.get(row.hashid, None)
+    if ssf is None:
         ssf_df = parser.ssf_dfs[row.hashid]
-        ssf_cache[row.hashid] = SidSoundFragment(args.percussion, sid, smf, ssf_df)
-    ssf = ssf_cache[row.hashid]
+        ssf = SidSoundFragment(args.percussion, sid, smf, ssf_df)
+        ssf_cache[row.hashid] = ssf
+        ssf_instruments.append(ssf.instrument({'hashid': row.hashid}))
     ssf.smf_transcribe(smf, row.clock, row.voice)
+
+ssf_instrument_file = out_path(args.ssflogfile, 'inst.txt.xz')
+ssf_instrument_df = pd.DataFrame(ssf_instruments)
+ssf_instrument_df.to_csv(ssf_instrument_file, index=False)
 
 midifile = args.midifile
 if not midifile:

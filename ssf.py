@@ -63,6 +63,7 @@ class SidSoundFragment:
                 self.initial_pitch_drop = pitch_diff
         self.drum_pitches = []
         self.pitches = []
+        self.drum_instrument = pd.NA
         self._set_pitches(sid)
 
     @staticmethod
@@ -105,12 +106,18 @@ class SidSoundFragment:
             else:
                 self.drum_pitches.append(
                     (clock, self.total_duration, LOW_TOM, velocity))
+        if self.drum_pitches:
+            self.drum_instrument = self.drum_pitches[0][2]
 
     def smf_transcribe(self, smf, first_clock, voicenum):
         for clock, duration, pitch, velocity in self.pitches:
             smf.add_pitch(voicenum, first_clock + clock, duration, pitch, velocity)
         for clock, duration, pitch, velocity in self.drum_pitches:
             smf.add_drum_pitch(voicenum, first_clock + clock, duration, pitch, velocity)
+
+    def instrument(self, base_instrument):
+        base_instrument.update({'drum_instrument': self.drum_instrument})
+        return base_instrument
 
 
 def add_freq_notes_df(sid, ssfs_df):
