@@ -4,6 +4,7 @@
 
 ## The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 
+from collections import defaultdict
 import numpy as np
 import pandas as pd
 from scipy.io import wavfile
@@ -14,7 +15,10 @@ from pyresidfp import ControlBits, ModeVolBits, ResFiltBits, Voice
 def psfromsamples(samplerate, data):
     y = np.abs(rfft(data))
     x = rfftfreq(len(data), 1 / samplerate)
-    e = {f: n for f, n in zip(x, y) if n}
+    e = defaultdict(int)
+    for f, n in zip(x, y):
+        if n:
+            e[round(f)] += n
     return e
 
 
@@ -36,15 +40,6 @@ def mostf(wav_file_name, threshold=0.65):
     return f
 
 
-def spectral_centroid(wav_file_name):
-    samplerate, data = wavfile.read(wav_file_name)
-    magnitudes = np.abs(np.fft.rfft(data))
-    length = len(data)
-    freqs = np.abs(np.fft.fftfreq(length, 1.0/samplerate)[:length//2+1])
-    magnitudes = magnitudes[:length//2+1]
-    return np.sum(magnitudes*freqs) / np.sum(magnitudes)
-
-
 def loudestf(wav_file_name):
     e = psfromwav(wav_file_name)
     for f, _ in sorted(e.items(), key=lambda x: x[1], reverse=True):
@@ -54,7 +49,9 @@ def loudestf(wav_file_name):
 
 def samples_loudestf(data, sid):
     e = psfromsamples(sid.resid.sampling_frequency, data)
-    for f, _ in sorted(e.items(), key=lambda x: x[1], reverse=True):
+    for f, n in sorted(e.items(), key=lambda x: x[1], reverse=True):
+        if f <= 1:
+            continue
         return f
     return None
 

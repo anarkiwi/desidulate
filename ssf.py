@@ -34,6 +34,7 @@ class SidSoundFragment:
         self.waveform_order = tuple([frozenset(i[0]) for i in groupby(waveform_states)])
         self.waveforms = frozenset().union(*self.waveform_order)
         self.noisephases = len([waveforms for waveforms in self.waveform_order if 'noise' in waveforms])
+        self.pulsephases = len([waveforms for waveforms in self.waveform_order if 'pulse' in waveforms])
         self.all_noise = self.waveforms == {'noise'}
         self.midi_notes = tuple(smf.get_midi_notes_from_events(zip(self.df.itertuples(), waveform_states)))
         self.midi_pitches = tuple([midi_note[2] for midi_note in self.midi_notes])
@@ -68,6 +69,8 @@ class SidSoundFragment:
         self.samples = state2samples(self.df, sid, skiptest=True)
         self.loudestf = samples_loudestf(self.samples, sid)
         self._set_pitches(sid)
+        if self.drum_pitches:
+            self.drum_instrument = self.drum_pitches[0][2]
 
     @staticmethod
     def drum_noise_duration(sid, duration):
@@ -89,30 +92,33 @@ class SidSoundFragment:
             return
         clock, _frame, _pitch, _duration, velocity, _ = self.midi_notes[0]
 
-        if not self.noisephases:
-            self._set_nondrum_pitches()
-
-        if not self.all_noise and self.noisephases and not self.initial_pitch_drop:
-            self._set_nondrum_pitches()
-            return
-
         # TODO: pitched percussion.
         if self.all_noise:
             self.drum_pitches.append(
                 (clock, self.total_duration, self.drum_noise_duration(sid, self.total_duration), velocity))
-        elif self.noisephases > 1:
+            return
+
+        if self.noisephases == 0 and self.pulsephases == 0:
+            self._set_nondrum_pitches()
+            return
+
+        if self.noisephases > 1:
             self.drum_pitches.append(
                 (clock, self.total_duration, ELECTRIC_SNARE, velocity))
-        else:
-            if self.initial_pitch_drop:
-                # http://www.ucapps.de/howto_sid_wavetables_1.html
-                self.drum_pitches.append(
-                    (clock, self.total_duration, BASS_DRUM, velocity))
-            else:
-                self.drum_pitches.append(
-                    (clock, self.total_duration, LOW_TOM, velocity))
-        if self.drum_pitches:
-            self.drum_instrument = self.drum_pitches[0][2]
+            return
+
+        if self.initial_pitch_drop and self.loudestf < 100:
+            # http://www.ucapps.de/howto_sid_wavetables_1.html
+            self.drum_pitches.append(
+                (clock, self.total_duration, BASS_DRUM, velocity))
+            return
+
+        if self.pulsephases and self.loudestf < 150:
+            self.drum_pitches.append(
+                (clock, self.total_duration, LOW_TOM, velocity))
+            return
+
+        self._set_nondrum_pitches()
 
     def smf_transcribe(self, smf, first_clock, voicenum):
         for clock, duration, pitch, velocity in self.pitches:
