@@ -92,7 +92,7 @@ class SidSoundFragment:
         if not self.noisephases:
             self._set_nondrum_pitches()
 
-        if not self.all_noise and self.noisephases not self.initial_pitch_drop:
+        if not self.all_noise and self.noisephases and not self.initial_pitch_drop:
             self._set_nondrum_pitches()
             return
 
