@@ -209,7 +209,7 @@ class SidMidiFile:
         for row, row_waveforms in row_states:
             clock = row.Index
             if row.gate1:
-                last_gate_clock = clock 
+                last_gate_clock = clock
                 last_rel = row.rel1
             if row_waveforms and not row.test1:
                 # TODO: add pitch bend if significantly different to canonical note.
