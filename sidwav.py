@@ -59,7 +59,7 @@ def samples_loudestf(data, sid):
     return None
 
 
-def state2samples(orig_df, sid):
+def state2samples(orig_df, sid, skiptest=False):
 
     def nib2byte(hi, lo):
         return (int(hi) << 4) + int(lo)
@@ -168,11 +168,13 @@ def state2samples(orig_df, sid):
             df[col] = 0
     df = df.fillna(0).astype(pd.Int64Dtype())
     df['clock'] = df.index
+
     raw_samples = []
 
     row = df.iloc[0]
     for f in funcs.values():
         f(row)
+    in_test = row.test1
 
     diff_cols = {}
     diffs = ['diff_clock']
@@ -187,11 +189,21 @@ def state2samples(orig_df, sid):
     diff_df.columns = diffs
     df = df.join(diff_df)
 
-    for row in df[1:].itertuples():
-        raw_samples.extend(sid.add_samples(row.diff_clock))
-        diffs_funcs = (funcs[v] for k, v in diff_cols.items() if getattr(row, k) != 0)
-        for func in diffs_funcs:
-            func(row)
+    if skiptest:
+        for row in df[1:].itertuples():
+            if not in_test or not row.test1:
+                if not in_test:
+                    raw_samples.extend(sid.add_samples(row.diff_clock))
+                in_test = False
+            diffs_funcs = (funcs[v] for k, v in diff_cols.items() if getattr(row, k) != 0)
+            for func in diffs_funcs:
+                func(row)
+    else:
+        for row in df[1:].itertuples():
+            raw_samples.extend(sid.add_samples(row.diff_clock))
+            diffs_funcs = (funcs[v] for k, v in diff_cols.items() if getattr(row, k) != 0)
+            for func in diffs_funcs:
+                func(row)
 
     return np.array(raw_samples, dtype=np.int16)
 
@@ -200,5 +212,5 @@ def write_wav(wav_file_name, sid, raw_samples):
     wavfile.write(wav_file_name, int(sid.resid.sampling_frequency), raw_samples)
 
 
-def df2wav(df, sid, wav_file_name):
-    write_wav(wav_file_name, sid, state2samples(df, sid))
+def df2wav(df, sid, wav_file_name, skiptest=False):
+    write_wav(wav_file_name, sid, state2samples(df, sid, skiptest=skiptest))

@@ -65,7 +65,7 @@ class SidSoundFragment:
         self.drum_pitches = []
         self.pitches = []
         self.drum_instrument = pd.NA
-        self.samples = state2samples(self.df, sid)
+        self.samples = state2samples(self.df, sid, skiptest=True)
         self.loudestf = samples_loudestf(self.samples, sid)
         self._set_pitches(sid)
 
@@ -89,7 +89,10 @@ class SidSoundFragment:
             return
         clock, _frame, _pitch, _duration, velocity, _ = self.midi_notes[0]
 
-        if not (self.noisephases or self.initial_pitch_drop):
+        if not self.noisephases:
+            self._set_nondrum_pitches()
+
+        if not self.all_noise and self.noisephases not self.initial_pitch_drop:
             self._set_nondrum_pitches()
             return
 
@@ -114,12 +117,16 @@ class SidSoundFragment:
     def smf_transcribe(self, smf, first_clock, voicenum):
         for clock, duration, pitch, velocity in self.pitches:
             smf.add_pitch(voicenum, first_clock + clock, duration, pitch, velocity)
-        for clock, duration, pitch, velocity in self.drum_pitches:
-            smf.add_drum_pitch(voicenum, first_clock + clock, duration, pitch, velocity)
+        if self.percussion:
+            for clock, duration, pitch, velocity in self.drum_pitches:
+                smf.add_drum_pitch(voicenum, first_clock + clock, duration, pitch, velocity)
 
     def instrument(self, base_instrument):
-        base_instrument.update(
-            {'drum_instrument': self.drum_instrument, 'loudestf': self.loudestf, 'last_clock': self.df.index[-1]})
+        base_instrument.update({
+            'drum_instrument': self.drum_instrument,
+            'loudestf': self.loudestf,
+            'last_clock': self.df.index[-1],
+            'initial_pitch_drop': self.initial_pitch_drop})
         return base_instrument
 
 
