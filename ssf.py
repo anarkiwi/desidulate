@@ -22,7 +22,9 @@ class SidSoundFragment:
     @staticmethod
     def _waveform_state(ssf):
         return [frozenset(
-            waveform[:-1] for waveform in ('noise1', 'pulse1', 'tri1', 'saw1') if pd.notna(getattr(row, waveform)) and getattr(row, waveform) > 0) for row in ssf.itertuples()]
+            waveform[:-1] for waveform in ('noise1', 'pulse1', 'tri1', 'saw1')
+            if pd.notna(getattr(row, waveform)) and getattr(row, waveform) > 0)
+                for row in ssf.itertuples()]
 
     def __init__(self, percussion, sid, smf, df):
         self.df = df.fillna(method='ffill').set_index('clock')
@@ -40,10 +42,14 @@ class SidSoundFragment:
         self.initial_midi_notes = []
         self.initial_midi_pitches = []
         if self.midi_notes:
-            self.initial_midi_notes = tuple([midi_note for midi_note in self.midi_notes if midi_note[1] <= 2])
-            self.initial_midi_pitches = tuple([midi_note[2] for midi_note in self.initial_midi_notes])
-            self.total_duration = sum([midi_note[3] for midi_note in self.midi_notes])
-            self.initial_duration = sum([midi_note[3] for midi_note in self.initial_midi_notes])
+            self.initial_midi_notes = tuple(
+                [midi_note for midi_note in self.midi_notes if midi_note[1] <= 2])
+            self.initial_midi_pitches = tuple(
+                [midi_note[2] for midi_note in self.initial_midi_notes])
+            self.total_duration = sum(
+                [midi_note[3] for midi_note in self.midi_notes])
+            self.initial_duration = sum(
+                [midi_note[3] for midi_note in self.initial_midi_notes])
             self.max_midi_note = max(self.midi_pitches)
             self.min_midi_note = min(self.midi_pitches)
         self.initial_pitch_drop = 0
@@ -108,11 +114,15 @@ class SidSoundFragment:
 
 
 def add_freq_notes_df(sid, ssfs_df):
-    real_freqs = {freq: freq * sid.freq_scaler for freq in ssfs_df['freq1'].unique() if pd.notna(freq)}
-    closest_notes = {real_freq: closest_midi(real_freq)[1] for real_freq in real_freqs.values()}
-    freq_map = [(freq, real_freq, closest_notes[real_freq]) for freq, real_freq in real_freqs.items()]
+    real_freqs = {
+        freq: freq * sid.freq_scaler for freq in ssfs_df['freq1'].unique() if pd.notna(freq)}
+    closest_notes = {
+        real_freq: closest_midi(real_freq)[1] for real_freq in real_freqs.values()}
+    freq_map = [
+        (freq, real_freq, closest_notes[real_freq]) for freq, real_freq in real_freqs.items()]
     freq_map.extend([(pd.NA, pd.NA, pd.NA)])
-    freq_notes_df = pd.DataFrame.from_records(freq_map, columns=['freq1', 'real_freq', 'closest_note']).astype(pd.Float64Dtype())
+    freq_notes_df = pd.DataFrame.from_records(
+        freq_map, columns=['freq1', 'real_freq', 'closest_note']).astype(pd.Float64Dtype())
     freq_notes_df['freq1'] = freq_notes_df['freq1'].astype(pd.UInt16Dtype())
     freq_notes_df['closest_note'] = freq_notes_df['closest_note'].astype(pd.UInt8Dtype())
     return set_sid_dtype(ssfs_df).merge(freq_notes_df, how='left', on='freq1')

@@ -5,7 +5,6 @@ import unittest
 import tempfile
 import pandas as pd
 import numpy as np
-import sox
 from sidwav import state2samples, write_wav, loudestf
 from sidlib import get_sid
 
@@ -95,7 +94,6 @@ class SidWavTestCase(unittest.TestCase):
 
     def test_df2wav(self):
         sid = get_sid(pal=True)
-        transformer = sox.Transformer()
 
         with tempfile.TemporaryDirectory() as tmpdir:
             test_wav = os.path.join(tmpdir, 'test.wav')
