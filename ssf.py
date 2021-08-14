@@ -15,6 +15,7 @@ import pandas as pd
 from fileio import out_path
 from sidlib import set_sid_dtype
 from sidmidi import ELECTRIC_SNARE, BASS_DRUM, LOW_TOM, PEDAL_HIHAT, CLOSED_HIHAT, OPEN_HIHAT, ACCOUSTIC_SNARE, CRASH_CYMBAL1, closest_midi
+from sidwav import state2samples, samples_loudestf
 
 
 class SidSoundFragment:
@@ -64,6 +65,8 @@ class SidSoundFragment:
         self.drum_pitches = []
         self.pitches = []
         self.drum_instrument = pd.NA
+        self.samples = state2samples(self.df, sid)
+        self.loudestf = samples_loudestf(self.samples, sid)
         self._set_pitches(sid)
 
     @staticmethod
@@ -76,19 +79,18 @@ class SidSoundFragment:
             max_duration *= 2
         return noise_pitch
 
+    def _set_nondrum_pitches(self):
+        for clock, _frame, pitch, duration, velocity, _ in self.midi_notes:
+            assert duration > 0, self.midi_notes
+            self.pitches.append((clock, duration, pitch, velocity))
+
     def _set_pitches(self, sid):
         if not self.midi_notes:
             return
         clock, _frame, _pitch, _duration, velocity, _ = self.midi_notes[0]
 
         if not (self.noisephases or self.initial_pitch_drop):
-            for clock, _frame, pitch, duration, velocity, _ in self.midi_notes:
-                assert duration > 0, self.midi_notes
-                self.pitches.append(
-                    (clock, duration, pitch, velocity))
-            return
-
-        if not self.percussion:
+            self._set_nondrum_pitches()
             return
 
         # TODO: pitched percussion.
@@ -116,7 +118,8 @@ class SidSoundFragment:
             smf.add_drum_pitch(voicenum, first_clock + clock, duration, pitch, velocity)
 
     def instrument(self, base_instrument):
-        base_instrument.update({'drum_instrument': self.drum_instrument})
+        base_instrument.update(
+            {'drum_instrument': self.drum_instrument, 'loudestf': self.loudestf, 'last_clock': self.df.index[-1]})
         return base_instrument
 
 
