@@ -18,6 +18,8 @@ from sidmidi import ELECTRIC_SNARE, BASS_DRUM, LOW_TOM, PEDAL_HIHAT, CLOSED_HIHA
 from sidwav import state2samples, samples_loudestf
 
 INITIAL_PERIOD_FRAMES = 4
+# Percussion duration must be no longer than two quarter notes.
+MAX_PERCUSSION_QNS = 2
 
 
 class SidSoundFragment:
@@ -29,7 +31,7 @@ class SidSoundFragment:
             if pd.notna(getattr(row, waveform)) and getattr(row, waveform) > 0)
                 for row in ssf.itertuples()]
 
-    def __init__(self, percussion, sid, smf, df):
+    def __init__(self, percussion, sid, df, smf, bpm):
         self.df = df.fillna(method='ffill').set_index('clock')
         self.percussion = percussion
         waveform_states = self._waveform_state(self.df)
@@ -69,7 +71,9 @@ class SidSoundFragment:
         self.pitches = []
         self.drum_instrument = pd.NA
         self.loudestf = 0
-        self.samples = state2samples(self.df, sid, skiptest=True, maxclock=1e6)
+        self.total_clocks = self.df.index[-1]
+        self.one_qn = sid.qn_to_clock(1, bpm)
+        self.samples = state2samples(self.df, sid, skiptest=True, maxclock=self.one_qn*MAX_PERCUSSION_QNS)
         if len(self.samples):
             self.loudestf = samples_loudestf(self.samples, sid)
             self._set_pitches(sid)
@@ -80,7 +84,7 @@ class SidSoundFragment:
     def drum_noise_duration(sid, duration):
         max_duration = sid.clockq
         noise_pitch = None
-        for noise_pitch in (PEDAL_HIHAT, CLOSED_HIHAT, OPEN_HIHAT, ACCOUSTIC_SNARE, CRASH_CYMBAL1):
+        for noise_pitch in (PEDAL_HIHAT, CLOSED_HIHAT, OPEN_HIHAT, ACCOUSTIC_SNARE, ELECTRIC_SNARE):
             if duration <= max_duration:
                 break
             max_duration *= 2
@@ -92,36 +96,28 @@ class SidSoundFragment:
             self.pitches.append((clock, duration, pitch, velocity))
 
     def _set_pitches(self, sid):
-        # TODO: pitched percussion.
         if not self.midi_notes:
             return
         clock, _frame, _pitch, _duration, velocity, _ = self.midi_notes[0]
 
-        if self.midi_notes == self.initial_midi_notes:
-            if self.noisephases == 0 and self.pulsephases == 0:
-                self._set_nondrum_pitches()
-                return
-
-            if self.noisephases > 1:
-                self.drum_pitches.append(
-                    (clock, self.total_duration, ELECTRIC_SNARE, velocity))
-                return
-
-            if self.all_noise or self.noisephases:
+        # TODO: pitched percussion.
+        if self.total_clocks < self.one_qn*MAX_PERCUSSION_QNS:
+            if self.all_noise or self.noisephases > 1:
                 self.drum_pitches.append(
                     (clock, self.total_duration, self.drum_noise_duration(sid, self.total_duration), velocity))
                 return
 
-            if self.initial_pitch_drop and self.loudestf < 100:
-                # http://www.ucapps.de/howto_sid_wavetables_1.html
-                self.drum_pitches.append(
-                    (clock, self.total_duration, BASS_DRUM, velocity))
-                return
+            if self.pulsephases:
+                if self.initial_pitch_drop and self.loudestf < 100:
+                    # http://www.ucapps.de/howto_sid_wavetables_1.html
+                    self.drum_pitches.append(
+                        (clock, self.total_duration, BASS_DRUM, velocity))
+                    return
 
-            if self.pulsephases and self.loudestf < 250:
-                self.drum_pitches.append(
-                    (clock, self.total_duration, LOW_TOM, velocity))
-                return
+                if self.loudestf < 250:
+                    self.drum_pitches.append(
+                        (clock, self.total_duration, LOW_TOM, velocity))
+                    return
 
         self._set_nondrum_pitches()
 

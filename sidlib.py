@@ -94,6 +94,9 @@ class SidWrap:
         self.decay_release_clock = {
             k: int(v / 1e3 * self.clock_freq) for k, v in self.DECAY_RELEASE_MS.items()}
 
+    def qn_to_clock(self, qn, bpm):
+        return self.clock_freq * 60 / bpm * qn
+
     def clock_to_s(self, clock):
         return clock / self.clock_freq
 
