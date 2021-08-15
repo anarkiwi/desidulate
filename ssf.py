@@ -97,30 +97,31 @@ class SidSoundFragment:
             return
         clock, _frame, _pitch, _duration, velocity, _ = self.midi_notes[0]
 
-        if self.noisephases == 0 and self.pulsephases == 0:
-            self._set_nondrum_pitches()
-            return
+        if self.midi_notes == self.initial_midi_notes:
+            if self.noisephases == 0 and self.pulsephases == 0:
+                self._set_nondrum_pitches()
+                return
 
-        if self.noisephases > 1:
-            self.drum_pitches.append(
-                (clock, self.total_duration, ELECTRIC_SNARE, velocity))
-            return
+            if self.noisephases > 1:
+                self.drum_pitches.append(
+                    (clock, self.total_duration, ELECTRIC_SNARE, velocity))
+                return
 
-        if self.all_noise or (self.noisephases and self.midi_notes == self.initial_midi_notes):
-            self.drum_pitches.append(
-                (clock, self.total_duration, self.drum_noise_duration(sid, self.total_duration), velocity))
-            return
+            if self.all_noise or self.noisephases:
+                self.drum_pitches.append(
+                    (clock, self.total_duration, self.drum_noise_duration(sid, self.total_duration), velocity))
+                return
 
-        if self.initial_pitch_drop and self.loudestf < 100:
-            # http://www.ucapps.de/howto_sid_wavetables_1.html
-            self.drum_pitches.append(
-                (clock, self.total_duration, BASS_DRUM, velocity))
-            return
+            if self.initial_pitch_drop and self.loudestf < 100:
+                # http://www.ucapps.de/howto_sid_wavetables_1.html
+                self.drum_pitches.append(
+                    (clock, self.total_duration, BASS_DRUM, velocity))
+                return
 
-        if self.pulsephases and self.loudestf < 250 and self.midi_notes == self.initial_midi_notes:
-            self.drum_pitches.append(
-                (clock, self.total_duration, LOW_TOM, velocity))
-            return
+            if self.pulsephases and self.loudestf < 250:
+                self.drum_pitches.append(
+                    (clock, self.total_duration, LOW_TOM, velocity))
+                return
 
         self._set_nondrum_pitches()
 
