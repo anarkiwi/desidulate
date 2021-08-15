@@ -56,7 +56,7 @@ def samples_loudestf(data, sid):
     return None
 
 
-def state2samples(orig_df, sid, skiptest=False):
+def state2samples(orig_df, sid, skiptest=False, maxclock=None):
 
     def nib2byte(hi, lo):
         return (int(hi) << 4) + int(lo)
@@ -165,6 +165,8 @@ def state2samples(orig_df, sid, skiptest=False):
             df[col] = 0
     df = df.fillna(0).astype(pd.Int64Dtype())
     df['clock'] = df.index
+    if maxclock is not None:
+        df = df[df['clock'] <= maxclock]
 
     raw_samples = []
 

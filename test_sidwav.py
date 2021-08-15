@@ -21,6 +21,8 @@ class SidWavTestCase(unittest.TestCase):
         raw_samples = state2samples(df1, sid)
         sid = get_sid(pal=True)
         raw_samples2 = state2samples(df2, sid)
+        self.assertTrue(len(raw_samples))
+        self.assertTrue(len(raw_samples2))
         self.assertNotEqual(df1.to_string(), df2.to_string())
         self.assertTrue(np.array_equal(raw_samples, raw_samples2))
 
