@@ -59,18 +59,18 @@ def samples_loudestf(data, sid):
 def state2samples(orig_df, sid, skiptest=False, maxclock=None):
 
     def nib2byte(hi, lo):
-        return (int(hi) << 4) + int(lo)
+        return (hi << 4) + lo
 
     def control(gate, sync, ring, test, tri, saw, pulse, noise):
-        return int(
-            int(ControlBits.GATE.value * gate) |
-            int(ControlBits.SYNC.value * sync) |
-            int(ControlBits.RING_MOD.value * ring) |
-            int(ControlBits.TEST.value * test) |
-            int(ControlBits.TRIANGLE.value * tri) |
-            int(ControlBits.SAWTOOTH.value * saw) |
-            int(ControlBits.PULSE.value * pulse) |
-            int(ControlBits.NOISE.value * noise))
+        return (
+            (ControlBits.GATE.value * gate) |
+            (ControlBits.SYNC.value * sync) |
+            (ControlBits.RING_MOD.value * ring) |
+            (ControlBits.TEST.value * test) |
+            (ControlBits.TRIANGLE.value * tri) |
+            (ControlBits.SAWTOOTH.value * saw) |
+            (ControlBits.PULSE.value * pulse) |
+            (ControlBits.NOISE.value * noise))
 
     def control1(row):
         sid.resid.control(
@@ -89,17 +89,17 @@ def state2samples(orig_df, sid, skiptest=False, maxclock=None):
 
     def flt(row):
         sid.resid.Filter_Res_Filt = (
-            int(ResFiltBits.Filt1.value * row.flt1) |
-            int(ResFiltBits.Filt2.value * row.flt2) |
-            int(ResFiltBits.Filt3.value * row.flt3) |
-            int(ResFiltBits.FiltEX.value * row.fltext)) + (int(row.fltres) << 4)
+            (ResFiltBits.Filt1.value * row.flt1) |
+            (ResFiltBits.Filt2.value * row.flt2) |
+            (ResFiltBits.Filt3.value * row.flt3) |
+            (ResFiltBits.FiltEX.value * row.fltext)) + (row.fltres << 4)
 
     def main(row):
         sid.resid.Filter_Mode_Vol = (
-            int(ModeVolBits.LP.value * row.fltlo) |
-            int(ModeVolBits.BP.value * row.fltband) |
-            int(ModeVolBits.HP.value * row.flthi) |
-            int(ModeVolBits.THREE_OFF.value * row.mute3)) + int(row.vol)
+            (ModeVolBits.LP.value * row.fltlo) |
+            (ModeVolBits.BP.value * row.fltband) |
+            (ModeVolBits.HP.value * row.flthi) |
+            (ModeVolBits.THREE_OFF.value * row.mute3)) + row.vol
 
     funcs = {
         'atk1': lambda row: sid.resid.attack_decay(Voice.ONE, nib2byte(row.atk1, row.dec1)),
@@ -112,14 +112,14 @@ def state2samples(orig_df, sid, skiptest=False, maxclock=None):
         'flt2': flt,
         'flt3': flt,
         'fltband': main,
-        'fltcoff': lambda row: sid.resid.filter_cutoff(int(row.fltcoff)),
+        'fltcoff': lambda row: sid.resid.filter_cutoff(row.fltcoff),
         'flthi': main,
         'fltlo': main,
         'fltres': flt,
         'fltext': flt,
-        'freq1': lambda row: sid.resid.oscillator(Voice.ONE, int(row.freq1)),
-        'freq2': lambda row: sid.resid.oscillator(Voice.TWO, int(row.freq2)),
-        'freq3': lambda row: sid.resid.oscillator(Voice.THREE, int(row.freq3)),
+        'freq1': lambda row: sid.resid.oscillator(Voice.ONE, row.freq1),
+        'freq2': lambda row: sid.resid.oscillator(Voice.TWO, row.freq2),
+        'freq3': lambda row: sid.resid.oscillator(Voice.THREE, row.freq3),
         'gate1': control1,
         'gate2': control2,
         'gate3': control3,
@@ -130,9 +130,9 @@ def state2samples(orig_df, sid, skiptest=False, maxclock=None):
         'pulse1': control1,
         'pulse2': control2,
         'pulse3': control3,
-        'pwduty1': lambda row: sid.resid.pulse_width(Voice.ONE, int(row.pwduty1)),
-        'pwduty2': lambda row: sid.resid.pulse_width(Voice.TWO, int(row.pwduty2)),
-        'pwduty3': lambda row: sid.resid.pulse_width(Voice.THREE, int(row.pwduty3)),
+        'pwduty1': lambda row: sid.resid.pulse_width(Voice.ONE, row.pwduty1),
+        'pwduty2': lambda row: sid.resid.pulse_width(Voice.TWO, row.pwduty2),
+        'pwduty3': lambda row: sid.resid.pulse_width(Voice.THREE, row.pwduty3),
         'rel1': lambda row: sid.resid.sustain_release(Voice.ONE, nib2byte(row.sus1, row.rel1)),
         'rel2': lambda row: sid.resid.sustain_release(Voice.TWO, nib2byte(row.sus2, row.rel2)),
         'rel3': lambda row: sid.resid.sustain_release(Voice.THREE, nib2byte(row.sus3, row.rel3)),
@@ -170,7 +170,7 @@ def state2samples(orig_df, sid, skiptest=False, maxclock=None):
 
     raw_samples = []
 
-    row = df.iloc[0]
+    row = df.iloc[0].astype(pd.Int64Dtype())
     for f in funcs.values():
         f(row)
     in_test = row.test1
