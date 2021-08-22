@@ -202,20 +202,22 @@ def state2samples(orig_df, sid, skiptest=False, maxclock=None):
     for f in funcs.values():
         f(row)
     in_test = row.test1
+    df = df[1:]
 
     if skiptest:
-        for row in df[1:].itertuples():
-            if not in_test or not row.test1:
-                if not in_test:
-                    raw_samples.extend(sid.add_samples(row.diff_clock))
-                in_test = False
+        i = 0
+        for row in df.itertuples():
             for func in row.diff_funcs:
                 func(row)
-    else:
-        for row in df[1:].itertuples():
-            raw_samples.extend(sid.add_samples(row.diff_clock))
-            for func in row.diff_funcs:
-                func(row)
+            i += 1
+            if not row.test1:
+                break
+        df = df[i:]
+
+    for row in df.itertuples():
+        raw_samples.extend(sid.add_samples(row.diff_clock))
+        for func in row.diff_funcs:
+            func(row)
 
     return np.array(raw_samples, dtype=np.int16)
 
