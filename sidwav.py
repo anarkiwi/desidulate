@@ -170,11 +170,6 @@ def state2samples(orig_df, sid, skiptest=False, maxclock=None):
 
     raw_samples = []
 
-    row = df.iloc[0].astype(pd.Int64Dtype())
-    for f in funcs.values():
-        f(row)
-    in_test = row.test1
-
     diff_cols = {}
     diffs = ['diff_clock']
     cols = ['clock']
@@ -199,6 +194,11 @@ def state2samples(orig_df, sid, skiptest=False, maxclock=None):
         mask = (df[diff_col] != 0)
         func = funcs[col]
         df.loc[mask, 'diff_funcs'] = df.loc[mask, 'diff_funcs'].apply(lambda row: row + [func])
+
+    row = df.iloc[0]
+    for f in funcs.values():
+        f(row)
+    in_test = row.test1
 
     if skiptest:
         for row in df[1:].itertuples():
