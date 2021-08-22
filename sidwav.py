@@ -195,6 +195,9 @@ def state2samples(orig_df, sid, skiptest=False, maxclock=None):
         func = funcs[col]
         df.loc[mask, 'diff_funcs'] = df.loc[mask, 'diff_funcs'].apply(lambda row: row + [func])
 
+    diffs.remove('diff_clock')
+    df = df.drop(diffs, axis=1)
+
     row = df.iloc[0]
     for f in funcs.values():
         f(row)
