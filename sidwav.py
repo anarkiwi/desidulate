@@ -185,7 +185,8 @@ def state2samples(orig_df, sid, skiptest=False, maxclock=None):
     df = df.join(diff_df)
     drop_diff_cols = []
     for diff_col, col in diff_cols.items():
-        if df[diff_col].max() == 0:
+        diff_max = df[diff_col].max()
+        if pd.isna(diff_max) or diff_max == 0:
             drop_diff_cols.append(diff_col)
     for diff_col in drop_diff_cols:
         del diff_cols[diff_col]
@@ -196,7 +197,10 @@ def state2samples(orig_df, sid, skiptest=False, maxclock=None):
         df.loc[mask, 'diff_funcs'] = df.loc[mask, 'diff_funcs'].apply(lambda row: row + [func])
 
     diffs.remove('diff_clock')
-    df = df.drop(diffs, axis=1)
+    df['diff_clock'] = df['diff_clock'].fillna(0)
+    dtypes = {'diff_clock': np.uint32, 'diff_funcs': object}
+    dtypes.update({col: np.uint16 for col in funcs})
+    df = df.drop(diffs, axis=1).astype(dtypes)
 
     row = df.iloc[0]
     for f in funcs.values():
