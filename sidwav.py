@@ -187,6 +187,12 @@ def state2samples(orig_df, sid, skiptest=False, maxclock=None):
     diff_df = df[cols].diff().astype(pd.Int32Dtype())
     diff_df.columns = diffs
     df = df.join(diff_df)
+    drop_diff_cols = []
+    for diff_col, col in diff_cols.items():
+        if df[diff_col].max() == 0:
+            drop_diff_cols.append(diff_col)
+    for diff_col in drop_diff_cols:
+        del diff_cols[diff_col]
 
     if skiptest:
         for row in df[1:].itertuples():
