@@ -186,6 +186,7 @@ def state2samples(orig_df, sid, skiptest=False, maxclock=None):
             cols.append(col)
     diff_df = df[cols].diff().astype(pd.Int32Dtype())
     diff_df.columns = diffs
+    diff_df['diff_funcs'] = np.empty((len(df), 0)).tolist()
     df = df.join(diff_df)
     drop_diff_cols = []
     for diff_col, col in diff_cols.items():
@@ -194,20 +195,23 @@ def state2samples(orig_df, sid, skiptest=False, maxclock=None):
     for diff_col in drop_diff_cols:
         del diff_cols[diff_col]
 
+    for diff_col, col in diff_cols.items():
+        mask = (df[diff_col] != 0)
+        func = funcs[col]
+        df.loc[mask, 'diff_funcs'] = df.loc[mask, 'diff_funcs'].apply(lambda row: row + [func])
+
     if skiptest:
         for row in df[1:].itertuples():
             if not in_test or not row.test1:
                 if not in_test:
                     raw_samples.extend(sid.add_samples(row.diff_clock))
                 in_test = False
-            diffs_funcs = (funcs[v] for k, v in diff_cols.items() if getattr(row, k) != 0)
-            for func in diffs_funcs:
+            for func in row.diff_funcs:
                 func(row)
     else:
         for row in df[1:].itertuples():
             raw_samples.extend(sid.add_samples(row.diff_clock))
-            diffs_funcs = (funcs[v] for k, v in diff_cols.items() if getattr(row, k) != 0)
-            for func in diffs_funcs:
+            for func in row.diff_funcs:
                 func(row)
 
     return np.array(raw_samples, dtype=np.int16)
