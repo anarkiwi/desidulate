@@ -199,7 +199,10 @@ def state2samples(orig_df, sid, skiptest=False, maxclock=None):
     diffs.remove('diff_clock')
     df['diff_clock'] = df['diff_clock'].fillna(0)
     dtypes = {'diff_clock': np.uint32, 'diff_funcs': object}
-    dtypes.update({col: np.uint16 for col in funcs})
+    for col in funcs:
+        if col.startswith('freq') or col.startswith('pwduty') or col == 'fltcoff':
+            dtypes[col] = np.uint16
+        dtypes[col] = np.uint8
     df = df.drop(diffs, axis=1).astype(dtypes)
 
     row = df.iloc[0]
