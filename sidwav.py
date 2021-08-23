@@ -202,6 +202,7 @@ def state2samples(orig_df, sid, skiptest=False, maxclock=None):
     for col in funcs:
         if col.startswith('freq') or col.startswith('pwduty') or col == 'fltcoff':
             dtypes[col] = np.uint16
+            continue
         dtypes[col] = np.uint8
     df = df.drop(diffs, axis=1).astype(dtypes)
 
