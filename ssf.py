@@ -79,6 +79,8 @@ class SidSoundFragment:
             self._set_pitches(sid)
             if self.drum_pitches:
                 self.drum_instrument = self.drum_pitches[0][2]
+        else:
+            self._set_nondrum_pitches()
 
     @staticmethod
     def drum_noise_duration(sid, duration):

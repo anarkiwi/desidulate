@@ -44,7 +44,7 @@ def loudestf(wav_file_name):
     e = psfromwav(wav_file_name)
     for f, _ in sorted(e.items(), key=lambda x: x[1], reverse=True):
         return f
-    return None
+    return 0
 
 
 def samples_loudestf(data, sid):
@@ -53,7 +53,7 @@ def samples_loudestf(data, sid):
         if f <= 1:
             continue
         return f
-    return None
+    return 0
 
 
 def state2samples(orig_df, sid, skiptest=False, maxclock=None):
