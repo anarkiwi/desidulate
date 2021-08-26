@@ -22,6 +22,21 @@ INITIAL_PERIOD_FRAMES = 4
 MAX_PERCUSSION_QNS = 2
 
 
+def add_freq_notes_df(sid, ssfs_df):
+    real_freqs = {
+        freq: freq * sid.freq_scaler for freq in ssfs_df['freq1'].unique() if pd.notna(freq)}
+    closest_notes = {
+        real_freq: closest_midi(real_freq)[1] for real_freq in real_freqs.values()}
+    freq_map = [
+        (freq, real_freq, closest_notes[real_freq]) for freq, real_freq in real_freqs.items()]
+    freq_map.extend([(pd.NA, pd.NA, pd.NA)])
+    freq_notes_df = pd.DataFrame.from_records(
+        freq_map, columns=['freq1', 'real_freq', 'closest_note']).astype(pd.Float64Dtype())
+    freq_notes_df['freq1'] = freq_notes_df['freq1'].astype(pd.UInt16Dtype())
+    freq_notes_df['closest_note'] = freq_notes_df['closest_note'].astype(pd.UInt8Dtype())
+    return set_sid_dtype(ssfs_df).merge(freq_notes_df, how='left', on='freq1')
+
+
 class SidSoundFragment:
 
     @staticmethod
@@ -59,7 +74,7 @@ class SidSoundFragment:
             self.max_midi_note = max(self.midi_pitches)
             self.min_midi_note = min(self.midi_pitches)
         self.initial_pitch_drop = 0
-        if len(self.initial_midi_pitches) > 2:
+        if len(self.initial_midi_pitches) >= 2:
             first_pitch = self.initial_midi_pitches[0]
             last_pitch = self.initial_midi_pitches[-1]
             pitch_diff = round((first_pitch - last_pitch) / 12)
@@ -137,21 +152,6 @@ class SidSoundFragment:
             'last_clock': self.df.index[-1],
             'initial_pitch_drop': self.initial_pitch_drop})
         return base_instrument
-
-
-def add_freq_notes_df(sid, ssfs_df):
-    real_freqs = {
-        freq: freq * sid.freq_scaler for freq in ssfs_df['freq1'].unique() if pd.notna(freq)}
-    closest_notes = {
-        real_freq: closest_midi(real_freq)[1] for real_freq in real_freqs.values()}
-    freq_map = [
-        (freq, real_freq, closest_notes[real_freq]) for freq, real_freq in real_freqs.items()]
-    freq_map.extend([(pd.NA, pd.NA, pd.NA)])
-    freq_notes_df = pd.DataFrame.from_records(
-        freq_map, columns=['freq1', 'real_freq', 'closest_note']).astype(pd.Float64Dtype())
-    freq_notes_df['freq1'] = freq_notes_df['freq1'].astype(pd.UInt16Dtype())
-    freq_notes_df['closest_note'] = freq_notes_df['closest_note'].astype(pd.UInt8Dtype())
-    return set_sid_dtype(ssfs_df).merge(freq_notes_df, how='left', on='freq1')
 
 
 class SidSoundFragmentParser:

@@ -217,6 +217,7 @@ def state2samples(orig_df, sid, skiptest=False, maxclock=None):
         for row in df.itertuples():
             for func in row.diff_funcs:
                 func(row)
+            sid.add_samples(row.diff_clock)
             i += 1
             if not row.test1:
                 break
