@@ -31,7 +31,7 @@ class SidSoundFragment:
             if pd.notna(getattr(row, waveform)) and getattr(row, waveform) > 0)
                 for row in ssf.itertuples()]
 
-    def __init__(self, percussion, sid, df, smf, bpm):
+    def __init__(self, percussion, sid, df, smf):
         self.df = df.fillna(method='ffill').set_index('clock')
         self.percussion = percussion
         waveform_states = self._waveform_state(self.df)
@@ -72,7 +72,7 @@ class SidSoundFragment:
         self.drum_instrument = pd.NA
         self.loudestf = 0
         self.total_clocks = self.df.index[-1]
-        self.one_qn = sid.qn_to_clock(1, bpm)
+        self.one_qn = sid.qn_to_clock(1, smf.bpm)
         self.samples = state2samples(self.df, sid, skiptest=True, maxclock=self.one_qn*MAX_PERCUSSION_QNS)
         if len(self.samples):
             self.loudestf = samples_loudestf(self.samples, sid)

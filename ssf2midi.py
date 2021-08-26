@@ -41,7 +41,7 @@ for row in ssf_log_df.itertuples():
     ssf = ssf_cache.get(row.hashid, None)
     if ssf is None:
         ssf_df = parser.ssf_dfs[row.hashid]
-        ssf = SidSoundFragment(args.percussion, sid, ssf_df, smf, args.bpm)
+        ssf = SidSoundFragment(args.percussion, sid, ssf_df, smf)
         ssf_cache[row.hashid] = ssf
         ssf_instruments.append(ssf.instrument({'hashid': row.hashid}))
     ssf.smf_transcribe(smf, row.clock, row.voice)

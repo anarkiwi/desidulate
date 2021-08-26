@@ -49,7 +49,7 @@ class SSFTestCase(unittest.TestCase):
         smf = SidMidiFile(sid, 125)
         df = add_freq_notes_df(sid, df)
         df['frame'] = df['clock'].floordiv(int(sid.clockq))
-        return SidSoundFragment(percussion=percussion, sid=sid, smf=smf, df=df, bpm=125)
+        return SidSoundFragment(percussion=percussion, sid=sid, smf=smf, df=df)
 
     def test_notest_ssf(self):
         df = pd.DataFrame(
@@ -92,7 +92,7 @@ class SSFTestCase(unittest.TestCase):
             ssf = None
             row = None
             for row in ssf_log_df.itertuples():
-                ssf = SidSoundFragment(percussion=True, sid=sid, smf=smf, df=ssf_df[ssf_df['hashid'] == row.hashid], bpm=125)
+                ssf = SidSoundFragment(percussion=True, sid=sid, smf=smf, df=ssf_df[ssf_df['hashid'] == row.hashid])
                 if ssf and row.clock == 103:
                     break
             self.assertTrue(row is not None)
