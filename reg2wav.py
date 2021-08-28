@@ -9,7 +9,7 @@
 import argparse
 import logging
 from fileio import wav_path
-from sidlib import get_sid, reg2state. timer_args
+from sidlib import get_sid, reg2state, timer_args
 from sidwav import state2samples, write_wav
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
