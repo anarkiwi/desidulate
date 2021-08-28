@@ -212,7 +212,7 @@ def state2samples(orig_df, sid, skiptest=False, maxclock=None):
     in_test = row.test1
     df = df[1:]
 
-    if skiptest:
+    if skiptest and in_test:
         i = 0
         for row in df.itertuples():
             for func in row.diff_funcs:

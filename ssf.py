@@ -14,7 +14,7 @@ from itertools import groupby
 import pandas as pd
 from fileio import out_path
 from sidlib import set_sid_dtype
-from sidmidi import ELECTRIC_SNARE, BASS_DRUM, LOW_TOM, PEDAL_HIHAT, CLOSED_HIHAT, OPEN_HIHAT, ACCOUSTIC_SNARE, CRASH_CYMBAL1, closest_midi
+from sidmidi import ELECTRIC_SNARE, BASS_DRUM, LOW_TOM, HIGH_TOM, PEDAL_HIHAT, CLOSED_HIHAT, OPEN_HIHAT, ACCOUSTIC_SNARE, CRASH_CYMBAL1, closest_midi
 from sidwav import state2samples, samples_loudestf
 
 INITIAL_PERIOD_FRAMES = 4
@@ -126,8 +126,8 @@ class SidSoundFragment:
                     (clock, self.total_duration, self.drum_noise_duration(sid, self.total_duration), velocity))
                 return
 
-            if self.pulsephases:
-                if self.initial_pitch_drop and self.loudestf < 100:
+            if (self.noisephases == 1 or self.initial_pitch_drop) and self.total_clocks < self.one_16n_clocks:
+                if self.loudestf < 100:
                     # http://www.ucapps.de/howto_sid_wavetables_1.html
                     self.drum_pitches.append(
                         (clock, self.total_duration, BASS_DRUM, velocity))
@@ -137,6 +137,10 @@ class SidSoundFragment:
                     self.drum_pitches.append(
                         (clock, self.total_duration, LOW_TOM, velocity))
                     return
+
+                self.drum_pitches.append(
+                    (clock, self.total_duration, HIGH_TOM, velocity))
+                return
 
         self._set_nondrum_pitches()
 
