@@ -39,7 +39,7 @@ if cols != {'clock', 'hashid', 'voice'}:
     sys.exit(1)
 
 if args.maxclock:
-    ssf_log_df = ssf_log_df[ssf_log_df['clock'] <= args.maxclock]
+    ssf_log_df = ssf_log_df[ssf_log_df['clock'] <= args.maxclock]  # pylint: disable=unsubscriptable-object
 ssf_cache = {}
 ssf_instruments = []
 for row in ssf_log_df.itertuples():
