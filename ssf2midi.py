@@ -17,11 +17,14 @@ from sidlib import get_sid, timer_args
 from sidmidi import SidMidiFile, DEFAULT_BPM, midi_args
 from ssf import SidSoundFragment, SidSoundFragmentParser
 
+ALL_VOICES = frozenset([1, 2, 3])
+
 parser = argparse.ArgumentParser(description='Convert ssf log into a MIDI file')
 parser.add_argument('ssflogfile', default='', help='SSF log file to read')
 parser.add_argument('--midifile', default='', help='MIDI file to write')
+parser.add_argument('--minclock', default=0, type=int, help='Min clock value')
 parser.add_argument('--maxclock', default=0, type=int, help='Max clock value')
-parser.add_argument('--voicemask', default='1,2,3', type=str, help='Voice mask')
+parser.add_argument('--voicemask', default=','.join([str(v) for v in ALL_VOICES]), type=str, help='Voice mask')
 timer_args(parser)
 midi_args(parser)
 args = parser.parse_args()
@@ -40,11 +43,17 @@ if cols != {'clock', 'hashid', 'voice'}:
 
 if args.maxclock:
     ssf_log_df = ssf_log_df[ssf_log_df['clock'] <= args.maxclock]  # pylint: disable=unsubscriptable-object
+if args.minclock:
+    ssf_log_df = ssf_log_df[ssf_log_df['clock'] >= args.minclock]  # pylint: disable=unsubscriptable-object
+    min_clock = ssf_log_df['clock'].min()
+    ssf_log_df['clock'] -= min_clock
+
+if voicemask != ALL_VOICES:
+    ssf_log_df = ssf_log_df[ssf_log_df['voice'].isin(voicemask)]
+
 ssf_cache = {}
 ssf_instruments = []
 for row in ssf_log_df.itertuples():
-    if row.voice not in voicemask:
-        continue
     ssf = ssf_cache.get(row.hashid, None)
     if ssf is None:
         ssf_df = parser.ssf_dfs[row.hashid]
