@@ -104,6 +104,8 @@ class SidMidiFile:
         self.drum_pitches = defaultdict(list)
         self.tpqn = 960
         self.sid_velocity = {i: int(i / 15 * 127) for i in range(16)}
+        self.one_qn_clocks = sid.qn_to_clock(1, self.bpm)
+        self.one_16n_clocks = self.one_qn_clocks / 4
 
     def clock_to_ticks(self, clock):
         return self.sid.clock_to_ticks(clock, self.bpm, self.tpqn)

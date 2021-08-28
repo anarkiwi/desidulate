@@ -87,8 +87,9 @@ class SidSoundFragment:
         self.drum_instrument = pd.NA
         self.loudestf = 0
         self.total_clocks = self.df.index[-1]
-        self.one_qn = sid.qn_to_clock(1, smf.bpm)
-        self.samples = state2samples(self.df, sid, skiptest=True, maxclock=self.one_qn*MAX_PERCUSSION_QNS)
+        self.max_percussion_clocks = smf.one_qn_clocks*MAX_PERCUSSION_QNS
+        self.one_16n_clocks = smf.one_16n_clocks
+        self.samples = state2samples(self.df, sid, skiptest=True, maxclock=self.max_percussion_clocks)
         if len(self.samples):
             self.loudestf = samples_loudestf(self.samples, sid)
             self._set_pitches(sid)
@@ -115,10 +116,11 @@ class SidSoundFragment:
     def _set_pitches(self, sid):
         if not self.midi_notes:
             return
-        clock, _frame, _pitch, _duration, velocity, _ = self.midi_notes[0]
 
         # TODO: pitched percussion.
-        if self.total_clocks < self.one_qn*MAX_PERCUSSION_QNS:
+        if self.total_clocks < self.max_percussion_clocks:
+            clock, _frame, _pitch, _duration, velocity, _ = self.midi_notes[0]
+
             if self.all_noise or self.noisephases > 1:
                 self.drum_pitches.append(
                     (clock, self.total_duration, self.drum_noise_duration(sid, self.total_duration), velocity))
