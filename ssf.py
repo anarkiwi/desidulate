@@ -18,8 +18,6 @@ from sidmidi import ELECTRIC_SNARE, BASS_DRUM, LOW_TOM, HIGH_TOM, PEDAL_HIHAT, C
 from sidwav import state2samples, samples_loudestf
 
 INITIAL_PERIOD_FRAMES = 4
-# Percussion duration must be no longer than two quarter notes.
-MAX_PERCUSSION_QNS = 2
 
 
 def add_freq_notes_df(sid, ssfs_df):
@@ -47,7 +45,7 @@ class SidSoundFragment:
                 for row in ssf.itertuples()]
 
     def __init__(self, percussion, sid, df, smf):
-        self.df = df.fillna(method='ffill').set_index('clock')
+        self.df = df
         self.percussion = percussion
         waveform_states = self._waveform_state(self.df)
         self.waveform_order = tuple([frozenset(i[0]) for i in groupby(waveform_states)])
@@ -80,19 +78,18 @@ class SidSoundFragment:
             first_pitch = self.initial_midi_pitches[0]
             last_pitch = self.initial_midi_pitches[-1]
             pitch_diff = round((first_pitch - last_pitch) / 12)
-            if (first_pitch > last_pitch and
-                    pitch_diff and
-                    tuple(sorted(self.initial_midi_pitches, reverse=True)) == self.initial_midi_pitches):
+            if first_pitch > last_pitch and pitch_diff:
                 self.initial_pitch_drop = pitch_diff
         self.drum_pitches = []
         self.pitches = []
         self.drum_instrument = pd.NA
         self.loudestf = 0
         self.total_clocks = self.df.index[-1]
-        self.max_percussion_clocks = smf.one_4n_clocks*MAX_PERCUSSION_QNS
+        self.one_2n_clocks = smf.one_2n_clocks
+        self.one_4n_clocks = smf.one_4n_clocks
         self.one_8n_clocks = smf.one_8n_clocks
         self.one_16n_clocks = smf.one_16n_clocks
-        self.samples = state2samples(self.df, sid, skiptest=True, maxclock=self.max_percussion_clocks)
+        self.samples = state2samples(self.df, sid, skiptest=True, maxclock=self.one_2n_clocks)
         if len(self.samples):
             self.loudestf = samples_loudestf(self.samples, sid)
             self._set_pitches(sid)
@@ -120,16 +117,18 @@ class SidSoundFragment:
         if not self.midi_notes:
             return
 
-        # TODO: pitched percussion.
-        if self.total_clocks < self.max_percussion_clocks:
+        # Percussion must be no longer than one half note.
+        if self.total_clocks <= self.one_2n_clocks:
             clock, _frame, _pitch, _duration, velocity, _ = self.midi_notes[0]
 
+            # TODO: pitched noise percussion.
             if self.all_noise or self.noisephases > 1:
                 self.drum_pitches.append(
                     (clock, self.total_duration, self.drum_noise_duration(sid, self.total_duration), velocity))
                 return
 
-            if self.total_clocks < self.one_8n_clocks:
+            # Membrane percussion must be no longer than 1 quarter note.
+            if self.total_clocks <= self.one_4n_clocks:
                 if self.noisephases == 1 or self.initial_pitch_drop > 2:
                     if self.loudestf < 100:
                         # http://www.ucapps.de/howto_sid_wavetables_1.html
@@ -137,7 +136,7 @@ class SidSoundFragment:
                             (clock, self.total_duration, BASS_DRUM, velocity))
                         return
 
-                    if self.loudestf < 250:
+                    if self.loudestf < 200:
                         self.drum_pitches.append(
                             (clock, self.total_duration, LOW_TOM, velocity))
                         return
@@ -158,6 +157,7 @@ class SidSoundFragment:
     def instrument(self, base_instrument):
         base_instrument.update({
             'drum_instrument': self.drum_instrument,
+            'samples': len(self.samples),
             'loudestf': self.loudestf,
             'last_clock': self.df.index[-1],
             'initial_pitch_drop': self.initial_pitch_drop})
@@ -178,4 +178,5 @@ class SidSoundFragmentParser:
         ssfs_df = add_freq_notes_df(self.sid, pd.read_csv(patch_log, dtype=pd.Int64Dtype()))
         for hashid, ssf_df in ssfs_df.groupby('hashid', sort=False):
             self.patch_count[hashid] = ssf_df['count'].max()
-            self.ssf_dfs[hashid] = ssf_df.drop(['hashid', 'count'], axis=1)
+            self.ssf_dfs[hashid] = ssf_df.drop(
+                ['hashid', 'count'], axis=1).set_index('clock').fillna(method='ffill')

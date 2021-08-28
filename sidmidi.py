@@ -105,6 +105,7 @@ class SidMidiFile:
         self.tpqn = 960
         self.sid_velocity = {i: int(i / 15 * 127) for i in range(16)}
         self.one_4n_clocks = sid.qn_to_clock(1, self.bpm)
+        self.one_2n_clocks = self.one_4n_clocks * 2
         self.one_8n_clocks = self.one_4n_clocks / 2
         self.one_16n_clocks = self.one_4n_clocks / 4
 
@@ -127,24 +128,27 @@ class SidMidiFile:
         pc.data = program
         add_event(track, pc, 0, channel)
 
+    def deoverlap_pitches(self, voice_pitch_data):
+        deoverlapped = []
+        if voice_pitch_data:
+            clock_order = sorted(voice_pitch_data, key=lambda x: x[0])
+            last_pitch_data = clock_order[-1]
+            deoverlapped = []
+            for i, pitch_data in enumerate(clock_order[:-1]):
+                next_pitch_data = clock_order[i+1]
+                clock, duration, pitch, velocity = pitch_data
+                next_clock = next_pitch_data[0]
+                duration = min(duration, next_clock - clock)
+                assert duration > 0, (pitch_data, next_pitch_data)
+                deoverlapped.append((clock, duration, pitch, velocity))
+            deoverlapped.append(last_pitch_data)
+        return deoverlapped
+
     def write_pitches(self, smf_track, channel, program, voice_pitch_data):
         track = midi.MidiTrack(smf_track)
         self.add_program_change(track, channel, program)
-        last_pitch_data = tuple()
-        deoverlapped = []
-        for pitch_data in sorted(voice_pitch_data, key=lambda x: x[0]):
-            if last_pitch_data:
-                last_clock, last_duration, last_pitch, last_velocity = last_pitch_data
-                assert last_duration > 0, (last_pitch_data, pitch_data)
-                clock, _, _, _ = pitch_data
-                last_duration = min(last_duration, clock - last_clock)
-                assert last_duration > 0, (last_duration, clock, last_clock, clock - last_clock)
-                deoverlapped.append((last_clock, last_duration, last_pitch, last_velocity))
-            last_pitch_data = pitch_data
-        if deoverlapped:
-            deoverlapped.append(last_pitch_data)
         last_clock = 0
-        for pitch_data in deoverlapped:
+        for pitch_data in self.deoverlap_pitches(voice_pitch_data):
             clock, duration, pitch, velocity = pitch_data
             assert velocity
             last_clock = self.add_note(track, channel, pitch, velocity, last_clock, clock, duration)
@@ -152,29 +156,22 @@ class SidMidiFile:
         return track
 
     def write(self, file_name):
-        trackmap = {}
-        drummap = {}
-        tracks = 0
+        track_pitches = []
+
         for voicenum, voice_pitch_data in self.pitches.items():
             if voice_pitch_data:
-                tracks += 1
-                trackmap[voicenum] = tracks
+                track_pitches.append((None, self.program, voice_pitch_data))
         for voicenum, voice_pitch_data in self.drum_pitches.items():
             if voice_pitch_data:
-                tracks += 1
-                drummap[voicenum] = tracks
+                track_pitches.append((DRUM_CHANNEL, self.drum_program, voice_pitch_data))
+
         tracks = []
-        for voicenum, voice_pitch_data in self.pitches.items():
-            if voice_pitch_data:
-                channel = trackmap[voicenum]
-                smf_track = channel - 1
-                tracks.append(self.write_pitches(
-                    smf_track, channel, self.program, voice_pitch_data))
-        for voicenum, voice_pitch_data in self.drum_pitches.items():
-            if voice_pitch_data:
-                smf_track = drummap[voicenum] - 1
-                tracks.append(self.write_pitches(
-                    smf_track, DRUM_CHANNEL, self.drum_program, voice_pitch_data))
+        for smf_track, pitches in enumerate(track_pitches, start=1):
+            channel, program, voice_pitch_data = pitches
+            if channel is None:
+                channel = smf_track
+            tracks.append(self.write_pitches(
+                smf_track, channel, program, voice_pitch_data))
         write_midi(file_name, self.tpqn, tracks)
 
     def add_pitch(self, voicenum, clock, duration, pitch, velocity):

@@ -49,6 +49,7 @@ class SSFTestCase(unittest.TestCase):
         smf = SidMidiFile(sid, DEFAULT_BPM)
         df = add_freq_notes_df(sid, df)
         df['frame'] = df['clock'].floordiv(int(sid.clockq))
+        df = df.fillna(method='ffill').set_index('clock')
         return SidSoundFragment(percussion=percussion, sid=sid, smf=smf, df=df)
 
     def test_notest_ssf(self):
@@ -85,14 +86,15 @@ class SSFTestCase(unittest.TestCase):
                     '1 13 255',
                     '100 11 129',
                     '100000 11 0')) + '\n')
-            ssf_log_df, ssf_df, _, _ = state2ssfs(sid, reg2state(sid, test_log))
+            ssf_log_df, ssf_dfs, _, _ = state2ssfs(sid, reg2state(sid, test_log))
             ssf_log_df.reset_index(level=0, inplace=True)
-            ssf_df.reset_index(level=0, inplace=True)
-            ssf_df = add_freq_notes_df(sid, ssf_df)
+            ssf_dfs.reset_index(level=0, inplace=True)
+            ssf_dfs = add_freq_notes_df(sid, ssf_dfs)
             ssf = None
             row = None
             for row in ssf_log_df.itertuples():
-                ssf = SidSoundFragment(percussion=True, sid=sid, smf=smf, df=ssf_df[ssf_df['hashid'] == row.hashid])
+                ssf_df = ssf_dfs[ssf_dfs['hashid'] == row.hashid].set_index('clock')
+                ssf = SidSoundFragment(True, sid, ssf_df, smf)
                 if ssf and row.clock == 103:
                     break
             self.assertTrue(row is not None)

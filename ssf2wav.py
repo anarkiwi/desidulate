@@ -40,9 +40,10 @@ ssf_df = df[df['hashid'] == hashid].copy()
 
 if len(ssf_df):
     ssf_df = add_freq_notes_df(sid, ssf_df)
-    ssf_df = ssf_df.fillna(method='ffill')
+    ssf_df = ssf_df.fillna(method='ffill').set_index('clock')
     ssf = SidSoundFragment(args.percussion, sid, ssf_df, smf)
-    df2wav(ssf_df.set_index('clock'), sid, wavfile, skiptest=args.skiptest)
+    df2wav(ssf_df, sid, wavfile, skiptest=args.skiptest)
     print(ssf_df.to_string())
+    print(ssf.instrument({}))
 else:
     print('SSF %d not found' % hashid)
