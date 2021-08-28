@@ -8,6 +8,7 @@ from collections import defaultdict
 from functools import lru_cache
 from music21 import midi
 
+DEFAULT_BPM=125
 
 A = 440
 MIDI_N_TO_F = {n: (A / 32) * (2 ** ((n - 9) / 12)) for n in range(128)}
@@ -25,6 +26,14 @@ LOW_TOM = 45
 ACCOUSTIC_SNARE = 38
 ELECTRIC_SNARE = 40
 CRASH_CYMBAL1 = 49
+
+
+def midi_args(parser):
+    parser.add_argument('--bpm', default=DEFAULT_BPM, type=int, help='MIDI BPM')
+    parser.add_argument('--percussion', dest='percussion', action='store_true')
+    parser.add_argument('--no-percussion', dest='percussion', action='store_false')
+    parser.set_defaults(pal=True, percussion=True)
+
 
 def closest_midi(sid_f):
     closest_midi_f = min(MIDI_N_TO_F.values(), key=lambda x: abs(x - sid_f))

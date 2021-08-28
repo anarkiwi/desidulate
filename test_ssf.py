@@ -6,7 +6,7 @@ import unittest
 from io import StringIO
 import pandas as pd
 from sidlib import get_sid, jittermatch_df, reg2state, state2ssfs
-from sidmidi import SidMidiFile
+from sidmidi import SidMidiFile, DEFAULT_BPM
 from ssf import SidSoundFragment, add_freq_notes_df
 
 
@@ -46,7 +46,7 @@ class SSFTestCase(unittest.TestCase):
     @staticmethod
     def _df2ssf(df, percussion=True):
         sid = get_sid(pal=True)
-        smf = SidMidiFile(sid, 125)
+        smf = SidMidiFile(sid, DEFAULT_BPM)
         df = add_freq_notes_df(sid, df)
         df['frame'] = df['clock'].floordiv(int(sid.clockq))
         return SidSoundFragment(percussion=percussion, sid=sid, smf=smf, df=df)
@@ -76,7 +76,7 @@ class SSFTestCase(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             test_log = os.path.join(tmpdir, 'vicesnd.log')
             sid = get_sid(pal=True)
-            smf = SidMidiFile(sid, 125)
+            smf = SidMidiFile(sid, DEFAULT_BPM)
             with open(test_log, 'w') as log:
                 log.write('\n'.join((
                     '1 24 15',

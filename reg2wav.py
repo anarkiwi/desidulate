@@ -9,7 +9,7 @@
 import argparse
 import logging
 from fileio import wav_path
-from sidlib import get_sid, reg2state
+from sidlib import get_sid, reg2state. timer_args
 from sidwav import state2samples, write_wav
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
@@ -18,10 +18,7 @@ parser = argparse.ArgumentParser(description='Convert vicesnd.sid log into a WAV
 parser.add_argument('logfile', default='vicesnd.sid', help='log file to read')
 parser.add_argument('--maxstates', default=int(10 * 1e6), help='maximum number of SID states to analyze')
 parser.add_argument('--wavfile', default='', help='WAV file to write')
-pal_parser = parser.add_mutually_exclusive_group(required=False)
-pal_parser.add_argument('--pal', dest='pal', action='store_true', help='Use PAL clock')
-pal_parser.add_argument('--ntsc', dest='pal', action='store_false', help='Use NTSC clock')
-parser.set_defaults(pal=True)
+timer_args(parser)
 args = parser.parse_args()
 wavfile = args.wavfile
 if not wavfile:

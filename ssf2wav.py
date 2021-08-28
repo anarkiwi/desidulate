@@ -11,8 +11,10 @@ import numpy as np
 import pandas as pd
 
 from fileio import wav_path
-from sidlib import get_sid
+from sidlib import get_sid, timer_args
 from sidwav import df2wav
+from sidmidi import SidMidiFile, midi_args
+from ssf import add_freq_notes_df, SidSoundFragment
 
 
 parser = argparse.ArgumentParser(description='Convert .ssf into a WAV file')
@@ -22,23 +24,25 @@ parser.add_argument('--wavfile', default='', help='WAV file to write')
 skiptest_parser = parser.add_mutually_exclusive_group(required=False)
 skiptest_parser.add_argument('--skiptest', dest='skiptest', action='store_true', help='skip initial SSF period where test1 is set')
 skiptest_parser.add_argument('--no-skiptest', dest='skiptest', action='store_false', help='do not skip initial SSF period where test1 is set')
-pal_parser = parser.add_mutually_exclusive_group(required=False)
-pal_parser.add_argument('--pal', dest='pal', action='store_true', help='Use PAL clock')
-pal_parser.add_argument('--ntsc', dest='pal', action='store_false', help='Use NTSC clock')
-parser.set_defaults(pal=True, skiptest=True)
+timer_args(parser)
+midi_args(parser)
 args = parser.parse_args()
 
 sid = get_sid(pal=args.pal)
+smf = SidMidiFile(sid, args.bpm)
 wavfile = args.wavfile
 if not wavfile:
     wavfile = wav_path(args.ssffile)
 
 df = pd.read_csv(args.ssffile, dtype=pd.Int64Dtype())
 hashid = np.int64(args.hashid)
-ssf_df = df[df['hashid'] == hashid]
+ssf_df = df[df['hashid'] == hashid].copy()
 
 if len(ssf_df):
-    ssf_df = ssf_df.fillna(method='ffill').set_index('clock')
-    df2wav(ssf_df, sid, wavfile, skiptest=args.skiptest)
+    ssf_df = add_freq_notes_df(sid, ssf_df)
+    ssf_df = ssf_df.fillna(method='ffill')
+    ssf = SidSoundFragment(args.percussion, sid, ssf_df, smf)
+    df2wav(ssf_df.set_index('clock'), sid, wavfile, skiptest=args.skiptest)
+    print(ssf_df.to_string())
 else:
     print('SSF %d not found' % hashid)

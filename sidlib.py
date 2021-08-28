@@ -20,6 +20,13 @@ SKIP_VOL_MOD_HZ = 2000
 SKIP_PWDUTY_MOD_HZ = 2000
 
 
+def timer_args(parser):
+    pal_parser = parser.add_mutually_exclusive_group(required=False)
+    pal_parser.add_argument('--pal', dest='pal', action='store_true', help='Use PAL clock')
+    pal_parser.add_argument('--ntsc', dest='pal', action='store_false', help='Use NTSC clock')
+    parser.set_defaults(pal=True, skiptest=True)
+
+
 def set_sid_dtype(df):
     df.dtype = pd.UInt64Dtype()
     for col in df.columns:

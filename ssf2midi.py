@@ -13,14 +13,14 @@ import argparse
 import pandas as pd
 from fileio import midi_path, out_path
 from sidlib import get_sid
-from sidmidi import SidMidiFile
+from sidmidi import SidMidiFile, DEFAULT_BPM
 from ssf import SidSoundFragment, SidSoundFragmentParser
 
 
 parser = argparse.ArgumentParser(description='Convert ssf log into a MIDI file')
 parser.add_argument('ssflogfile', default='', help='SSF log file to read')
 parser.add_argument('--midifile', default='', help='MIDI file to write')
-parser.add_argument('--bpm', default=125, type=int, help='MIDI BPM')
+parser.add_argument('--bpm', default=DEFAULT_BPM, type=int, help='MIDI BPM')
 parser.add_argument('--percussion', dest='percussion', action='store_true')
 parser.add_argument('--no-percussion', dest='percussion', action='store_false')
 pal_parser = parser.add_mutually_exclusive_group(required=False)
