@@ -10,6 +10,7 @@
 # http://www.ucapps.de/howto_sid_wavetables_1.html
 
 import argparse
+import sys
 import pandas as pd
 from fileio import midi_path, out_path
 from sidlib import get_sid, timer_args
@@ -20,9 +21,11 @@ parser = argparse.ArgumentParser(description='Convert ssf log into a MIDI file')
 parser.add_argument('ssflogfile', default='', help='SSF log file to read')
 parser.add_argument('--midifile', default='', help='MIDI file to write')
 parser.add_argument('--maxclock', default=0, type=int, help='Max clock value')
+parser.add_argument('--voicemask', default='1,2,3', type=str, help='Voice mask')
 timer_args(parser)
 midi_args(parser)
 args = parser.parse_args()
+voicemask = frozenset([int(v) for v in args.voicemask.split(',')])
 
 sid = get_sid(args.pal)
 smf = SidMidiFile(sid, args.bpm)
@@ -30,11 +33,18 @@ parser = SidSoundFragmentParser(args.ssflogfile, args.percussion, sid)
 parser.read_patches()
 
 ssf_log_df = pd.read_csv(args.ssflogfile, dtype=pd.Int64Dtype())
+cols = set(ssf_log_df.columns)
+if cols != {'clock', 'hashid', 'voice'}:
+    print('not an SSF log file (cols %s)' % cols)
+    sys.exit(1)
+
 if args.maxclock:
     ssf_log_df = ssf_log_df[ssf_log_df['clock'] <= args.maxclock]
 ssf_cache = {}
 ssf_instruments = []
 for row in ssf_log_df.itertuples():
+    if row.voice not in voicemask:
+        continue
     ssf = ssf_cache.get(row.hashid, None)
     if ssf is None:
         ssf_df = parser.ssf_dfs[row.hashid]

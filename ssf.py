@@ -63,8 +63,10 @@ class SidSoundFragment:
         self.initial_midi_notes = []
         self.initial_midi_pitches = []
         if self.midi_notes:
+            initial_midi_note = self.midi_notes[0]
+            initial_clock_end = initial_midi_note[1] + INITIAL_PERIOD_FRAMES
             self.initial_midi_notes = tuple(
-                [midi_note for midi_note in self.midi_notes if midi_note[1] <= INITIAL_PERIOD_FRAMES])
+                [midi_note for midi_note in self.midi_notes if midi_note[1] <= initial_clock_end])
             self.initial_midi_pitches = tuple(
                 [midi_note[2] for midi_note in self.initial_midi_notes])
             self.total_duration = sum(
@@ -87,7 +89,8 @@ class SidSoundFragment:
         self.drum_instrument = pd.NA
         self.loudestf = 0
         self.total_clocks = self.df.index[-1]
-        self.max_percussion_clocks = smf.one_qn_clocks*MAX_PERCUSSION_QNS
+        self.max_percussion_clocks = smf.one_4n_clocks*MAX_PERCUSSION_QNS
+        self.one_8n_clocks = smf.one_8n_clocks
         self.one_16n_clocks = smf.one_16n_clocks
         self.samples = state2samples(self.df, sid, skiptest=True, maxclock=self.max_percussion_clocks)
         if len(self.samples):
@@ -126,21 +129,22 @@ class SidSoundFragment:
                     (clock, self.total_duration, self.drum_noise_duration(sid, self.total_duration), velocity))
                 return
 
-            if (self.noisephases == 1 or self.initial_pitch_drop) and self.total_clocks < self.one_16n_clocks:
-                if self.loudestf < 100:
-                    # http://www.ucapps.de/howto_sid_wavetables_1.html
-                    self.drum_pitches.append(
-                        (clock, self.total_duration, BASS_DRUM, velocity))
-                    return
+            if self.total_clocks < self.one_8n_clocks:
+                if self.noisephases == 1 or self.initial_pitch_drop > 2:
+                    if self.loudestf < 100:
+                        # http://www.ucapps.de/howto_sid_wavetables_1.html
+                        self.drum_pitches.append(
+                            (clock, self.total_duration, BASS_DRUM, velocity))
+                        return
 
-                if self.loudestf < 250:
-                    self.drum_pitches.append(
-                        (clock, self.total_duration, LOW_TOM, velocity))
-                    return
+                    if self.loudestf < 250:
+                        self.drum_pitches.append(
+                            (clock, self.total_duration, LOW_TOM, velocity))
+                        return
 
-                self.drum_pitches.append(
-                    (clock, self.total_duration, HIGH_TOM, velocity))
-                return
+                    self.drum_pitches.append(
+                        (clock, self.total_duration, HIGH_TOM, velocity))
+                    return
 
         self._set_nondrum_pitches()
 
