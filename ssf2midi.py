@@ -30,13 +30,13 @@ midi_args(parser)
 args = parser.parse_args()
 voicemask = frozenset([int(v) for v in args.voicemask.split(',')])
 
-sid = get_sid(args.pal)
-smf = SidMidiFile(sid, args.bpm)
-parser = SidSoundFragmentParser(args.ssflogfile, args.percussion, sid)
-parser.read_patches()
-
 ssf_log_df = pd.read_csv(args.ssflogfile, dtype=pd.Int64Dtype())
 cols = set(ssf_log_df.columns)
+
+if len(ssf_log_df) == 0:
+    print('empty SSF log')
+    sys.exit(0)
+
 if cols != {'clock', 'hashid', 'voice'}:
     print('not an SSF log file (cols %s)' % cols)
     sys.exit(1)
@@ -50,6 +50,11 @@ if args.minclock:
 
 if voicemask != ALL_VOICES:
     ssf_log_df = ssf_log_df[ssf_log_df['voice'].isin(voicemask)]
+
+sid = get_sid(args.pal)
+smf = SidMidiFile(sid, args.bpm)
+parser = SidSoundFragmentParser(args.ssflogfile, args.percussion, sid)
+parser.read_patches()
 
 ssf_cache = {}
 ssf_instruments = []
