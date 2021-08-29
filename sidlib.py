@@ -340,7 +340,7 @@ def split_vdf(sid, df):
 
         # build control-only SSFs
         logging.debug('building control only SSFs for voice %u', v)
-        control_ignore_diff_cols = ['freq1', 'freq3', 'pwduty1', 'fltcoff', 'atk1', 'dec1', 'sus1', 'rel1']
+        control_ignore_diff_cols = ['freq1', 'freq3', 'pwduty1', 'fltcoff', 'fltres', 'atk1', 'dec1', 'sus1', 'rel1']
         for col in control_ignore_diff_cols:
             diff_cols.remove(col)
         v_control_df = v_df.drop(control_ignore_diff_cols, axis=1).copy()
@@ -356,8 +356,10 @@ def split_vdf(sid, df):
         for x_df in (v_df, v_control_df):
             x_df['clock_start'] = x_df.groupby(['ssf'], sort=False)['clock'].transform('min')
             x_df['clock'] = x_df.groupby(['ssf'], sort=False)['clock'].transform(lambda x: x - x.min())
-            x_df['hashid_clock'] = x_df.groupby(['ssf'], sort=False)['clock'].transform(hash_tuple).astype(np.int64)
             x_df['frame'] = x_df['clock'].floordiv(int(sid.clockq))
+            if x_df is v_control_df:
+                x_df['clock'] = x_df.groupby(['ssf'], sort=False)['clock'].transform(lambda x: x.index - x.index.min())
+            x_df['hashid_clock'] = x_df.groupby(['ssf'], sort=False)['clock'].transform(hash_tuple).astype(np.int64)
 
         # add SSF metadata
         logging.debug('adding SSF metadata for voice %u', v)
