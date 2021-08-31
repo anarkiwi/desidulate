@@ -14,6 +14,8 @@ import numpy as np
 from pyresidfp import SoundInterfaceDevice
 from pyresidfp.sound_interface_device import ChipModel
 
+SID_SAMPLE_FREQ = 11025
+
 # SSFs with vol modulation > than this, rejected
 SKIP_VOL_MOD_HZ = 2000
 # SSFs with pwduty modulation > than this, rejected
@@ -84,7 +86,7 @@ class SidWrap:
         15: 24000,
     }
 
-    def __init__(self, pal, model=ChipModel.MOS8580, sampling_frequency=22050):
+    def __init__(self, pal, model, sampling_frequency):
         if pal:
             self.clock_freq = SoundInterfaceDevice.PAL_CLOCK_FREQUENCY
             self.int_freq = 50.0
@@ -122,8 +124,8 @@ class SidWrap:
         return self.resid.clock(timedelta(seconds=timeoffset_seconds))
 
 
-def get_sid(pal):
-    return SidWrap(pal)
+def get_sid(pal, model=ChipModel.MOS8580, sampling_frequency=SID_SAMPLE_FREQ):
+    return SidWrap(pal, model, sampling_frequency)
 
 
 # Read a VICE "-sounddev dump" register dump (emulator or vsid)
