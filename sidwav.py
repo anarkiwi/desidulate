@@ -185,7 +185,7 @@ def state2samples(orig_df, sid, skiptest=False, maxclock=None):
     df = df.join(diff_df)
     drop_diff_cols = []
     for diff_col, col in diff_cols.items():
-        diff_max = df[diff_col].max()
+        diff_max = df[diff_col].abs().max()
         if pd.isna(diff_max) or diff_max == 0:
             drop_diff_cols.append(diff_col)
     for diff_col in drop_diff_cols:
