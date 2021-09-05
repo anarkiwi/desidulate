@@ -208,7 +208,7 @@ def reg2state(sid, snd_log_name, nrows=(10 * 1e6)):
     return df
 
 
-def split_vdf(sid, df):
+def split_vdf(sid, df, frame_resync=0):
     fltcols = [col for col in df.columns if col.startswith('flt') and not col[-1].isdigit()]
 
     def hash_tuple(s):
@@ -354,8 +354,16 @@ def split_vdf(sid, df):
             x_df['clock_start'] = x_df.groupby(['ssf'], sort=False)['clock'].transform('min')
             x_df['clock'] = x_df.groupby(['ssf'], sort=False)['clock'].transform(lambda x: x - x.min())
             x_df['frame'] = x_df['clock'].floordiv(int(sid.clockq))
-            if x_df is v_control_df:
-                x_df['clock'] = x_df.groupby(['ssf'], sort=False)['clock'].transform(lambda x: x.index - x.index.min())
+
+        v_control_df['clock'] = x_df.groupby(['ssf'], sort=False)['clock'].transform(lambda x: x.index - x.index.min())
+
+        # TODO: account for frame slip.
+        if frame_resync:
+            clock_diff = ((v_df[(v_df.frame > 0) & (v_df.frame.diff() == 1)]['frame'] + 1) * int(sid.clockq) - v_df.clock).fillna(method='ffill').astype(pd.Int64Dtype()).fillna(0).astype(np.int64)
+            clock_diff[clock_diff.abs() > frame_resync] = 0
+            v_df.clock = (v_df.clock - clock_diff).astype(np.int64)
+
+        for x_df in (v_df, v_control_df):
             x_df['hashid_clock'] = x_df.groupby(['ssf'], sort=False)['clock'].transform(hash_tuple).astype(np.int64)
 
         # add SSF metadata
