@@ -383,7 +383,7 @@ def jittermatch_df(df1, df2, jitter_col, jitter_max):
     return False
 
 
-def skip_ssf(hashid, ssf_df):
+def sample_ssf(hashid, ssf_df):
     # Skip SSFs with sample playback.
     # http://www.ffd2.com/fridge/chacking/c=hacking20.txt
     # http://www.ffd2.com/fridge/chacking/c=hacking21.txt
@@ -426,12 +426,12 @@ def state2ssfs(sid, df):
     ssf_log = []
     ssf_dfs = {}
     ssf_count = defaultdict(int)
-    control_ssf_dfs = {}
-    control_ssf_count = defaultdict(int)
+    thumbnail_ssf_dfs = {}
+    thumbnail_ssf_count = defaultdict(int)
     remap_ssf_dfs = {}
     ssf_noclock_dfs = {}
     control_remap_ssf_dfs = {}
-    control_ssf_noclock_dfs = {}
+    thumbnail_ssf_noclock_dfs = {}
     skip_hashids = {}
 
     for v, v_df, v_control_df in split_vdf(sid, df):
@@ -439,37 +439,37 @@ def state2ssfs(sid, df):
         if pd.isna(ssfs):
             continue
         logging.debug('splitting %u SSFs for voice %u', ssfs, v)
-        skip_ssfs = set()
+        sample_ssfs = set()
         for hashid_noclock, hashid_noclock_df in v_df.groupby(['hashid_noclock'], sort=False):
             for ssf, ssf_df in hashid_noclock_df.groupby(['ssf'], sort=False):
                 hashid_clock = ssf_df['hashid_clock'].iat[0]
                 hashid = normalize_ssf(hashid_clock, hashid_noclock, ssf_df, remap_ssf_dfs, ssf_noclock_dfs, ssf_dfs, ssf_count)
                 if hashid:
                     if hashid not in skip_hashids:
-                        skip_hashids[hashid] = skip_ssf(hashid, ssf_df)
+                        skip_hashids[hashid] = sample_ssf(hashid, ssf_df)
                     if skip_hashids[hashid]:
-                        skip_ssfs.add(ssf)
+                        sample_ssfs.add(ssf)
                     else:
                         ssf_log.append({'clock': ssf_df['clock_start'].iat[0], 'hashid': hashid, 'voice': v})
-        if skip_ssfs:
-            v_control_df = v_control_df[~v_control_df['ssf'].isin(skip_ssfs)]
+        if sample_ssfs:
+            v_control_df = v_control_df[~v_control_df['ssf'].isin(sample_ssfs)]
         for hashid_noclock, hashid_noclock_df in v_control_df.groupby(['hashid_noclock'], sort=False):
             for ssf, ssf_df in hashid_noclock_df.groupby(['ssf'], sort=False):
                 hashid_clock = ssf_df['hashid_clock'].iat[0]
-                normalize_ssf(hashid_clock, hashid_noclock, ssf_df, control_remap_ssf_dfs, control_ssf_noclock_dfs, control_ssf_dfs, control_ssf_count)
+                normalize_ssf(hashid_clock, hashid_noclock, ssf_df, control_remap_ssf_dfs, thumbnail_ssf_noclock_dfs, thumbnail_ssf_dfs, thumbnail_ssf_count)
 
-    skip_ssf_dfs = {}
-    skip_ssf_count = {}
+    sample_ssf_dfs = {}
+    sample_ssf_count = {}
     skip_hashids = {hashid for hashid, skip in skip_hashids.items() if skip}
     for hashid in skip_hashids:
-        skip_ssf_dfs[hashid] = ssf_dfs[hashid]
-        skip_ssf_count[hashid] = ssf_count[hashid]
+        sample_ssf_dfs[hashid] = ssf_dfs[hashid]
+        sample_ssf_count[hashid] = ssf_count[hashid]
         del ssf_dfs[hashid]
         del ssf_count[hashid]
 
     for x, y in ((ssf_dfs, ssf_count),
-                 (control_ssf_dfs, control_ssf_count),
-                 (skip_ssf_dfs, skip_ssf_count)):
+                 (thumbnail_ssf_dfs, thumbnail_ssf_count),
+                 (sample_ssf_dfs, sample_ssf_count)):
         for hashid, count in y.items():
             x[hashid]['count'] = count
             x[hashid]['hashid'] = hashid
@@ -486,9 +486,9 @@ def state2ssfs(sid, df):
             ssf_log, dtype=pd.Int64Dtype()).set_index('clock').sort_index()
 
     ssf_df = concat_dfs(ssf_dfs, ssf_count)
-    control_ssf_df = concat_dfs(control_ssf_dfs, control_ssf_count)
-    skip_ssf_df = concat_dfs(skip_ssf_dfs, skip_ssf_count)
+    thumbnail_ssf_df = concat_dfs(thumbnail_ssf_dfs, thumbnail_ssf_count)
+    sample_ssf_df = concat_dfs(sample_ssf_dfs, sample_ssf_count)
 
     logging.debug('%u SSFs, %u control SSFs, %u skipped SSFs',
-        ssf_df.index.nunique(), control_ssf_df.index.nunique(), skip_ssf_df.index.nunique())
-    return ssf_log_df, ssf_df, control_ssf_df, skip_ssf_df
+        ssf_df.index.nunique(), thumbnail_ssf_df.index.nunique(), sample_ssf_df.index.nunique())
+    return ssf_log_df, ssf_df, thumbnail_ssf_df, sample_ssf_df

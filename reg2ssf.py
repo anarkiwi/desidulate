@@ -24,13 +24,13 @@ args = parser.parse_args()
 
 sid = get_sid(args.pal)
 df = reg2state(sid, args.logfile, nrows=int(args.maxstates))
-ssf_log_df, ssf_df, control_ssf_df, skip_ssf_df = state2ssfs(sid, df)
+ssf_log_df, ssf_df, thumbnail_ssf_df, sample_ssf_df = state2ssfs(sid, df)
 
 for ext, filedf in (
         ('log.xz', ssf_log_df),
         ('ssf.xz', ssf_df),
-        ('control_ssf.xz', control_ssf_df),
-        ('skip_ssf.xz', skip_ssf_df)):
+        ('thumbnail_ssf.xz', thumbnail_ssf_df),
+        ('sample_ssf.xz', sample_ssf_df)):
     filename = out_path(args.logfile, ext)
     logging.debug('writing %s', filename)
     filedf.to_csv(filename)

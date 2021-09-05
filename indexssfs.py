@@ -14,7 +14,7 @@ from pathlib import Path
 import pandas as pd
 
 MAX_WORKERS = 4
-SSF_SUFFIX = 'control_ssf'
+SSF_SUFFIX = 'thumbnail_ssf'
 SSF_ROOT = r'.'
 SSF_EXT = '.%s.xz' % SSF_SUFFIX
 
@@ -45,4 +45,4 @@ df['ssffileslen'] = df.ssffiles.transform(len)
 df.to_csv('%s_index.xz' % SSF_SUFFIX, index=False)
 
 # to re-read
-# df = pd.read_csv('control_ssf_index.xz', converters={'ssffiles': ast.literal_eval}, index_col=['hashid'])
+# df = pd.read_csv('thumbnail_ssf_index.xz', converters={'ssffiles': ast.literal_eval}, index_col=['hashid'])
