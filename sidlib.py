@@ -333,7 +333,6 @@ def split_vdf(sid, df, frame_resync=0):
         # remove empty SSFs
         logging.debug('removing empty SSFs for voice %u', v)
         v_df = v_df[v_df.groupby('ssf', sort=False)['vol'].transform('max') > 0]
-        v_df = v_df[v_df.groupby('ssf', sort=False)['test1'].transform('min') < 1]
 
         # build control-only SSFs
         logging.debug('building control only SSFs for voice %u', v)
@@ -384,19 +383,22 @@ def jittermatch_df(df1, df2, jitter_col, jitter_max):
     return False
 
 
-def skip_ssf(ssf_df):
+def skip_ssf(hashid, ssf_df):
     # Skip SSFs with sample playback.
     # http://www.ffd2.com/fridge/chacking/c=hacking20.txt
     # http://www.ffd2.com/fridge/chacking/c=hacking21.txt
     # https://codebase64.org/doku.php?id=base:vicious_sid_demo_routine_explained
     # volume or pwduty modulation, and no or pulse waveform
     frames = ssf_df['frame'].iat[-1]
-    if frames > 2:
-        if ssf_df['test1diff'].iat[0] > frames:
-            return True
-        if ssf_df['voldiff'].iat[0] > frames:
-            return True
-        if ssf_df['pwduty1diff'].iat[0] > frames:
+    if frames > 2 and ssf_df['noise1'].max() != 1:
+        max_update_rate = frames * 2
+        for col in ('test1diff', 'pwduty1diff'):
+            val = ssf_df[col].iat[0]
+            if val > max_update_rate:
+                logging.debug('skip ssf %d because %s %u > %u', hashid, col, val, frames)
+                return True
+        if ssf_df['voldiff'].iat[0] > max_update_rate and ssf_df['vol'].min() == 0:
+            logging.debug('skip ssf %d because volume based sample playback', hashid)
             return True
     return False
 
@@ -447,7 +449,7 @@ def state2ssfs(sid, df):
                 hashid = normalize_ssf(hashid_clock, hashid_noclock, ssf_df, remap_ssf_dfs, ssf_noclock_dfs, ssf_dfs, ssf_count)
                 if hashid:
                     if hashid not in skip_hashids:
-                        skip_hashids[hashid] = skip_ssf(ssf_df)
+                        skip_hashids[hashid] = skip_ssf(hashid, ssf_df)
                     if skip_hashids[hashid]:
                         skip_ssfs.add(ssf)
                     else:
