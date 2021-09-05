@@ -22,7 +22,10 @@ current = pathlib.Path(r'./')
 sidfiles = current.rglob(r'*.sid')
 
 def scrape_sidinfo(sidfile):
-    result = {'path': str(sidfile)}
+    result = {
+        'path': str(sidfile),
+        'mtime': sidfile.stat().st_mtime,
+    }
     cmd = ['/usr/bin/sidplayfp', '-w/dev/null', '-t1', '-v', str(sidfile)]
     with subprocess.Popen(cmd,
             stdin=subprocess.DEVNULL,
