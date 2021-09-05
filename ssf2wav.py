@@ -7,6 +7,7 @@
 ## The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 
 import argparse
+import os
 import numpy as np
 import pandas as pd
 
@@ -21,6 +22,9 @@ parser = argparse.ArgumentParser(description='Convert .ssf into a WAV file')
 parser.add_argument('ssffile', default='', help='ssf to read')
 parser.add_argument('hashid', default=0, help='hashid to reproduce')
 parser.add_argument('--wavfile', default='', help='WAV file to write')
+play_parser = parser.add_mutually_exclusive_group(required=False)
+play_parser.add_argument('--play', dest='play', action='store_true', help='play the wavfile')
+play_parser.add_argument('--no-play', dest='play', action='store_false', help='do not play the wavfile')
 skiptest_parser = parser.add_mutually_exclusive_group(required=False)
 skiptest_parser.add_argument('--skiptest', dest='skiptest', action='store_true', help='skip initial SSF period where test1 is set')
 skiptest_parser.add_argument('--no-skiptest', dest='skiptest', action='store_false', help='do not skip initial SSF period where test1 is set')
@@ -45,5 +49,7 @@ if len(ssf_df):
     df2wav(ssf_df, sid, wavfile, skiptest=args.skiptest)
     print(ssf_df.to_string())
     print(ssf.instrument({}))
+    if args.play:
+        os.system(' '.join(['aplay', wavfile]))
 else:
     print('SSF %d not found' % hashid)
