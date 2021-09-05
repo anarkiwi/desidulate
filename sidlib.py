@@ -16,11 +16,6 @@ from pyresidfp.sound_interface_device import ChipModel
 
 SID_SAMPLE_FREQ = 11025
 
-# SSFs with vol modulation > than this, rejected
-SKIP_VOL_MOD_HZ = 2000
-# SSFs with pwduty modulation > than this, rejected
-SKIP_PWDUTY_MOD_HZ = 2000
-
 
 def timer_args(parser):
     pal_parser = parser.add_mutually_exclusive_group(required=False)
@@ -365,8 +360,8 @@ def split_vdf(sid, df):
 
         # add SSF metadata
         logging.debug('adding SSF metadata for voice %u', v)
-        for ncol in ['freq1', 'pwduty1', 'vol']:
-            v_df['%snunique' % ncol] = v_df.groupby(['ssf'], sort=False)[ncol].transform('nunique').astype(np.uint64)
+        for col in ['test1', 'vol', 'pwduty1']:
+            v_df['%sdiff' % col] = v_df.groupby(['ssf'], sort=False)[col].transform(lambda x: len(x[x.diff() != 0]))
 
         yield (v, v_df, v_control_df)
 
@@ -381,35 +376,20 @@ def jittermatch_df(df1, df2, jitter_col, jitter_max):
     return False
 
 
-def mask_not_pulse(ssf_df):
-    return ssf_df['tri1'].max() == 0 and ssf_df['saw1'].max() == 0 and ssf_df['noise1'].max() == 0
-
-
-def fast_clock_diff(ssf_df, fast_mod_cycles):
-    diffs = ssf_df['clock'].diff()
-    if diffs.min() > fast_mod_cycles:
-        return False
-    if diffs.mean() < fast_mod_cycles:
-        return True
-    return diffs.quantile(0.95).mean() < fast_mod_cycles
-
-
-def skip_ssf(ssf_df, vol_mod_cycles, pwduty_mod_cycles):
+def skip_ssf(ssf_df):
     # Skip SSFs with sample playback.
-    if len(ssf_df) > 2 and ssf_df['frame'].nunique() > 3:
-        # https://codebase64.org/doku.php?id=base:vicious_sid_demo_routine_explained
-        # http://www.ffd2.com/fridge/chacking/c=hacking21.txt
-        # http://www.ffd2.com/fridge/chacking/c=hacking20.txt
-        # Skip SSFs with high rate volume changes.
-        if ssf_df['volnunique'].iat[0] > 2:
-            vol_ssf_df = squeeze_diffs(ssf_df[['clock', 'vol']], ['vol'])
-            if fast_clock_diff(vol_ssf_df, vol_mod_cycles):
-                return True
-        # Skip SSFs with high PW duty cycle changes
-        elif ssf_df['pwduty1nunique'].iat[0] > 1 and mask_not_pulse(ssf_df):
-            pwduty_clock_df = squeeze_diffs(ssf_df[['clock', 'pwduty1']], ['pwduty1'])
-            if fast_clock_diff(pwduty_clock_df, pwduty_mod_cycles):
-                return True
+    # http://www.ffd2.com/fridge/chacking/c=hacking20.txt
+    # http://www.ffd2.com/fridge/chacking/c=hacking21.txt
+    # https://codebase64.org/doku.php?id=base:vicious_sid_demo_routine_explained
+    # volume or pwduty modulation, and no or pulse waveform
+    frames = ssf_df['frame'].iat[-1]
+    if frames > 2:
+        if ssf_df['test1diff'].iat[0] > frames:
+            return True
+        if ssf_df['voldiff'].iat[0] > frames:
+            return True
+        if ssf_df['pwduty1diff'].iat[0] > frames:
+            return True
     return False
 
 
@@ -435,7 +415,7 @@ def normalize_ssf(hashid_clock, hashid_noclock, ssf_df, remap_ssf_dfs, ssf_noclo
     return hashid
 
 
-def split_ssf(sid, df):
+def state2ssfs(sid, df):
     ssf_log = []
     ssf_dfs = {}
     ssf_count = defaultdict(int)
@@ -446,8 +426,6 @@ def split_ssf(sid, df):
     control_remap_ssf_dfs = {}
     control_ssf_noclock_dfs = {}
     skip_hashids = {}
-    vol_mod_cycles = int(sid.clock_freq / SKIP_VOL_MOD_HZ)
-    pwduty_mod_cycles = int(sid.clock_freq / SKIP_PWDUTY_MOD_HZ)
 
     for v, v_df, v_control_df in split_vdf(sid, df):
         ssfs = v_df['ssf'].max()
@@ -461,7 +439,7 @@ def split_ssf(sid, df):
                 hashid = normalize_ssf(hashid_clock, hashid_noclock, ssf_df, remap_ssf_dfs, ssf_noclock_dfs, ssf_dfs, ssf_count)
                 if hashid:
                     if hashid not in skip_hashids:
-                        skip_hashids[hashid] = skip_ssf(ssf_df, vol_mod_cycles, pwduty_mod_cycles)
+                        skip_hashids[hashid] = skip_ssf(ssf_df)
                     if skip_hashids[hashid]:
                         skip_ssfs.add(ssf)
                     else:
@@ -506,9 +484,4 @@ def split_ssf(sid, df):
 
     logging.debug('%u SSFs, %u control SSFs, %u skipped SSFs',
         ssf_df.index.nunique(), control_ssf_df.index.nunique(), skip_ssf_df.index.nunique())
-    return ssf_log_df, ssf_df, control_ssf_df, skip_ssf_df
-
-
-def state2ssfs(sid, df):
-    ssf_log_df, ssf_df, control_ssf_df, skip_ssf_df = split_ssf(sid, df)
     return ssf_log_df, ssf_df, control_ssf_df, skip_ssf_df
