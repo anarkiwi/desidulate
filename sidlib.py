@@ -367,8 +367,8 @@ def split_vdf(sid, df, frame_resync=0):
 
         # add SSF metadata
         logging.debug('adding SSF metadata for voice %u', v)
-        for col in ['test1', 'vol', 'pwduty1']:
-            v_df['%sdiff' % col] = v_df.groupby(['ssf'], sort=False)[col].transform(lambda x: len(x[x.diff() != 0]))
+        for col in ['test1', 'vol']:
+            v_df['%sdiff' % col] = v_df[v_df.noise1 != 1].groupby(['ssf'], sort=False)[col].transform(lambda x: len(x[x.diff() != 0]))
 
         yield (v, v_df, v_control_df)
 
@@ -388,16 +388,13 @@ def skip_ssf(hashid, ssf_df):
     # http://www.ffd2.com/fridge/chacking/c=hacking20.txt
     # http://www.ffd2.com/fridge/chacking/c=hacking21.txt
     # https://codebase64.org/doku.php?id=base:vicious_sid_demo_routine_explained
-    # volume or pwduty modulation, and no or pulse waveform
     frames = ssf_df['frame'].iat[-1]
-    if frames > 2 and ssf_df[ssf_df['test1'] != 1]['noise1'].max() != 1:
+    if frames > 2:
         max_update_rate = frames * 2
-        for col in ('test1diff', 'pwduty1diff'):
-            val = ssf_df[col].iat[0]
-            if val > max_update_rate:
-                logging.debug('skip SSF %d because %s %u > %u', hashid, col, val, frames)
-                return True
-        if ssf_df['voldiff'].iat[0] > max_update_rate and ssf_df['vol'].min() == 0:
+        if ssf_df['test1diff'].max() > max_update_rate:
+            logging.debug('skip SSF %d because test bit based sample playback', hashid)
+            return True
+        if ssf_df['voldiff'].max() > max_update_rate and ssf_df['vol'].min() == 0:
             logging.debug('skip SSF %d because volume based sample playback', hashid)
             return True
     return False
