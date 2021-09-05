@@ -15,6 +15,7 @@ from pyresidfp import SoundInterfaceDevice
 from pyresidfp.sound_interface_device import ChipModel
 
 SID_SAMPLE_FREQ = 11025
+CONTROL_SSF_IGNORE_COLS = {'freq1', 'freq3', 'pwduty1', 'fltcoff', 'fltres', 'atk1', 'dec1', 'sus1', 'rel1', 'vol'}
 
 
 def timer_args(parser):
@@ -336,10 +337,9 @@ def split_vdf(sid, df, frame_resync=0):
 
         # build control-only SSFs
         logging.debug('building control only SSFs for voice %u', v)
-        control_ignore_diff_cols = ['freq1', 'freq3', 'pwduty1', 'fltcoff', 'fltres', 'atk1', 'dec1', 'sus1', 'rel1']
-        for col in control_ignore_diff_cols:
+        for col in CONTROL_SSF_IGNORE_COLS:
             diff_cols.remove(col)
-        v_control_df = v_df.drop(control_ignore_diff_cols, axis=1).copy()
+        v_control_df = v_df.drop(CONTROL_SSF_IGNORE_COLS, axis=1).copy()
         v_control_df = squeeze_diffs(v_control_df, diff_cols)
 
         # calculate row hashes
@@ -390,15 +390,15 @@ def skip_ssf(hashid, ssf_df):
     # https://codebase64.org/doku.php?id=base:vicious_sid_demo_routine_explained
     # volume or pwduty modulation, and no or pulse waveform
     frames = ssf_df['frame'].iat[-1]
-    if frames > 2 and ssf_df['noise1'].max() != 1:
+    if frames > 2 and ssf_df[ssf_df['test1'] != 1]['noise1'].max() != 1:
         max_update_rate = frames * 2
         for col in ('test1diff', 'pwduty1diff'):
             val = ssf_df[col].iat[0]
             if val > max_update_rate:
-                logging.debug('skip ssf %d because %s %u > %u', hashid, col, val, frames)
+                logging.debug('skip SSF %d because %s %u > %u', hashid, col, val, frames)
                 return True
         if ssf_df['voldiff'].iat[0] > max_update_rate and ssf_df['vol'].min() == 0:
-            logging.debug('skip ssf %d because volume based sample playback', hashid)
+            logging.debug('skip SSF %d because volume based sample playback', hashid)
             return True
     return False
 
