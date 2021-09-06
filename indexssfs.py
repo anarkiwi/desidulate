@@ -26,8 +26,10 @@ def index_dir(dirname):
     for path in dir_paths:
         try:
             hashids = pd.read_csv(path, usecols=['hashid'])['hashid'].unique()
+            short_path = os.path.join(
+                os.path.basename(os.path.dirname(path)), os.path.basename(path))
             for file_hashid in hashids:
-                dir_index[file_hashid].add(os.path.basename(path))
+                dir_index[file_hashid].add(short_path)
         except ValueError:
             continue
     return dir_index
