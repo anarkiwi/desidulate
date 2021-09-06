@@ -6,6 +6,8 @@ desidulate is a command line python suite of tools for understanding C64/SID mus
 
 desidulate is intended to help new SID composers understand the SID more quickly and completely, find unexplored territory, and build upon the SID legacy. desidulate was also written to assist [CHIME RED](https://github.com/anarkiwi/chime_red2) Tesla coil synthesizer research - how to apply SID style synthesis to high voltage audio generators, and to avoid error-prone audio based transcription (such has that built into Ableton Live). desidulate doesn't require extensive dependencies and is intended for command line use (e.g. to analyze 1000s of SID files efficiently), and is based on Pandas.
 
+![Alt text](desidulate-pipeline.png?raw=true "desidulate pipeline")
+
 ## Installing
 
 ```
