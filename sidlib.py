@@ -339,8 +339,10 @@ def split_vdf(sid, df, frame_resync=0):
         logging.debug('building control only SSFs for voice %u', v)
         for col in CONTROL_SSF_IGNORE_COLS:
             diff_cols.remove(col)
-        v_control_df = v_df.drop(CONTROL_SSF_IGNORE_COLS, axis=1).copy()
-        v_control_df = squeeze_diffs(v_control_df, diff_cols)
+        v_control_df = squeeze_diffs(v_df.drop(['atk1', 'dec1', 'sus1', 'rel1'], axis=1).copy(), diff_cols)
+        for col in ('freq1', 'pwduty1', 'freq3', 'fltres', 'fltcoff', 'vol'):
+            v_control_df[col] = v_control_df.groupby(['ssf'], sort=False)[col].transform(lambda x: x.astype(pd.Int32Dtype()).diff().clip(lower=-1, upper=1).astype(pd.Int8Dtype()))
+        v_control_df = v_control_df.fillna(0)
 
         # calculate row hashes
         logging.debug('calculating row hashes for voice %u', v)
