@@ -15,7 +15,7 @@ from pyresidfp import SoundInterfaceDevice
 from pyresidfp.sound_interface_device import ChipModel
 
 SID_SAMPLE_FREQ = 11025
-CONTROL_SSF_IGNORE_COLS = {'freq1', 'freq3', 'pwduty1', 'fltcoff', 'fltres', 'atk1', 'dec1', 'sus1', 'rel1', 'vol'}
+THUMBNAIL_SSF_IGNORE_COLS = {'freq1', 'freq3', 'pwduty1', 'fltcoff', 'fltres', 'atk1', 'dec1', 'sus1', 'rel1', 'vol'}
 
 
 def timer_args(parser):
@@ -335,28 +335,28 @@ def split_vdf(sid, df, frame_resync=0):
         logging.debug('removing empty SSFs for voice %u', v)
         v_df = v_df[v_df.groupby('ssf', sort=False)['vol'].transform('max') > 0]
 
-        # build control-only SSFs
-        logging.debug('building control only SSFs for voice %u', v)
-        for col in CONTROL_SSF_IGNORE_COLS:
+        # build thumbail SSFs
+        logging.debug('building thumbnail SSFs for voice %u', v)
+        for col in THUMBNAIL_SSF_IGNORE_COLS:
             diff_cols.remove(col)
-        v_control_df = squeeze_diffs(v_df.drop(['atk1', 'dec1', 'sus1', 'rel1'], axis=1).copy(), diff_cols)
+        v_thumbnail_df = squeeze_diffs(v_df.drop(['atk1', 'dec1', 'sus1', 'rel1'], axis=1).copy(), diff_cols)
         for col in ('freq1', 'pwduty1', 'freq3', 'fltres', 'fltcoff', 'vol'):
-            v_control_df[col] = v_control_df.groupby(['ssf'], sort=False)[col].transform(lambda x: x.astype(pd.Int32Dtype()).diff().clip(lower=-1, upper=1).astype(pd.Int8Dtype()))
-        v_control_df = v_control_df.fillna(0)
+            v_thumbnail_df[col] = v_thumbnail_df.groupby(['ssf'], sort=False)[col].transform(lambda x: x.astype(pd.Int32Dtype()).diff().clip(lower=-1, upper=1).astype(pd.Int8Dtype()))
+        v_thumbnail_df = v_thumbnail_df.fillna(0)
 
         # calculate row hashes
         logging.debug('calculating row hashes for voice %u', v)
         v_df = hash_vdf(v_df)
-        v_control_df = hash_vdf(v_control_df)
+        v_thumbnail_df = hash_vdf(v_thumbnail_df)
 
         # normalize clock, calculate clock hashes
         logging.debug('calculating clock/hashes for voice %u', v)
-        for x_df in (v_df, v_control_df):
+        for x_df in (v_df, v_thumbnail_df):
             x_df['clock_start'] = x_df.groupby(['ssf'], sort=False)['clock'].transform('min')
             x_df['clock'] = x_df.groupby(['ssf'], sort=False)['clock'].transform(lambda x: x - x.min())
             x_df['frame'] = x_df['clock'].floordiv(int(sid.clockq))
 
-        v_control_df['clock'] = x_df.groupby(['ssf'], sort=False)['clock'].transform(lambda x: x.index - x.index.min())
+        v_thumbnail_df['clock'] = x_df.groupby(['ssf'], sort=False)['clock'].transform(lambda x: x.index - x.index.min())
 
         # TODO: account for frame slip.
         if frame_resync:
@@ -364,7 +364,7 @@ def split_vdf(sid, df, frame_resync=0):
             clock_diff[clock_diff.abs() > frame_resync] = 0
             v_df.clock = (v_df.clock - clock_diff).astype(np.int64)
 
-        for x_df in (v_df, v_control_df):
+        for x_df in (v_df, v_thumbnail_df):
             x_df['hashid_clock'] = x_df.groupby(['ssf'], sort=False)['clock'].transform(hash_tuple).astype(np.int64)
 
         # add SSF metadata
@@ -372,7 +372,7 @@ def split_vdf(sid, df, frame_resync=0):
         for col in ['test1', 'vol']:
             v_df['%sdiff' % col] = v_df[v_df.noise1 != 1].groupby(['ssf'], sort=False)[col].transform(lambda x: len(x[x.diff() != 0]))
 
-        yield (v, v_df, v_control_df)
+        yield (v, v_df, v_thumbnail_df)
 
 
 def jittermatch_df(df1, df2, jitter_col, jitter_max):
@@ -432,11 +432,11 @@ def state2ssfs(sid, df):
     thumbnail_ssf_count = defaultdict(int)
     remap_ssf_dfs = {}
     ssf_noclock_dfs = {}
-    control_remap_ssf_dfs = {}
+    thumbnail_remap_ssf_dfs = {}
     thumbnail_ssf_noclock_dfs = {}
     skip_hashids = {}
 
-    for v, v_df, v_control_df in split_vdf(sid, df):
+    for v, v_df, v_thumbnail_df in split_vdf(sid, df):
         ssfs = v_df['ssf'].max()
         if pd.isna(ssfs):
             continue
@@ -454,11 +454,11 @@ def state2ssfs(sid, df):
                     else:
                         ssf_log.append({'clock': ssf_df['clock_start'].iat[0], 'hashid': hashid, 'voice': v})
         if sample_ssfs:
-            v_control_df = v_control_df[~v_control_df['ssf'].isin(sample_ssfs)]
-        for hashid_noclock, hashid_noclock_df in v_control_df.groupby(['hashid_noclock'], sort=False):
+            v_thumbnail_df = v_thumbnail_df[~v_thumbnail_df['ssf'].isin(sample_ssfs)]
+        for hashid_noclock, hashid_noclock_df in v_thumbnail_df.groupby(['hashid_noclock'], sort=False):
             for ssf, ssf_df in hashid_noclock_df.groupby(['ssf'], sort=False):
                 hashid_clock = ssf_df['hashid_clock'].iat[0]
-                normalize_ssf(hashid_clock, hashid_noclock, ssf_df, control_remap_ssf_dfs, thumbnail_ssf_noclock_dfs, thumbnail_ssf_dfs, thumbnail_ssf_count)
+                normalize_ssf(hashid_clock, hashid_noclock, ssf_df, thumbnail_remap_ssf_dfs, thumbnail_ssf_noclock_dfs, thumbnail_ssf_dfs, thumbnail_ssf_count)
 
     sample_ssf_dfs = {}
     sample_ssf_count = {}
@@ -491,6 +491,6 @@ def state2ssfs(sid, df):
     thumbnail_ssf_df = concat_dfs(thumbnail_ssf_dfs, thumbnail_ssf_count)
     sample_ssf_df = concat_dfs(sample_ssf_dfs, sample_ssf_count)
 
-    logging.debug('%u SSFs, %u control SSFs, %u skipped SSFs',
+    logging.debug('%u SSFs, %u thumbnail SSFs, %u sample SSFs',
         ssf_df.index.nunique(), thumbnail_ssf_df.index.nunique(), sample_ssf_df.index.nunique())
     return ssf_log_df, ssf_df, thumbnail_ssf_df, sample_ssf_df
