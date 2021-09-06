@@ -327,8 +327,7 @@ def split_vdf(sid, df, frame_resync=0):
         # extract only changes
         logging.debug('extracting only state changes for voice %u (rows before %u)', v, len(v_df))
         v_df = v_df.set_index('clock')
-        diff_cols = list(v_df.columns)
-        v_df = squeeze_diffs(v_df, diff_cols)
+        v_df = squeeze_diffs(v_df, v_df.columns)
         logging.debug('extracted only state changes for voice %u (rows after %u)', v, len(v_df))
 
         # remove empty SSFs
@@ -337,6 +336,7 @@ def split_vdf(sid, df, frame_resync=0):
 
         # build thumbail SSFs
         logging.debug('building thumbnail SSFs for voice %u', v)
+        diff_cols = list(v_df.columns)
         for col in THUMBNAIL_SSF_IGNORE_COLS:
             diff_cols.remove(col)
         v_thumbnail_df = squeeze_diffs(v_df.drop(['atk1', 'dec1', 'sus1', 'rel1'], axis=1).copy(), diff_cols)
