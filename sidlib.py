@@ -370,7 +370,7 @@ def split_vdf(sid, df, frame_resync=0):
         # add SSF metadata
         logging.debug('adding SSF metadata for voice %u', v)
         for col in ['test1', 'vol']:
-            v_df['%sdiff' % col] = v_df[v_df.noise1 != 1].groupby(['ssf'], sort=False)[col].transform(lambda x: len(x[x.diff() != 0]))
+            v_df['%sdiff' % col] = v_df[(v_df.noise1 == 0) | (v_df.noise1.isna())].groupby(['ssf'], sort=False)[col].transform(lambda x: len(x[x.diff() != 0]))
 
         yield (v, v_df, v_thumbnail_df)
 
