@@ -354,7 +354,8 @@ def split_vdf(sid, df):
             lambda x: len(x[x.diff() != 0]))
         v_df['maxframe'] = v_df.groupby(['ssf'], sort=False)['frame'].transform(
             max)
-        v_df = v_df[(v_df['maxframe'] < 2) | (v_df['test1diff'] < v_df['maxframe'] * 2)].drop(['test1diff', 'maxframe'], axis=1)
+        v_df = v_df[(v_df['maxframe'] < 2) | v_df['test1diff'].isna() | (v_df['test1diff'] < v_df['maxframe'] * 2)]
+        v_df = v_df.drop(['test1diff', 'maxframe'], axis=1)
 
         yield (v, v_df)
 
