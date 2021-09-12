@@ -25,6 +25,7 @@ parser.add_argument('--midifile', default='', help='MIDI file to write')
 parser.add_argument('--minclock', default=0, type=int, help='Min clock value')
 parser.add_argument('--maxclock', default=0, type=int, help='Max clock value')
 parser.add_argument('--voicemask', default=','.join([str(v) for v in ALL_VOICES]), type=str, help='Voice mask')
+parser.add_argument('--dfext', default='xz', help='default dataframe extension')
 timer_args(parser)
 midi_args(parser)
 args = parser.parse_args()
@@ -54,7 +55,7 @@ if voicemask != ALL_VOICES:
 sid = get_sid(args.pal)
 smf = SidMidiFile(sid, args.bpm)
 parser = SidSoundFragmentParser(args.ssflogfile, args.percussion, sid)
-parser.read_patches()
+parser.read_patches(args.dfext)
 
 ssf_cache = {}
 ssf_instruments = []
@@ -67,7 +68,7 @@ for row in ssf_log_df.itertuples():
         ssf_instruments.append(ssf.instrument({'hashid': row.hashid}))
     ssf.smf_transcribe(smf, row.clock, row.voice)
 
-ssf_instrument_file = out_path(args.ssflogfile, 'inst.txt.xz')
+ssf_instrument_file = out_path(args.ssflogfile, '.'.join(('inst.txt', args.dfext)))
 ssf_instrument_df = pd.DataFrame(ssf_instruments)
 ssf_instrument_df.to_csv(ssf_instrument_file, index=False)
 

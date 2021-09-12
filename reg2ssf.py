@@ -19,6 +19,7 @@ logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(message)s')
 parser = argparse.ArgumentParser(description='Convert vicesnd.sid log into SSF log files')
 parser.add_argument('logfile', default='vicesnd.sid', help='log file to read')
 parser.add_argument('--maxstates', default=int(10 * 1e6), help='maximum number of SID states to analyze')
+parser.add_argument('--dfext', default='xz', help='default dataframe extension')
 timer_args(parser)
 args = parser.parse_args()
 
@@ -27,8 +28,8 @@ df = reg2state(sid, args.logfile, nrows=int(args.maxstates))
 ssf_log_df, ssf_df = state2ssfs(sid, df)
 
 for ext, filedf in (
-        ('log.xz', ssf_log_df),
-        ('ssf.xz', ssf_df)):
+        ('.'.join(('log', args.dfext)), ssf_log_df),
+        ('.'.join(('ssf', args.dfext)), ssf_df)):
     filename = out_path(args.logfile, ext)
     logging.debug('writing %s', filename)
     filedf.to_csv(filename)
