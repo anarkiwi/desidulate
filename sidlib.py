@@ -208,7 +208,7 @@ def reg2state(sid, snd_log_name, nrows=(10 * 1e6)):
     return df
 
 
-def split_vdf(sid, df, frame_resync=0):
+def split_vdf(sid, df):
     fltcols = [col for col in df.columns if col.startswith('flt') and not col[-1].isdigit()]
 
     def hash_tuple(s):
@@ -289,6 +289,8 @@ def split_vdf(sid, df, frame_resync=0):
         v_df = coalesce_near_writes(v_df, 16, v)
 
         logging.debug('removing redundant state for voice %u', v)
+        # discard any digi information.
+        v_df.loc[v_df['vol'] != 0, ['vol']] = 15
         # remove non-pulse waveform state, while test1 test
         v_df.loc[(v_df['test1'] == 1) & (v_df['pulse1'] != 1), ['freq1', 'sync1', 'ring1', 'tri1', 'saw1', 'pulse1', 'noise1', 'pwduty1', 'freq3', 'test3']] = pd.NA
         # remove modulator voice state while sync1/ring1 not set
@@ -343,10 +345,16 @@ def split_vdf(sid, df, frame_resync=0):
         v_df['frame'] = v_df['clock'].floordiv(int(sid.clockq))
         v_df['hashid_clock'] = v_df.groupby(['ssf'], sort=False)['clock'].transform(hash_tuple).astype(np.int64)
 
-        # add SSF metadata
-        logging.debug('adding SSF metadata for voice %u', v)
-        for col in ['test1', 'vol']:
-            v_df['%sdiff' % col] = v_df[(v_df.noise1 == 0) | (v_df.noise1.isna())].groupby(['ssf'], sort=False)[col].transform(lambda x: len(x[x.diff() != 0]))
+        # Skip SSFs with sample playback.
+        # http://www.ffd2.com/fridge/chacking/c=hacking20.txt
+        # http://www.ffd2.com/fridge/chacking/c=hacking21.txt
+        # https://codebase64.org/doku.php?id=base:vicious_sid_demo_routine_explained
+        logging.debug('discarding SSFs with test1 modulation for voice %u', v)
+        v_df['test1diff'] = v_df[(v_df.noise1 == 0) | (v_df.noise1.isna())].groupby(['ssf'], sort=False)['test1'].transform(
+            lambda x: len(x[x.diff() != 0]))
+        v_df['maxframe'] = v_df.groupby(['ssf'], sort=False)['frame'].transform(
+            max)
+        v_df = v_df[(v_df['maxframe'] < 2) | (v_df['test1diff'] < v_df['maxframe'] * 2)].drop(['test1diff', 'maxframe'], axis=1)
 
         yield (v, v_df)
 
@@ -358,23 +366,6 @@ def jittermatch_df(df1, df2, jitter_col, jitter_max):
         diff = df1_col - df2_col
         diff_max = diff.abs().max()
         return pd.notna(diff_max) and diff_max < jitter_max
-    return False
-
-
-def sample_ssf(hashid, ssf_df):
-    # Skip SSFs with sample playback.
-    # http://www.ffd2.com/fridge/chacking/c=hacking20.txt
-    # http://www.ffd2.com/fridge/chacking/c=hacking21.txt
-    # https://codebase64.org/doku.php?id=base:vicious_sid_demo_routine_explained
-    frames = ssf_df['frame'].iat[-1]
-    if frames > 2:
-        max_update_rate = frames * 2
-        if ssf_df['test1diff'].max() > max_update_rate:
-            logging.debug('skip SSF %d because test bit based sample playback', hashid)
-            return True
-        if ssf_df['voldiff'].max() > max_update_rate and ssf_df['vol'].min() == 0:
-            logging.debug('skip SSF %d because volume based sample playback', hashid)
-            return True
     return False
 
 
@@ -406,39 +397,21 @@ def state2ssfs(sid, df):
     ssf_count = defaultdict(int)
     remap_ssf_dfs = {}
     ssf_noclock_dfs = {}
-    skip_hashids = {}
 
     for v, v_df in split_vdf(sid, df):
         ssfs = v_df['ssf'].max()
         if pd.isna(ssfs):
             continue
         logging.debug('splitting %u SSFs for voice %u', ssfs, v)
-        sample_ssfs = set()
         for hashid_noclock, hashid_noclock_df in v_df.groupby(['hashid_noclock'], sort=False):
             for ssf, ssf_df in hashid_noclock_df.groupby(['ssf'], sort=False):
                 hashid_clock = ssf_df['hashid_clock'].iat[0]
                 hashid = normalize_ssf(hashid_clock, hashid_noclock, ssf_df, remap_ssf_dfs, ssf_noclock_dfs, ssf_dfs, ssf_count)
-                if hashid:
-                    if hashid not in skip_hashids:
-                        skip_hashids[hashid] = sample_ssf(hashid, ssf_df)
-                    if skip_hashids[hashid]:
-                        sample_ssfs.add(ssf)
-                    else:
-                        ssf_log.append({'clock': ssf_df['clock_start'].iat[0], 'hashid': hashid, 'voice': v})
-    sample_ssf_dfs = {}
-    sample_ssf_count = {}
-    skip_hashids = {hashid for hashid, skip in skip_hashids.items() if skip}
-    for hashid in skip_hashids:
-        sample_ssf_dfs[hashid] = ssf_dfs[hashid]
-        sample_ssf_count[hashid] = ssf_count[hashid]
-        del ssf_dfs[hashid]
-        del ssf_count[hashid]
+                ssf_log.append({'clock': ssf_df['clock_start'].iat[0], 'hashid': hashid, 'voice': v})
 
-    for x, y in ((ssf_dfs, ssf_count),
-                 (sample_ssf_dfs, sample_ssf_count)):
-        for hashid, count in y.items():
-            x[hashid]['count'] = count
-            x[hashid]['hashid'] = hashid
+    for hashid, count in ssf_count.items():
+        ssf_dfs[hashid]['count'] = count
+        ssf_dfs[hashid]['hashid'] = hashid
 
     def concat_dfs(x, y):
         if x and y:
@@ -452,8 +425,6 @@ def state2ssfs(sid, df):
             ssf_log, dtype=pd.Int64Dtype()).set_index('clock').sort_index()
 
     ssf_df = concat_dfs(ssf_dfs, ssf_count)
-    sample_ssf_df = concat_dfs(sample_ssf_dfs, sample_ssf_count)
 
-    logging.debug('%u SSFs, %u sample SSFs',
-        ssf_df.index.nunique(), sample_ssf_df.index.nunique())
-    return ssf_log_df, ssf_df, sample_ssf_df
+    logging.debug('%u SSFs', ssf_df.index.nunique())
+    return ssf_log_df, ssf_df
