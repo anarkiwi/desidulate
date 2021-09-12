@@ -78,14 +78,15 @@ class SSFTestCase(unittest.TestCase):
             test_log = os.path.join(tmpdir, 'vicesnd.log')
             sid = get_sid(pal=True)
             smf = SidMidiFile(sid, DEFAULT_BPM)
-            with open(test_log, 'w') as log:
+            with open(test_log, 'w', encoding='utf8') as log:
                 log.write('\n'.join((
                     '1 24 15',
                     '1 7 255',
                     '1 8 128',
                     '1 13 255',
                     '100 11 129',
-                    '100000 11 0')) + '\n')
+                    '100000 11 0',
+                    '')))
             ssf_log_df, ssf_dfs, = state2ssfs(sid, reg2state(sid, test_log))
             ssf_log_df.reset_index(level=0, inplace=True)
             ssf_dfs.reset_index(level=0, inplace=True)

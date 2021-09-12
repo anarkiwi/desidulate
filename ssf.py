@@ -14,7 +14,7 @@ from itertools import groupby
 import pandas as pd
 from fileio import out_path
 from sidlib import set_sid_dtype
-from sidmidi import ELECTRIC_SNARE, BASS_DRUM, LOW_TOM, HIGH_TOM, PEDAL_HIHAT, CLOSED_HIHAT, OPEN_HIHAT, ACCOUSTIC_SNARE, CRASH_CYMBAL1, closest_midi
+from sidmidi import ELECTRIC_SNARE, BASS_DRUM, LOW_TOM, HIGH_TOM, PEDAL_HIHAT, CLOSED_HIHAT, OPEN_HIHAT, ACCOUSTIC_SNARE, closest_midi
 from sidwav import state2samples, samples_loudestf
 
 INITIAL_PERIOD_FRAMES = 4

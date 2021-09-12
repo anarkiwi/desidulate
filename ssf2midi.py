@@ -14,7 +14,7 @@ import sys
 import pandas as pd
 from fileio import midi_path, out_path
 from sidlib import get_sid, timer_args
-from sidmidi import SidMidiFile, DEFAULT_BPM, midi_args
+from sidmidi import SidMidiFile, midi_args
 from ssf import SidSoundFragment, SidSoundFragmentParser
 
 ALL_VOICES = frozenset([1, 2, 3])
