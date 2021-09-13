@@ -27,7 +27,7 @@ if not set(THUMBNAIL_KEEP).issubset(set(ssf_df.columns)):
     print('not an SSF file: %s' % args.ssffile)
     sys.exit(0)
 
-ssf_df = ssf_df.drop(THUMBNAIL_IGNORE, axis=1).set_index('hashid')
+ssf_df = ssf_df.drop(THUMBNAIL_IGNORE, axis=1).set_index('hashid')  # pylint: disable=no-member
 ssf_df = ssf_df[ssf_df['frame'] <= args.maxframe]
 ssf_df = ssf_df.fillna(0)
 
