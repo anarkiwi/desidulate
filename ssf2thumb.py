@@ -7,6 +7,7 @@
 ## The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 
 import argparse
+import sys
 import numpy as np
 import pandas as pd
 from fileio import out_path
@@ -22,6 +23,10 @@ parser.add_argument('--maxframe', default=30, help='max frame count')
 args = parser.parse_args()
 
 ssf_df = pd.read_csv(args.ssffile, dtype=pd.Int64Dtype())
+if set(THUMBNAIL_KEEP) not in set(ssf_df.columns):
+    print('not an SSF file: %s' % args.ssffile)
+    sys.exit(0)
+
 ssf_df = ssf_df.drop(THUMBNAIL_IGNORE, axis=1).set_index('hashid')
 ssf_df = ssf_df[ssf_df['frame'] <= args.maxframe]
 ssf_df = ssf_df.fillna(0)
