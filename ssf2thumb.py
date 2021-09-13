@@ -23,7 +23,7 @@ parser.add_argument('--maxframe', default=30, help='max frame count')
 args = parser.parse_args()
 
 ssf_df = pd.read_csv(args.ssffile, dtype=pd.Int64Dtype())
-if set(THUMBNAIL_KEEP) not in set(ssf_df.columns):
+if not set(THUMBNAIL_KEEP).subset(set(ssf_df.columns)):
     print('not an SSF file: %s' % args.ssffile)
     sys.exit(0)
 
