@@ -45,6 +45,8 @@ for _, ssf_df in ssf_df.groupby('hashid'):
     thumbnail_ssf_df = squeeze_diffs(ssf_df, THUMBNAIL_KEEP).reset_index(drop=True)
     if thumbnail_ssf_df.empty:
         thumbnail_ssf_df = ssf_df[:1]
+    elif len(thumbnail_ssf_df) == 1:
+        thumbnail_ssf_df['frame'] = 0
     thumbnail_hashid = hash(tuple([hash(tuple(r)) for r in thumbnail_ssf_df.itertuples()]))
     thumbnail_ssf_df = thumbnail_ssf_df.copy()
     thumbnail_ssf_df['hashid'] = thumbnail_hashid
