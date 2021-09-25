@@ -345,6 +345,11 @@ def split_vdf(sid, df):
         v_df['frame'] = v_df['clock'].floordiv(int(sid.clockq))
         v_df['hashid_clock'] = v_df.groupby(['ssf'], sort=False)['clock'].transform(hash_tuple).astype(np.int64)
 
+        waveform0 = v_df[(v_df['clock'] == 0) & (v_df['test1'] == 0) & (v_df['saw1'] == 0) & (v_df['tri1'] == 0) & (v_df['pulse1'] == 0) & (v_df['noise1'] == 0) & (v_df['sus1'] == 0)]
+        if len(waveform0):
+            logging.debug('discarding %u SSFs beginning with waveform 0', waveform0['ssf'].nunique())
+            v_df = v_df[~v_df['ssf'].isin(waveform0['ssf'])]
+
         # Skip SSFs with sample playback.
         # http://www.ffd2.com/fridge/chacking/c=hacking20.txt
         # http://www.ffd2.com/fridge/chacking/c=hacking21.txt
