@@ -15,6 +15,7 @@ from sidlib import squeeze_diffs
 
 THUMBNAIL_KEEP = ['gate1', 'test1', 'sync1', 'ring1', 'test3', 'pulse1', 'noise1', 'saw1', 'tri1', 'flt1', 'fltext', 'fltlo', 'fltband', 'flthi']
 THUMBNAIL_IGNORE = ['atk1', 'dec1', 'sus1', 'rel1', 'vol', 'count']
+PARAMS =  (('freq1', 8), ('freq3', 8), ('pwduty1', 4), ('fltcoff', 3))
 
 parser = argparse.ArgumentParser(description='Convert ssfs into thumbnail ssfs')
 parser.add_argument('ssffile', default='', help='SSF file to read')
@@ -31,17 +32,21 @@ ssf_df = ssf_df.drop(THUMBNAIL_IGNORE, axis=1).set_index('hashid')  # pylint: di
 ssf_df = ssf_df[ssf_df['frame'] <= args.maxframe]
 ssf_df = ssf_df.fillna(0)
 
-for col, bits in (
-        ('freq1', 8),
-        ('freq3', 8),
-        ('pwduty1', 4),
-        ('fltcoff', 3)):
+for col, bits in PARAMS:
     ssf_df[col] = np.right_shift(ssf_df[col], bits)
     ssf_df[col] = np.left_shift(ssf_df[col], bits)
 
 thumbnails = {}
 for _, ssf_df in ssf_df.groupby('hashid'):
     ssf_df = ssf_df.drop(['clock'], axis=1).reset_index(drop=True)
+    for param, _ in PARAMS:
+        v = ssf_df[ssf_df[param] > 0][param]
+        v_max = v.max()
+        if pd.notna(v_max):
+           v = v.iat[0]
+           ssf_df[param] /= v
+           ssf_df[param] = ssf_df[param].round(2)
+
     thumbnail_ssf_df = squeeze_diffs(ssf_df, THUMBNAIL_KEEP).reset_index(drop=True)
     if thumbnail_ssf_df.empty:
         thumbnail_ssf_df = ssf_df[:1]
