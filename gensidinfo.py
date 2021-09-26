@@ -43,6 +43,7 @@ def scrape_sidinfo(sidfile):
             fields_match = fields_re.match(line.strip())
             if fields_match:
                 field, val = fields_match.group(1).strip(), fields_match.group(2).strip()
+                field = field.replace(' ', '')
                 subfields_match = subfields_re.match(val)
                 if subfields_match and field not in ('Title', 'Author', 'Released'):
                     for subfield in val.split(','):
@@ -66,7 +67,7 @@ with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
     results = [future.result() for future in concurrent.futures.as_completed(result_futures)]
 
 df = pd.DataFrame(results)
-drops = []
+drops = ['Filename(s)']
 for col, col_type in df.dtypes.items():
     if col_type is np.dtype('object'):
         n = df[col].nunique()
