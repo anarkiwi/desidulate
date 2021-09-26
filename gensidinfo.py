@@ -19,6 +19,7 @@ import pandas as pd
 MAX_WORKERS = multiprocessing.cpu_count()
 fields_re = re.compile(r'^\|\s+([^:]+)\s+:\s+([^:]+)\s*$')
 subfields_re = re.compile(r'(.+)\s+\=\s+(.+)')
+year_re = re.compile(r'^([12][0-9]{3,3})\b.+')
 unknowns = pd.DataFrame([{'val': val} for val in ('<?>', 'UNKNOWN')])
 
 current = pathlib.Path(r'./')
@@ -49,6 +50,12 @@ def scrape_sidinfo(sidfile):
                         field, val = subfield_match.group(1).strip(), subfield_match.group(2).strip()
                         result[field] = val
                 else:
+                    if field == 'Released':
+                        year_match = year_re.match(val)
+                        year_val = pd.NA
+                        if year_match:
+                            year_val = int(year_match.group(1))
+                        result['ReleasedYear'] = year_val
                     result[field] = val
     speed = result.get('Song Speed', '')
     result['pal'] = int('PAL' in speed)
@@ -67,5 +74,7 @@ for col, col_type in df.dtypes.items():
             drops.append(col)
         else:
             df.loc[df[col].isin(unknowns.val), [col]] = pd.NA
+if drops:
+    df = df.drop(drops, axis=1)
 df[df.pal == 1].drop(['pal'], axis=1).to_csv('sidinfo-pal.csv', index=False, quoting=csv.QUOTE_NONNUMERIC)
 df[df.pal == 0].drop(['pal'], axis=1).to_csv('sidinfo-ntsc.csv', index=False, quoting=csv.QUOTE_NONNUMERIC)
