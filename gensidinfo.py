@@ -8,15 +8,18 @@
 
 
 import csv
+import multiprocessing
 import pathlib
 import re
 import subprocess
 import concurrent.futures
+import numpy as np
 import pandas as pd
 
-MAX_WORKERS = 64
+MAX_WORKERS = multiprocessing.cpu_count()
 fields_re = re.compile(r'^\|\s+([^:]+)\s+:\s+([^:]+)\s*$')
 subfields_re = re.compile(r'(.+)\s+\=\s+(.+)')
+unknowns = pd.DataFrame([{'val': val} for val in ('<?>', 'UNKNOWN')])
 
 current = pathlib.Path(r'./')
 sidfiles = current.rglob(r'*.sid')
@@ -48,7 +51,7 @@ def scrape_sidinfo(sidfile):
                 else:
                     result[field] = val
     speed = result.get('Song Speed', '')
-    result['pal'] = 'PAL' in speed
+    result['pal'] = int('PAL' in speed)
     return result
 
 with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
@@ -56,5 +59,13 @@ with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
     results = [future.result() for future in concurrent.futures.as_completed(result_futures)]
 
 df = pd.DataFrame(results)
-df[df.pal == True].drop(['pal'], axis=1).to_csv('sidinfo-pal.csv', index=0, quoting=csv.QUOTE_ALL)
-df[df.pal == False].drop(['pal'], axis=1).to_csv('sidinfo-ntsc.csv', index=0, quoting=csv.QUOTE_ALL)
+drops = []
+for col, col_type in df.dtypes.items():
+    if col_type is np.dtype('object'):
+        n = df[col].nunique()
+        if n == 1:
+            drops.append(col)
+        else:
+            df.loc[df[col].isin(unknowns.val), [col]] = pd.NA
+df[df.pal == 1].drop(['pal'], axis=1).to_csv('sidinfo-pal.csv', index=False, quoting=csv.QUOTE_NONNUMERIC)
+df[df.pal == 0].drop(['pal'], axis=1).to_csv('sidinfo-ntsc.csv', index=False, quoting=csv.QUOTE_NONNUMERIC)
