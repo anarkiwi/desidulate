@@ -30,14 +30,17 @@ def index_dir(dirname):
     dir_paths = [file_path for file_path in dir_paths if os.path.isfile(file_path) and file_path.endswith(SSF_EXT)]
     for path in dir_paths:
         try:
-            short_path = os.path.join(
-                os.path.basename(os.path.dirname(path)), os.path.basename(path))
+            short_path = path[len(SSF_ROOT)+1:]
             df = pd.read_csv(path)
             for hashid, ssf_df in df.groupby('hashid', sort=False):
                 dir_index[hashid].add(short_path)
                 if hashid not in dir_metadata:
                     metadata = {col: len(ssf_df[ssf_df[col] == 1][col]) for col in COL_MAXES}
-                    metadata.update({col: ssf_df[ssf_df[col] > 0][col].nunique() for col in COL_UNIQUE})
+                    metadata.update({'n%s' % col: ssf_df[ssf_df[col] > 0][col].nunique() for col in COL_UNIQUE})
+                    for col in COL_UNIQUE:
+                        v = df[df[col] > 0][col]
+                        if len(v):
+                            metadata.update({'f%s' % col: v.iat[0]})
                     metadata.update({'len': len(ssf_df), 'frames': ssf_df['frame'].max()})
                     dir_metadata[hashid] = metadata
         except ValueError:
