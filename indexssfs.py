@@ -38,7 +38,7 @@ def index_dir(dirname):
                     metadata = {col: len(ssf_df[ssf_df[col] == 1][col]) for col in COL_MAXES}
                     metadata.update({'n%s' % col: ssf_df[ssf_df[col] > 0][col].nunique() for col in COL_UNIQUE})
                     for col in COL_UNIQUE:
-                        v = df[df[col] > 0][col]
+                        v = df[df[col] > 0][col]  # pylint: disable=unsubscriptable-object
                         if len(v):
                             metadata.update({'f%s' % col: v.iat[0]})
                     metadata.update({'len': len(ssf_df), 'frames': ssf_df['frame'].max()})
