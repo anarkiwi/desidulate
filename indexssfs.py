@@ -8,41 +8,58 @@
 
 
 import os
-from collections import defaultdict
 import concurrent.futures
+import multiprocessing
+from collections import defaultdict
 from pathlib import Path
 import pandas as pd
 
-MAX_WORKERS = 4
+
+MAX_WORKERS = multiprocessing.cpu_count()
 SSF_SUFFIX = 'thumbnail_ssf'
 SSF_ROOT = r'.'
 SSF_EXT = '.%s.xz' % SSF_SUFFIX
+COL_MAXES = ('test1', 'sync1', 'ring1', 'pulse1', 'saw1', 'tri1', 'pulse1', 'noise1', 'flt1', 'fltlo', 'fltband', 'flthi', 'fltext')
+COL_UNIQUE = ('freq1', 'freq3', 'pwduty1', 'fltcoff')
 
 
 def index_dir(dirname):
     dir_index = defaultdict(set)
+    dir_metadata = {}
     dir_paths = [os.path.join(dirname, filename) for filename in os.listdir(dirname)]
     dir_paths = [file_path for file_path in dir_paths if os.path.isfile(file_path) and file_path.endswith(SSF_EXT)]
     for path in dir_paths:
         try:
-            hashids = pd.read_csv(path, usecols=['hashid'])['hashid'].unique()
             short_path = os.path.join(
                 os.path.basename(os.path.dirname(path)), os.path.basename(path))
-            for file_hashid in hashids:
-                dir_index[file_hashid].add(short_path)
+            df = pd.read_csv(path)
+            for hashid, ssf_df in df.groupby('hashid', sort=False):
+                dir_index[hashid].add(short_path)
+                if hashid not in dir_metadata:
+                    metadata = {col: len(ssf_df[ssf_df[col] == 1][col]) for col in COL_MAXES}
+                    metadata.update({col: ssf_df[ssf_df[col] > 0][col].nunique() for col in COL_UNIQUE})
+                    metadata.update({'len': len(ssf_df), 'frames': ssf_df['frame'].max()})
+                    dir_metadata[hashid] = metadata
         except ValueError:
             continue
-    return dir_index
+    return (dir_index, dir_metadata)
 
 
 global_dir_index = defaultdict(set)
+global_dir_metadata = {}
 with concurrent.futures.ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor:
     result_futures = map(lambda x: executor.submit(index_dir, x), Path(SSF_ROOT).glob('**/'))
     for future in concurrent.futures.as_completed(result_futures):
-        for hashid, paths in future.result().items():
+        dir_index, dir_metadata = future.result()
+        for hashid, paths in dir_index.items():
             global_dir_index[hashid].update(paths)
+        for hashid, metadata in dir_metadata.items():
+            global_dir_metadata[hashid] = metadata
 
-df = pd.DataFrame(global_dir_index.items(), columns=['hashid', 'ssffiles'])
+for hashid, paths in global_dir_index.items():
+    global_dir_metadata[hashid].update({'hashid': hashid, 'ssffiles': paths})
+
+df = pd.DataFrame(global_dir_metadata.values())
 df['ssffileslen'] = df.ssffiles.transform(len)
 df.to_csv('%s_index.xz' % SSF_SUFFIX, index=False)
 
