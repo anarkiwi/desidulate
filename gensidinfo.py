@@ -59,7 +59,7 @@ def scrape_sidinfo(sidfile):
                         result['ReleasedYear'] = year_val
                     result[field] = val
     speed = result.get('Song Speed', '')
-    result['pal'] = int('PAL' in speed)
+    result['pal'] = 'PAL' in speed
     return result
 
 with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
@@ -69,6 +69,8 @@ with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
 df = pd.DataFrame(results)
 drops = ['Filename(s)']
 for col, col_type in df.dtypes.items():
+    if col == 'pal':
+        continue
     if col_type is np.dtype('object'):
         n = df[col].nunique()
         if n == 1:
@@ -77,5 +79,5 @@ for col, col_type in df.dtypes.items():
             df.loc[df[col].isin(unknowns.val), [col]] = pd.NA
 if drops:
     df = df.drop(drops, axis=1)
-df[df.pal == 1].drop(['pal'], axis=1).to_csv('sidinfo-pal.csv', index=False, quoting=csv.QUOTE_NONNUMERIC)
-df[df.pal == 0].drop(['pal'], axis=1).to_csv('sidinfo-ntsc.csv', index=False, quoting=csv.QUOTE_NONNUMERIC)
+df[df.pal == True].drop(['pal'], axis=1).to_csv('sidinfo-pal.csv', index=False, quoting=csv.QUOTE_NONNUMERIC)
+df[df.pal == False].drop(['pal'], axis=1).to_csv('sidinfo-ntsc.csv', index=False, quoting=csv.QUOTE_NONNUMERIC)
