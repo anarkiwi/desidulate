@@ -308,16 +308,18 @@ def split_vdf(sid, df):
         v_df.loc[v_df['vol'] != 0, ['vol']] = 15
 
         logging.debug('removing redundant state for voice %u', v)
+        mod_cols = ['freq3', 'test3', 'sync1', 'ring1']
+
         # remove non-pulse waveform state, while test1 test
-        v_df.loc[(v_df['test1'] == 1) & (v_df['pulse1'] != 1), ['freq1', 'sync1', 'ring1', 'tri1', 'saw1', 'pulse1', 'noise1', 'pwduty1', 'freq3', 'test3']] = pd.NA
+        v_df.loc[(v_df['test1'] == 1) & (v_df['pulse1'] != 1), ['freq1', 'tri1', 'saw1', 'pulse1', 'noise1', 'pwduty1'] + mod_cols ] = pd.NA
         # remove modulator voice state while sync1/ring1 not set
-        v_df.loc[~((v_df['sync1'] == 1) | ((v_df['ring1'] == 1) & (v_df['tri1'] == 1))), ['freq3', 'test3']] = pd.NA
-        # remove freq1 state when no waveform
-        v_df.loc[(v_df['tri1'] != 1) & (v_df['saw1'] != 1) & (v_df['noise1'] != 1) & (v_df['pulse1'] != 1), ['freq1', 'freq3', 'test3']] = pd.NA
+        v_df.loc[~((v_df['sync1'] == 1) | ((v_df['ring1'] == 1) & (v_df['tri1'] == 1))), mod_cols] = pd.NA
+        # remove carrier state when no waveform
+        v_df.loc[(v_df['tri1'] != 1) & (v_df['saw1'] != 1) & (v_df['noise1'] != 1) & (v_df['pulse1'] != 1), ['freq1', 'flt1'] + mod_cols] = pd.NA
         # remove filter state when no filter.
-        v_df.loc[v_df['flt1'] != 1, fltcols] = pd.NA
+        v_df.loc[(v_df['flt1'] == 0) | v_df['flt1'].isna(), fltcols] = pd.NA
         # remove pwduty state when no pulse1 set.
-        v_df.loc[v_df['pulse1'] != 1, ['pwduty1']] = pd.NA
+        v_df.loc[(v_df['pulse1'] == 0) | v_df['pulse1'].isna(), ['pwduty1']] = pd.NA
 
         # select ADS from when gate on
         logging.debug('removing redundant ADSR for voice %u', v)
