@@ -311,7 +311,7 @@ def split_vdf(sid, df):
         mod_cols = ['freq3', 'test3', 'sync1', 'ring1']
 
         # remove non-pulse waveform state, while test1 test
-        v_df.loc[(v_df['test1'] == 1) & (v_df['pulse1'] != 1), ['freq1', 'tri1', 'saw1', 'pulse1', 'noise1', 'pwduty1'] + mod_cols ] = pd.NA
+        v_df.loc[(v_df['test1'] == 1) & (v_df['pulse1'] != 1), ['freq1', 'tri1', 'saw1', 'pulse1', 'noise1'] + mod_cols] = pd.NA
         # remove modulator voice state while sync1/ring1 not set
         v_df.loc[~((v_df['sync1'] == 1) | ((v_df['ring1'] == 1) & (v_df['tri1'] == 1))), mod_cols] = pd.NA
         # remove carrier state when waveform 0
