@@ -295,9 +295,6 @@ def split_vdf(sid, df):
         v_df.loc[v_df['ssf'] != 1, ['ssf']] = 0
         v_df['ssf'] = v_df['ssf'].cumsum().astype(np.uint64)
 
-        # remove empty SSFs
-        logging.debug('removing empty SSFs for voice %u', v)
-        v_df = v_df[v_df.groupby('ssf', sort=False)['vol'].transform('max') > 0]
         # Skip SSFs with sample playback.
         # http://www.ffd2.com/fridge/chacking/c=hacking20.txt
         # http://www.ffd2.com/fridge/chacking/c=hacking21.txt
@@ -342,6 +339,10 @@ def split_vdf(sid, df):
         v_df = v_df.set_index('clock')
         v_df = squeeze_diffs(v_df, v_df.columns)
         logging.debug('extracted only state changes for voice %u (rows after %u)', v, len(v_df))
+
+        # remove empty SSFs
+        logging.debug('removing empty SSFs for voice %u', v)
+        v_df = v_df[v_df.groupby('ssf', sort=False)['vol'].transform('max') > 0]
 
         # calculate row hashes
         logging.debug('calculating row hashes for voice %u', v)
