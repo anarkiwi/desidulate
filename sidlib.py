@@ -343,6 +343,7 @@ def split_vdf(sid, df):
         # remove empty SSFs
         logging.debug('removing empty SSFs for voice %u', v)
         v_df = v_df[v_df.groupby('ssf', sort=False)['vol'].transform('max') > 0]
+        v_df = v_df[v_df.groupby('ssf', sort=False)['gate1'].transform('max') > 0]
 
         # calculate row hashes
         logging.debug('calculating row hashes for voice %u', v)
