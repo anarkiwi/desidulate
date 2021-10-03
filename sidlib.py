@@ -304,10 +304,10 @@ def split_vdf(sid, df):
             lambda x: len(x[x.diff() != 0]))
         v_df = v_df[v_df['test1diff'].isna() | (v_df['test1diff'] <= 2)]
         v_df = v_df.drop(['test1diff'], axis=1)
-
-        logging.debug('removing redundant state for voice %u', v)
         # discard any digi information.
         v_df.loc[v_df['vol'] != 0, ['vol']] = 15
+
+        logging.debug('removing redundant state for voice %u', v)
         # remove non-pulse waveform state, while test1 test
         v_df.loc[(v_df['test1'] == 1) & (v_df['pulse1'] != 1), ['freq1', 'sync1', 'ring1', 'tri1', 'saw1', 'pulse1', 'noise1', 'pwduty1', 'freq3', 'test3']] = pd.NA
         # remove modulator voice state while sync1/ring1 not set
