@@ -288,6 +288,26 @@ def split_vdf(sid, df):
 
         v_df = coalesce_near_writes(v_df, 16, v)
 
+        # split on gate on transitions into SSFs
+        logging.debug('splitting to SSFs for voice %u', v)
+        v_df['diff_gate1'] = v_df['gate1'].astype(np.int8).diff(periods=1).fillna(0).astype(pd.Int8Dtype()).fillna(0)
+        v_df['ssf'] = v_df['diff_gate1']
+        v_df.loc[v_df['ssf'] != 1, ['ssf']] = 0
+        v_df['ssf'] = v_df['ssf'].cumsum().astype(np.uint64)
+
+        # remove empty SSFs
+        logging.debug('removing empty SSFs for voice %u', v)
+        v_df = v_df[v_df.groupby('ssf', sort=False)['vol'].transform('max') > 0]
+        # Skip SSFs with sample playback.
+        # http://www.ffd2.com/fridge/chacking/c=hacking20.txt
+        # http://www.ffd2.com/fridge/chacking/c=hacking21.txt
+        # https://codebase64.org/doku.php?id=base:vicious_sid_demo_routine_explained
+        logging.debug('discarding SSFs with test1 modulation for voice %u', v)
+        v_df['test1diff'] = v_df[(v_df.noise1 == 0) | (v_df.noise1.isna())].groupby(['ssf'], sort=False)['test1'].transform(
+            lambda x: len(x[x.diff() != 0]))
+        v_df = v_df[v_df['test1diff'].isna() | (v_df['test1diff'] <= 2)]
+        v_df = v_df.drop(['test1diff'], axis=1)
+
         logging.debug('removing redundant state for voice %u', v)
         # discard any digi information.
         v_df.loc[v_df['vol'] != 0, ['vol']] = 15
@@ -301,13 +321,6 @@ def split_vdf(sid, df):
         v_df.loc[v_df['flt1'] != 1, fltcols] = pd.NA
         # remove pwduty state when no pulse1 set.
         v_df.loc[v_df['pulse1'] != 1, ['pwduty1']] = pd.NA
-
-        # split on gate on transitions into SSFs
-        logging.debug('splitting to SSFs for voice %u', v)
-        v_df['diff_gate1'] = v_df['gate1'].astype(np.int8).diff(periods=1).fillna(0).astype(pd.Int8Dtype())
-        v_df['ssf'] = v_df['diff_gate1']
-        v_df.loc[v_df['ssf'] != 1, ['ssf']] = 0
-        v_df['ssf'] = v_df['ssf'].cumsum().astype(np.uint64)
 
         # select ADS from when gate on
         logging.debug('removing redundant ADSR for voice %u', v)
@@ -330,10 +343,6 @@ def split_vdf(sid, df):
         v_df = squeeze_diffs(v_df, v_df.columns)
         logging.debug('extracted only state changes for voice %u (rows after %u)', v, len(v_df))
 
-        # remove empty SSFs
-        logging.debug('removing empty SSFs for voice %u', v)
-        v_df = v_df[v_df.groupby('ssf', sort=False)['vol'].transform('max') > 0]
-
         # calculate row hashes
         logging.debug('calculating row hashes for voice %u', v)
         v_df = hash_vdf(v_df)
@@ -344,23 +353,6 @@ def split_vdf(sid, df):
         v_df['clock'] = v_df.groupby(['ssf'], sort=False)['clock'].transform(lambda x: x - x.min())
         v_df['frame'] = v_df['clock'].floordiv(int(sid.clockq))
         v_df['hashid_clock'] = v_df.groupby(['ssf'], sort=False)['clock'].transform(hash_tuple).astype(np.int64)
-
-        #waveform0 = v_df[(v_df['clock'] == 0) & (v_df['test1'] == 0) & (v_df['saw1'] == 0) & (v_df['tri1'] == 0) & (v_df['pulse1'] == 0) & (v_df['noise1'] == 0) & (v_df['sus1'] == 0)]
-        #if len(waveform0):
-        #    logging.debug('discarding %u SSFs beginning with waveform 0', waveform0['ssf'].nunique())
-        #    v_df = v_df[~v_df['ssf'].isin(waveform0['ssf'])]
-
-        # Skip SSFs with sample playback.
-        # http://www.ffd2.com/fridge/chacking/c=hacking20.txt
-        # http://www.ffd2.com/fridge/chacking/c=hacking21.txt
-        # https://codebase64.org/doku.php?id=base:vicious_sid_demo_routine_explained
-        logging.debug('discarding SSFs with test1 modulation for voice %u', v)
-        v_df['test1diff'] = v_df[(v_df.noise1 == 0) | (v_df.noise1.isna())].groupby(['ssf'], sort=False)['test1'].transform(
-            lambda x: len(x[x.diff() != 0]))
-        v_df['maxframe'] = v_df.groupby(['ssf'], sort=False)['frame'].transform(
-            max)
-        v_df = v_df[(v_df['maxframe'] < 2) | v_df['test1diff'].isna() | (v_df['test1diff'] < v_df['maxframe'] * 2)]
-        v_df = v_df.drop(['test1diff', 'maxframe'], axis=1)
 
         yield (v, v_df)
 
