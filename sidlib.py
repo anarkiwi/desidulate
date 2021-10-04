@@ -299,12 +299,13 @@ def split_vdf(sid, df):
         # http://www.ffd2.com/fridge/chacking/c=hacking20.txt
         # http://www.ffd2.com/fridge/chacking/c=hacking21.txt
         # https://codebase64.org/doku.php?id=base:vicious_sid_demo_routine_explained
+        # discard test-bit based sample playback (multiple test bit transitions while gate is on)
         logging.debug('discarding SSFs with test1 modulation for voice %u', v)
         v_df['test1diff'] = v_df[(v_df.noise1 == 0) | (v_df.noise1.isna())].groupby(['ssf'], sort=False)['test1'].transform(
             lambda x: len(x[x.diff() != 0]))
         v_df = v_df[v_df['test1diff'].isna() | (v_df['test1diff'] <= 2)]
         v_df = v_df.drop(['test1diff'], axis=1)
-        # discard any digi information.
+        # discard volume-based sample playback
         v_df.loc[v_df['vol'] != 0, ['vol']] = 15
 
         logging.debug('removing redundant state for voice %u', v)
