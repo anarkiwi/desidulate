@@ -306,7 +306,7 @@ def split_vdf(sid, df):
                 lambda x: len(x[x.diff() != 0]))
             v_df = v_df[v_df['coldiff'].isna() | (v_df['coldiff'] <= diff_limit)]
             v_df = v_df.drop(['coldiff'], axis=1)
-        minfreq = v_df[v_df['pulse1'] == 1].v_df.groupby(
+        minfreq = v_df[v_df['pulse1'] == 1].groupby(
             ['ssf'], sort=False)['freq1'].transform(min)
         v_df = v_df[minfreq != 65335]
 
