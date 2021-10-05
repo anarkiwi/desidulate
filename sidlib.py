@@ -308,7 +308,7 @@ def split_vdf(sid, df):
             v_df = v_df.drop(['coldiff'], axis=1)
         v_df['minpulsefreq'] = v_df[v_df['pulse1'] == 1].groupby(
             ['ssf'], sort=False)['freq1'].transform(min)
-        v_df = v_df[v_df['minpulsefreq'].isna() | (v_df['minpulsefreq'] != 65335)].drop(['minpulsefreq'], axis=1)
+        v_df = v_df[v_df['minpulsefreq'].isna() | (v_df['minpulsefreq'] != (2**16-1))].drop(['minpulsefreq'], axis=1)
 
         logging.debug('removing redundant state for voice %u', v)
         mod_cols = ['freq3', 'test3', 'sync1', 'ring1']
