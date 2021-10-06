@@ -351,6 +351,14 @@ def split_vdf(sid, df):
         v_df = v_df[v_df['maxrate'] > MAX_UPDATE_CYCLES].drop(['maxrate'], axis=1)
         after = v_df['ssf'].nunique()
         logging.debug('discarded %s high update rate (%u cycles max) SSFs for voice %u', before - after, MAX_UPDATE_CYCLES, v)
+        for col, diff_limit in (('vol', 1), ('test1', 2)):
+            before = v_df['ssf'].nunique()
+            v_df['coldiff'] = v_df.groupby(['ssf'], sort=False)[col].transform(
+                lambda x: len(x[x.diff() != 0]))
+            v_df = v_df[v_df['coldiff'].isna() | (v_df['coldiff'] <= diff_limit)]
+            v_df = v_df.drop(['coldiff'], axis=1)
+            after = v_df['ssf'].nunique()
+            logging.debug('discarded %u SSFs with %s modulation for voice %u', before - after, col, v)
 
         # calculate row hashes
         logging.debug('calculating row hashes for voice %u', v)
