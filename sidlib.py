@@ -15,6 +15,7 @@ from pyresidfp import SoundInterfaceDevice
 from pyresidfp.sound_interface_device import ChipModel
 
 SID_SAMPLE_FREQ = 11025
+MAX_UPDATE_CYCLES = 2048
 
 
 def timer_args(parser):
@@ -244,8 +245,7 @@ def split_vdf(sid, df):
         return new_cols
 
     def hash_vdf(vdf):
-        vdf.reset_index(level=0, inplace=True)
-        uniq = vdf.drop(['clock', 'ssf'], axis=1).drop_duplicates(ignore_index=True)
+        uniq = vdf.drop(['clock', 'ssf', 'clock_start', 'frame'], axis=1).drop_duplicates(ignore_index=True)
         uniq['row_hash'] = uniq.apply(hash_tuple, axis=1)
         logging.debug('%u unique voice states', len(uniq))
         merge_cols = list(uniq.columns)
@@ -295,21 +295,6 @@ def split_vdf(sid, df):
         v_df.loc[v_df['ssf'] != 1, ['ssf']] = 0
         v_df['ssf'] = v_df['ssf'].cumsum().astype(np.uint64)
 
-        # Skip SSFs with sample playback.
-        # http://www.ffd2.com/fridge/chacking/c=hacking20.txt
-        # http://www.ffd2.com/fridge/chacking/c=hacking21.txt
-        # https://codebase64.org/doku.php?id=base:vicious_sid_demo_routine_explained
-        # https://bitbucket.org/wothke/websid/src/master/docs/digi-samples.txt
-        for col, diff_limit in (('vol', 1), ('test1', 2)):
-            logging.debug('discarding SSFs with %s modulation for voice %u', col, v)
-            v_df['coldiff'] = v_df.groupby(['ssf'], sort=False)[col].transform(
-                lambda x: len(x[x.diff() != 0]))
-            v_df = v_df[v_df['coldiff'].isna() | (v_df['coldiff'] <= diff_limit)]
-            v_df = v_df.drop(['coldiff'], axis=1)
-        v_df['minpulsefreq'] = v_df[v_df['pulse1'] == 1].groupby(
-            ['ssf'], sort=False)['freq1'].transform(min)
-        v_df = v_df[v_df['minpulsefreq'].isna() | (v_df['minpulsefreq'] != (2**16-1))].drop(['minpulsefreq'], axis=1)
-
         logging.debug('removing redundant state for voice %u', v)
         mod_cols = ['freq3', 'test3', 'sync1', 'ring1']
 
@@ -350,15 +335,29 @@ def split_vdf(sid, df):
         for col in ('vol', 'gate1', 'freq1'):
             v_df = v_df[v_df.groupby('ssf', sort=False)[col].transform('max') > 0]
 
+        logging.debug('calculating clock for voice %u', v)
+        v_df.reset_index(level=0, inplace=True)
+        v_df['clock_start'] = v_df.groupby(['ssf'], sort=False)['clock'].transform('min')
+        v_df['clock'] = v_df.groupby(['ssf'], sort=False)['clock'].transform(lambda x: x - x.min())
+        v_df['frame'] = v_df['clock'].floordiv(int(sid.clockq))
+
+        # Skip SSFs with sample playback.
+        # http://www.ffd2.com/fridge/chacking/c=hacking20.txt
+        # http://www.ffd2.com/fridge/chacking/c=hacking21.txt
+        # https://codebase64.org/doku.php?id=base:vicious_sid_demo_routine_explained
+        # https://bitbucket.org/wothke/websid/src/master/docs/digi-samples.txt
+        before = v_df['ssf'].nunique()
+        v_df['maxrate'] = v_df.groupby(['ssf'], sort=False)['clock'].transform(lambda x: x.diff().max())
+        v_df = v_df[v_df['maxrate'] > MAX_UPDATE_CYCLES].drop(['maxrate'], axis=1)
+        after = v_df['ssf'].nunique()
+        logging.debug('discarded %s high update rate (%u cycles max) SSFs for voice %u', before - after, MAX_UPDATE_CYCLES, v)
+
         # calculate row hashes
         logging.debug('calculating row hashes for voice %u', v)
         v_df = hash_vdf(v_df)
 
         # normalize clock, calculate clock hashes
-        logging.debug('calculating clock/hashes for voice %u', v)
-        v_df['clock_start'] = v_df.groupby(['ssf'], sort=False)['clock'].transform('min')
-        v_df['clock'] = v_df.groupby(['ssf'], sort=False)['clock'].transform(lambda x: x - x.min())
-        v_df['frame'] = v_df['clock'].floordiv(int(sid.clockq))
+        logging.debug('calculating clock hashes for voice %u', v)
         v_df['hashid_clock'] = v_df.groupby(['ssf'], sort=False)['clock'].transform(hash_tuple).astype(np.int64)
 
         yield (v, v_df)
