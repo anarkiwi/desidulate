@@ -64,6 +64,7 @@ for hashid, paths in global_dir_index.items():
 
 df = pd.DataFrame(global_dir_metadata.values())
 df['ssffileslen'] = df.ssffiles.transform(len)
+df.sort('ssffileslen', ascending=False, inplace=True)
 df.to_csv('%s_index.xz' % SSF_SUFFIX, index=False)
 
 # to re-read
