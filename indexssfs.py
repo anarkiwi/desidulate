@@ -30,7 +30,7 @@ def index_dir(dirname):
     dir_paths = [file_path for file_path in dir_paths if os.path.isfile(file_path) and file_path.endswith(SSF_EXT)]
     for path in dir_paths:
         try:
-            short_path = path[len(SSF_ROOT)+1:]
+            short_path = path[len(SSF_ROOT)-1:]
             df = pd.read_csv(path)
             for hashid, ssf_df in df.groupby('hashid', sort=False):
                 dir_index[hashid].add(short_path)
