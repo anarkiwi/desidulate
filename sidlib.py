@@ -295,6 +295,20 @@ def split_vdf(sid, df):
         v_df.loc[v_df['ssf'] != 1, ['ssf']] = 0
         v_df['ssf'] = v_df['ssf'].cumsum().astype(np.uint64)
 
+        # Skip SSFs with sample playback.
+        # http://www.ffd2.com/fridge/chacking/c=hacking20.txt
+        # http://www.ffd2.com/fridge/chacking/c=hacking21.txt
+        # https://codebase64.org/doku.php?id=base:vicious_sid_demo_routine_explained
+        # https://bitbucket.org/wothke/websid/src/master/docs/digi-samples.txt
+        for col, diff_limit in (('vol', 1), ('test1', 2)):
+            before = v_df['ssf'].nunique()
+            v_df['coldiff'] = v_df.groupby(['ssf'], sort=False)[col].transform(
+                lambda x: len(x[x.diff() != 0]))
+            v_df = v_df[v_df['coldiff'].isna() | (v_df['coldiff'] <= diff_limit)]
+            v_df = v_df.drop(['coldiff'], axis=1)
+            after = v_df['ssf'].nunique()
+            logging.debug('discarded %u SSFs with %s modulation for voice %u', before - after, col, v)
+
         logging.debug('removing redundant state for voice %u', v)
         mod_cols = ['freq3', 'test3', 'sync1', 'ring1']
 
@@ -341,24 +355,15 @@ def split_vdf(sid, df):
         v_df['clock'] = v_df.groupby(['ssf'], sort=False)['clock'].transform(lambda x: x - x.min())
         v_df['frame'] = v_df['clock'].floordiv(int(sid.clockq))
 
-        # Skip SSFs with sample playback.
-        # http://www.ffd2.com/fridge/chacking/c=hacking20.txt
-        # http://www.ffd2.com/fridge/chacking/c=hacking21.txt
-        # https://codebase64.org/doku.php?id=base:vicious_sid_demo_routine_explained
-        # https://bitbucket.org/wothke/websid/src/master/docs/digi-samples.txt
-        before = v_df['ssf'].nunique()
-        v_df['maxrate'] = v_df.groupby(['ssf'], sort=False)['clock'].transform(lambda x: x.diff().max())
-        v_df = v_df[v_df['maxrate'] > MAX_UPDATE_CYCLES].drop(['maxrate'], axis=1)
-        after = v_df['ssf'].nunique()
-        logging.debug('discarded %s high update rate (%u cycles max) SSFs for voice %u', before - after, MAX_UPDATE_CYCLES, v)
-        for col, diff_limit in (('vol', 1), ('test1', 2)):
-            before = v_df['ssf'].nunique()
-            v_df['coldiff'] = v_df.groupby(['ssf'], sort=False)[col].transform(
-                lambda x: len(x[x.diff() != 0]))
-            v_df = v_df[v_df['coldiff'].isna() | (v_df['coldiff'] <= diff_limit)]
-            v_df = v_df.drop(['coldiff'], axis=1)
-            after = v_df['ssf'].nunique()
-            logging.debug('discarded %u SSFs with %s modulation for voice %u', before - after, col, v)
+        for col in ('freq1', 'pwduty1'):
+            v_df['coldiff'] = v_df[col].diff()
+            v_df['maxdiff'] = v_df[v_df['coldiff'] > 0].groupby(['ssf'], sort=False)['clock'].transform(lambda x: sum(x.diff() >= MAX_UPDATE_CYCLES))
+            v_df['mindiff'] = v_df[v_df['coldiff'] > 0].groupby(['ssf'], sort=False)['clock'].transform(lambda x: sum(x.diff() < MAX_UPDATE_CYCLES))
+            discard_ssfs = set(v_df[v_df['maxdiff'] < v_df['mindiff']]['ssf'].unique())
+            if discard_ssfs:
+                v_df = v_df[~v_df['ssf'].isin(discard_ssfs)]
+            v_df = v_df.drop(['coldiff', 'mindiff', 'maxdiff'], axis=1)
+            logging.debug('discarded %s high update %s rate (%u cycles max) SSFs for voice %u', len(discard_ssfs), col, MAX_UPDATE_CYCLES, v)
 
         # calculate row hashes
         logging.debug('calculating row hashes for voice %u', v)
