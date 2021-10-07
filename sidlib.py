@@ -365,6 +365,11 @@ def split_vdf(sid, df):
             v_df = v_df.drop(['coldiff', 'mindiff', 'maxdiff'], axis=1)
             logging.debug('discarded %s high update %s rate (%u cycles max) SSFs for voice %u', len(discard_ssfs), col, MAX_UPDATE_CYCLES, v)
 
+        #before = v_df['ssf'].nunique()
+        #v_df = v_df[v_df.groupby('ssf', sort=False)['clock'].transform('max') > (sid.clockq / 2)]
+        #after =  v_df['ssf'].nunique()
+        #logging.debug('removed %u half frame SSFs for voice %u', before - after, v)
+
         # calculate row hashes
         logging.debug('calculating row hashes for voice %u', v)
         v_df = hash_vdf(v_df)
