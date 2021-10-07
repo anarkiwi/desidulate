@@ -355,7 +355,7 @@ def split_vdf(sid, df):
         v_df['clock'] = v_df.groupby(['ssf'], sort=False)['clock'].transform(lambda x: x - x.min())
         v_df['frame'] = v_df['clock'].floordiv(int(sid.clockq))
 
-        for col in ('freq1', 'pwduty1'):
+        for col in ('freq1', 'pwduty1', 'fltcoff'):
             v_df['coldiff'] = v_df[col].diff()
             v_df['maxdiff'] = v_df[v_df['coldiff'] > 0].groupby(['ssf'], sort=False)['clock'].transform(lambda x: sum(x.diff() >= MAX_UPDATE_CYCLES))
             v_df['mindiff'] = v_df[v_df['coldiff'] > 0].groupby(['ssf'], sort=False)['clock'].transform(lambda x: sum(x.diff() < MAX_UPDATE_CYCLES))
