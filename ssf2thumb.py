@@ -43,9 +43,9 @@ for _, ssf_df in ssf_df.groupby('hashid'):
         v = ssf_df[ssf_df[param] > 0][param]
         v_max = v.max()
         if pd.notna(v_max):
-           v = v.iat[0]
-           ssf_df[param] /= v
-           ssf_df[param] = ssf_df[param].round(2)
+            v = v.iat[0]
+            ssf_df[param] /= v
+            ssf_df[param] = ssf_df[param].round(2)
 
     thumbnail_ssf_df = squeeze_diffs(ssf_df, THUMBNAIL_KEEP).reset_index(drop=True)
     if thumbnail_ssf_df.empty:

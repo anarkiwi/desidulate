@@ -426,7 +426,7 @@ def state2ssfs(sid, df):
             continue
         logging.debug('splitting %u SSFs for voice %u', ssfs, v)
         for hashid_noclock, hashid_noclock_df in v_df.groupby(['hashid_noclock'], sort=False):
-            for ssf, ssf_df in hashid_noclock_df.groupby(['ssf'], sort=False):
+            for _, ssf_df in hashid_noclock_df.groupby(['ssf'], sort=False):
                 hashid_clock = ssf_df['hashid_clock'].iat[0]
                 hashid = normalize_ssf(hashid_clock, hashid_noclock, ssf_df, remap_ssf_dfs, ssf_noclock_dfs, ssf_dfs, ssf_count)
                 ssf_log.append({'clock': ssf_df['clock_start'].iat[0], 'hashid': hashid, 'voice': v})

@@ -111,7 +111,7 @@ class SidWavTestCase(unittest.TestCase):
             write_wav(test_wav, sid, state2samples(df, sid))
             freq_max = loudestf(test_wav)
             self.assertEqual(freq_max, 0)
-            gateon['sus1'] = 15;
+            gateon['sus1'] = 15
             df = self._make_wav_df([
                 gateon,
                 sawon,
