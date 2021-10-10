@@ -48,10 +48,8 @@ for _, ssf_df in ssf_df.groupby('hashid'):
             ssf_df[param] = ssf_df[param].round(2)
 
     thumbnail_ssf_df = squeeze_diffs(ssf_df, THUMBNAIL_KEEP).reset_index(drop=True)
-    if thumbnail_ssf_df.empty:
-        thumbnail_ssf_df = ssf_df[:1]
-    elif len(thumbnail_ssf_df) == 1:
-        thumbnail_ssf_df['frame'] = 0
+    first_freq1 = thumbnail_ssf_df.iloc[0].freq1
+    assert first_freq1 in {0, 1}, ssf_df
     thumbnail_hashid = hash(tuple([hash(tuple(r)) for r in thumbnail_ssf_df.itertuples()]))
     thumbnail_ssf_df = thumbnail_ssf_df.copy()
     thumbnail_ssf_df['hashid'] = thumbnail_hashid
