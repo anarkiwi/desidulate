@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from io import StringIO
 import pandas as pd
-from sidlib import get_sid, jittermatch_df, reg2state, state2ssfs
+from sidlib import get_sid, jittermatch_df, reg2state, state2ssfs, squeeze_diffs
 from sidmidi import SidMidiFile, DEFAULT_BPM
 from ssf import SidSoundFragment, add_freq_notes_df
 
@@ -39,6 +39,26 @@ clock,frame,freq1,pwduty1,gate1,sync1,ring1,test1,tri1,saw1,pulse1,noise1,atk1,d
         self.assertTrue(jittermatch_df(df1, df2, 'clock', 1024))
         self.assertFalse(jittermatch_df(df1, df2, 'clock', 32))
 
+    def test_squeeze_diffs(self):
+        df_txt = StringIO('''
+clock,gate1,pulse1,noise1
+100,1,1,0
+200,1,0,1
+''')
+        df = pd.read_csv(df_txt, dtype=pd.UInt64Dtype()).set_index('clock')
+        s_df = squeeze_diffs(df, ['gate1', 'pulse1', 'noise1'])
+        self.assertEqual(df.to_string(), s_df.to_string())
+        df_txt = StringIO('''
+clock,gate1,pulse1,noise1
+100,1,1,0
+200,1,1,0
+300,1,0,1
+400,1,0,1
+''')
+        df = pd.read_csv(df_txt, dtype=pd.UInt64Dtype()).set_index('clock')
+        s_df = squeeze_diffs(df, ['gate1', 'pulse1', 'noise1'])
+        df = df[~df.index.isin((200, 400))]
+        self.assertEqual(df.to_string(), s_df.to_string())
 
 class SSFTestCase(unittest.TestCase):
     """Test SSF."""

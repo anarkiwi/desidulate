@@ -38,8 +38,8 @@ def set_sid_dtype(df):
     return df
 
 
-def squeeze_diffs(df, diff_cols):
-    return df.loc[(df[diff_cols].shift() != df[diff_cols]).any(axis=1)]
+def squeeze_diffs(df, diff_cols, fill_value=0):
+    return df.loc[(df[diff_cols].shift(fill_value=fill_value) != df[diff_cols]).any(axis=1)]
 
 
 class SidWrap:
