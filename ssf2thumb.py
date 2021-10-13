@@ -37,7 +37,9 @@ for col, bits in PARAMS:
     ssf_df[col] = np.left_shift(ssf_df[col], bits)
 
 thumbnails = {}
-for _, ssf_df in ssf_df.groupby('hashid'):
+ssf_to_thumbnail = {}
+
+for orig_hashid, ssf_df in ssf_df.groupby('hashid'):
     ssf_df = ssf_df.drop(['clock'], axis=1).reset_index(drop=True)
     for param, _ in PARAMS:
         v = ssf_df[ssf_df[param] > 0][param]
@@ -55,6 +57,10 @@ for _, ssf_df in ssf_df.groupby('hashid'):
     thumbnail_ssf_df['hashid'] = thumbnail_hashid
     if thumbnail_hashid not in thumbnails:
         thumbnails[thumbnail_hashid] = thumbnail_ssf_df
+    ssf_to_thumbnail[orig_hashid] = thumbnail_hashid
 
 thumbnail_df = pd.concat(list(thumbnails.values())).set_index('hashid')
 thumbnail_df.to_csv(out_path(args.ssffile, '.'.join(('thumbnail_ssf', args.dfext))))
+ssf_to_thumbnail_df = pd.DataFrame(
+    ({'orig_hashid': orig_hashid, 'hashid': hashid} for orig_hashid, hashid in ssf_to_thumbnail.items())).set_index('orig_hashid')
+ssf_to_thumbnail_df.to_csv(out_path(args.ssffile, '.'.join(('ssf_to_thumbnail', args.dfext))))
