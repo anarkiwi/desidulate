@@ -43,6 +43,11 @@ smf = SidMidiFile(sid, args.bpm)
 df = pd.read_csv(args.ssffile, dtype=pd.Int64Dtype())
 hashid = np.int64(args.hashid)
 
+if not len(df):
+    print('empty SSF file')
+    sys.exit(0)
+
+
 def render_wav(ssf_df, wavfile):
     ssf_df = add_freq_notes_df(sid, ssf_df)
     ssf_df = ssf_df.fillna(method='ffill').set_index('clock')
