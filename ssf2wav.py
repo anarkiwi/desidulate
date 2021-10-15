@@ -72,25 +72,29 @@ if hashid:
     else:
         print('SSF %d not found' % hashid)
 else:
-    waveforms = {'pulse1', 'saw1', 'tri1', 'noise1'}
+    def single_waveform(ssf_df):
+        waveforms = {'pulse1', 'saw1', 'tri1', 'noise1'}
 
-    def single_waveform_filter(ssf_df, w1, w2, w3, w4):
-        return ssf_df[w1].max() == 1 and ssf_df[w2].max() != 1 and ssf_df[w3].max() != 1 and ssf_df[w4].max() != 1
+        def single_waveform_filter(w1, w2, w3, w4):
+            return ssf_df[w1].max() == 1 and ssf_df[w2].max() != 1 and ssf_df[w3].max() != 1 and ssf_df[w4].max() != 1
+
+        for waveform in waveforms:
+            other_waveforms = list(waveforms - {waveform})
+            if single_waveform_filter(waveform, other_waveforms[0], other_waveforms[1], other_waveforms[2]):
+                return True
+        return False
 
     def waveform0(ssf_df):
-        return len(ssf_df[(ssf_df['test1'] == 0) & (ssf_df['pulse1'] != 1) & (ssf_df['saw1'] != 1) & (ssf_df['tri1'] != 1) & (ssf_df['noise1'] != 1)])
+        test0_df = ssf_df[ssf_df['test1'] == 0]
+        if len(test0_df):
+            first_row = test0_df.iloc[0]
+            return first_row.pulse1 != 1 and first_row.saw1 != 1 and first_row.tri1 != 1 and first_row.noise1 != 1
+        return True
 
     for hashid, ssf_df in df.groupby('hashid'):
-        skip = False
-        if args.skip_single_waveform:
-            for waveform in waveforms:
-                other_waveforms = list(waveforms - {waveform})
-                if single_waveform_filter(ssf_df, waveform, other_waveforms[0], other_waveforms[1], other_waveforms[2]):
-                    skip = True
-                    break
+        if args.skip_single_waveform and single_waveform(ssf_df):
+            continue
         if args.skip_waveform0 and waveform0(ssf_df):
-            skip = True
-        if skip:
             continue
         wavfile = out_path(args.ssffile, '%u.wav' % hashid)
         render_wav(ssf_df, wavfile)
