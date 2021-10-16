@@ -35,6 +35,9 @@ single_waveform_parser.add_argument('--no-skip-single-waveform', dest='skip_sing
 waveform0_parser = parser.add_mutually_exclusive_group(required=False)
 waveform0_parser.add_argument('--skip-waveform0', dest='skip_waveform0', action='store_true', help='skip SSFs that use waveform 0')
 waveform0_parser.add_argument('--no-skip-waveform0', dest='skip_waveform0', action='store_false', help='do not skip SSFs that use waveform 0')
+ssf_parser = parser.add_mutually_exclusive_group(required=False)
+ssf_parser.add_argument('--skip-ssf-parser', dest='skip_ssf_parser', action='store_true', help='skip parsing of SSF')
+ssf_parser.add_argument('--no-skip-ssf-parser', dest='skip_ssf_parser', action='store_false', help='do not skip parsing of SSF')
 timer_args(parser)
 midi_args(parser)
 args = parser.parse_args()
@@ -52,13 +55,14 @@ if not len(df):
 def render_wav(ssf_df, wavfile):
     ssf_df = add_freq_notes_df(sid, ssf_df)
     ssf_df = ssf_df.fillna(method='ffill').set_index('clock')
-    ssf = SidSoundFragment(args.percussion, sid, ssf_df, smf)
     df2wav(ssf_df, sid, wavfile, skiptest=args.skiptest)
     print(ssf_df.to_string())
-    print(ssf.instrument({}))
     if args.play:
         os.system(' '.join(['aplay', wavfile]))
-
+    if args.skip_ssf_parser:
+        return
+    ssf = SidSoundFragment(args.percussion, sid, ssf_df, smf)
+    print(ssf.instrument({}))
 
 if hashid:
     wavfile = args.wavfile
