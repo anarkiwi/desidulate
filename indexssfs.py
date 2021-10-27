@@ -19,7 +19,8 @@ MAX_WORKERS = multiprocessing.cpu_count()
 SSF_SUFFIX = 'thumbnail_ssf'
 SSF_ROOT = r'.'
 SSF_EXT = '.%s.xz' % SSF_SUFFIX
-COL_MAXES = ('test1', 'sync1', 'ring1', 'pulse1', 'saw1', 'tri1', 'pulse1', 'noise1', 'flt1', 'fltlo', 'fltband', 'flthi', 'fltext')
+WAVEFORMS = ('pulse1', 'saw1', 'tri1', 'noise1')
+COL_MAXES = WAVEFORMS + ('test1', 'sync1', 'ring1', 'flt1', 'fltlo', 'fltband', 'flthi', 'fltext')
 COL_UNIQUE = ('freq1', 'freq3', 'pwduty1', 'fltcoff')
 
 
@@ -66,6 +67,16 @@ df = pd.DataFrame(global_dir_metadata.values())
 df['ssffileslen'] = df.ssffiles.transform(len)
 df.sort_values('ssffileslen', ascending=False, inplace=True)
 df.to_csv('%s_index.xz' % SSF_SUFFIX, index=False)
+
+def cond(w1, w2, w3, w4):
+    return ((df[w1] > 0) & (df[w2] == 0) & (df[w3] == 0) & (df[w4] == 0))
+
+for waveform in WAVEFORMS:
+    other_waveforms = list(set(WAVEFORMS) - {waveform})
+    df = df[~cond(waveform, other_waveforms[0], other_waveforms[1], other_waveforms[2])]
+
+df.to_csv('%s_complex_index.xz' % SSF_SUFFIX, index=False)
+
 
 # to re-read
 # df = pd.read_csv('thumbnail_ssf_index.xz', converters={'ssffiles': ast.literal_eval}, index_col=['hashid'])
