@@ -277,6 +277,7 @@ def split_vdf(sid, df):
         vdf = vdf.drop(drop_cols, axis=1).set_index('clock')
         return vdf
 
+    df = set_sid_dtype(df)
     for v in (1, 2, 3):
         logging.debug('splitting voice %u', v)
         if df['gate%u' % v].max() == 0:
@@ -284,8 +285,6 @@ def split_vdf(sid, df):
         cols = v_cols(v)
         v_df = df[cols].copy()
         v_df.columns = renamed_cols(v, cols)
-        v_df = set_sid_dtype(v_df)
-
         v_df = coalesce_near_writes(v_df, 16, v)
 
         # split on gate on transitions into SSFs
