@@ -125,7 +125,7 @@ def get_sid(pal, model=ChipModel.MOS8580, sampling_frequency=SID_SAMPLE_FREQ):
 
 
 # Read a VICE "-sounddev dump" register dump (emulator or vsid)
-def reg2state(sid, snd_log_name, nrows=(10 * 1e6)):
+def reg2state(snd_log_name, nrows=(10 * 1e6)):
 
     def compress_writes():
         logging.debug('reading %s', snd_log_name)

@@ -26,6 +26,6 @@ if not wavfile:
     wavfile = wav_path(args.logfile)
 
 sid = get_sid(pal=args.pal, sampling_frequency=args.samplerate)
-df = reg2state(sid, args.logfile, nrows=int(args.maxstates))
+df = reg2state(args.logfile, nrows=int(args.maxstates))
 raw_samples = state2samples(df, sid)
 write_wav(wavfile, sid, raw_samples)
