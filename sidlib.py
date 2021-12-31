@@ -209,6 +209,25 @@ def reg2state(snd_log_name, nrows=(10 * 1e6)):
     return df
 
 
+def coalesce_near_writes(vdf, near, cols):
+    vdf = vdf.reset_index()
+    clock_diff = vdf['clock'].astype(np.int64).diff(periods=-1).astype(pd.Int64Dtype())
+    coalesce_cond = (clock_diff < 0) & (clock_diff > -near)
+    for b2_reg in cols:
+        i = 0
+        b2_shift = vdf[b2_reg].shift(-1)
+        while True:
+            i += 1
+            logging.debug('coalesce %s pass %u', b2_reg, i)
+            vdf.loc[coalesce_cond, [b2_reg]] = b2_shift
+            b2_shift = vdf[b2_reg].shift(-1)
+            if len(vdf[(vdf[b2_reg] != b2_shift) & coalesce_cond]):
+                continue
+            break
+    vdf = vdf.set_index('clock')
+    return vdf
+
+
 def split_vdf(sid, df):
     fltcols = [col for col in df.columns if col.startswith('flt') and not col[-1].isdigit()]
 
@@ -255,29 +274,8 @@ def split_vdf(sid, df):
         vdf.drop(['row_hash'], inplace=True, axis=1)
         return vdf
 
-    def coalesce_near_writes(vdf, near, v):
-        logging.debug('coalescing near %u register writes to voice %u', near, v)
-        vdf = vdf.reset_index()
-        drop_cols = ['clock_diff']
-        vdf['clock_diff'] = vdf['clock'].astype(np.int64).diff(periods=-1).astype(pd.Int64Dtype())
-        coalesce_cond = (vdf['clock_diff'] < 0) & (vdf['clock_diff'] > -near)
-        for b2_reg in ('freq1', 'pwduty1', 'freq3', 'fltcoff'):
-            i = 0
-            b2_shift = '%s_shift' % b2_reg
-            drop_cols.append(b2_shift)
-            vdf[b2_shift] = vdf[b2_reg].shift(-1)
-            while True:
-                i += 1
-                logging.debug('coalesce %s pass %u for voice %u', b2_reg, i, v)
-                vdf.loc[coalesce_cond, [b2_reg]] = vdf[b2_shift]
-                vdf[b2_shift] = vdf[b2_reg].shift(-1)
-                if len(vdf[(vdf[b2_reg] != vdf[b2_shift]) & coalesce_cond]):
-                    continue
-                break
-        vdf = vdf.drop(drop_cols, axis=1).set_index('clock')
-        return vdf
-
     df = set_sid_dtype(df)
+    df = coalesce_near_writes(df, 16, ('fltcoff',))
     for v in (1, 2, 3):
         logging.debug('splitting voice %u', v)
         if df['gate%u' % v].max() == 0:
@@ -285,7 +283,7 @@ def split_vdf(sid, df):
         cols = v_cols(v)
         v_df = df[cols].copy()
         v_df.columns = renamed_cols(v, cols)
-        v_df = coalesce_near_writes(v_df, 16, v)
+        v_df = coalesce_near_writes(v_df, 16, ('freq1', 'pwduty1', 'freq3'))
 
         # split on gate on transitions into SSFs
         logging.debug('splitting to SSFs for voice %u', v)

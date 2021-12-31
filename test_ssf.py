@@ -5,15 +5,18 @@ import tempfile
 import unittest
 from io import StringIO
 import pandas as pd
-from sidlib import get_sid, jittermatch_df, reg2state, state2ssfs, squeeze_diffs
+from sidlib import get_sid, jittermatch_df, reg2state, state2ssfs, squeeze_diffs, coalesce_near_writes
 from sidmidi import SidMidiFile, DEFAULT_BPM
 from ssf import SidSoundFragment, add_freq_notes_df
 
 
 class SIDLibTestCase(unittest.TestCase):
 
+    def str2df(self, df_str):
+        return pd.read_csv(StringIO(df_str), dtype=pd.UInt64Dtype()).set_index('clock')
+
     def test_jittermatch(self):
-        ssf1 = StringIO('''
+        df1 = self.str2df('''
 clock,frame,freq1,pwduty1,gate1,sync1,ring1,test1,tri1,saw1,pulse1,noise1,atk1,dec1,sus1,rel1,vol,fltlo,fltband,flthi,flt1,fltext,fltres,fltcoff,freq3,test3,freq1nunique,pwduty1nunique,volnunique
 0,0,,,1,,,1,,,,,0,0,5,5,15,0,0,1,1,0,15,128,,,1,0,1
 19346,1,,,1,,,1,,,,,0,0,5,5,15,0,0,1,1,0,15,640,,,1,0,1
@@ -21,8 +24,8 @@ clock,frame,freq1,pwduty1,gate1,sync1,ring1,test1,tri1,saw1,pulse1,noise1,atk1,d
 39225,2,50416,,1,0,0,0,0,0,0,1,0,15,5,5,15,0,0,1,1,0,15,640,,,1,0,1
 39234,2,50416,,1,0,0,0,0,0,0,1,0,15,0,0,15,0,0,1,1,0,15,640,,,1,0,1
 39283,2,50416,,0,0,0,0,0,0,0,1,,,,,15,0,0,1,1,0,15,640,,,1,0,1
-''')
-        ssf2 = StringIO('''
+''').reset_index()
+        df2 = self.str2df('''
 clock,frame,freq1,pwduty1,gate1,sync1,ring1,test1,tri1,saw1,pulse1,noise1,atk1,dec1,sus1,rel1,vol,fltlo,fltband,flthi,flt1,fltext,fltres,fltcoff,freq3,test3,freq1nunique,pwduty1nunique,volnunique
 0,0,,,1,,,1,,,,,0,0,5,5,15,0,0,1,1,0,15,128,,,1,0,1
 19410,1,,,1,,,1,,,,,0,0,5,5,15,0,0,1,1,0,15,640,,,1,0,1
@@ -30,9 +33,7 @@ clock,frame,freq1,pwduty1,gate1,sync1,ring1,test1,tri1,saw1,pulse1,noise1,atk1,d
 39289,2,50416,,1,0,0,0,0,0,0,1,0,15,5,5,15,0,0,1,1,0,15,640,,,1,0,1
 39298,2,50416,,1,0,0,0,0,0,0,1,0,15,0,0,15,0,0,1,1,0,15,640,,,1,0,1
 39347,2,50416,,0,0,0,0,0,0,0,1,,,,,15,0,0,1,1,0,15,640,,,1,0,1
-''')
-        df1 = pd.read_csv(ssf1, dtype=pd.UInt64Dtype())
-        df2 = pd.read_csv(ssf2, dtype=pd.UInt64Dtype())
+''').reset_index()
         self.assertEqual(
             df1.drop(['clock'], axis=1).to_string(),
             df2.drop(['clock'], axis=1).to_string())
@@ -40,25 +41,46 @@ clock,frame,freq1,pwduty1,gate1,sync1,ring1,test1,tri1,saw1,pulse1,noise1,atk1,d
         self.assertFalse(jittermatch_df(df1, df2, 'clock', 32))
 
     def test_squeeze_diffs(self):
-        df_txt = StringIO('''
+        df = self.str2df('''
 clock,gate1,pulse1,noise1
 100,1,1,0
 200,1,0,1
 ''')
-        df = pd.read_csv(df_txt, dtype=pd.UInt64Dtype()).set_index('clock')
         s_df = squeeze_diffs(df, ['gate1', 'pulse1', 'noise1'])
         self.assertEqual(df.to_string(), s_df.to_string())
-        df_txt = StringIO('''
+        df = self.str2df('''
 clock,gate1,pulse1,noise1
 100,1,1,0
 200,1,1,0
 300,1,0,1
 400,1,0,1
 ''')
-        df = pd.read_csv(df_txt, dtype=pd.UInt64Dtype()).set_index('clock')
         s_df = squeeze_diffs(df, ['gate1', 'pulse1', 'noise1'])
         df = df[~df.index.isin((200, 400))]
         self.assertEqual(df.to_string(), s_df.to_string())
+
+    def test_coalesce_near_writes(self):
+        df = self.str2df('''
+clock,gate1,freq1
+100,1,100
+101,1,200
+''')
+        df_coalesced = self.str2df('''
+clock,gate1,freq1
+100,1,200
+101,1,200
+''')
+        df = coalesce_near_writes(df, 16, ['freq1'])
+        self.assertEqual(df.to_string(), df_coalesced.to_string())
+
+        df = self.str2df('''
+clock,gate1,freq1
+100,1,100
+201,1,200
+''')
+        df_coalesced = coalesce_near_writes(df, 16, ['freq1'])
+        self.assertEqual(df.to_string(), df_coalesced.to_string())
+
 
 class SSFTestCase(unittest.TestCase):
     """Test SSF."""
