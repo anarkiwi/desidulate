@@ -16,6 +16,8 @@ from pyresidfp.sound_interface_device import ChipModel
 
 SID_SAMPLE_FREQ = 11025
 MAX_UPDATE_CYCLES = 2048
+# use of external filter will be non deterministic.
+FLTEXT = False
 
 
 def timer_args(parser):
@@ -184,6 +186,8 @@ def reg2state(snd_log_name, nrows=(10 * 1e6)):
         set_bits(reg_df, main, ['fltlo', 'fltband', 'flthi', 'mute3'], start=4)
         filter_route = reg_df[23]
         set_bits(reg_df, filter_route, ['flt1', 'flt2', 'flt3', 'fltext'])
+        if not FLTEXT:
+            reg_df['fltext'] = 0
         reg_df['fltres'] = np.right_shift(filter_route, 4)
         filter_cutoff_lo = reg_df[21] & 7
         filter_cutoff_hi = np.left_shift(reg_df[22].astype(np.uint16), 3)
@@ -271,6 +275,7 @@ def split_vdf(sid, df):
 
     df = set_sid_dtype(df)
     df = coalesce_near_writes(df, ('fltcoff',))
+
     for v in (1, 2, 3):
         logging.debug('splitting voice %u', v)
         if df['gate%u' % v].max() == 0:
