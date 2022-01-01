@@ -263,7 +263,7 @@ def split_vdf(sid, df):
         return new_cols
 
     def hash_vdf(vdf):
-        uniq = vdf.drop(['clock', 'ssf', 'clock_start', 'frame'], axis=1).drop_duplicates(ignore_index=True)
+        uniq = vdf.drop(['clock', 'ssf', 'clock_start', 'frame', 'v'], axis=1).drop_duplicates(ignore_index=True)
         merge_cols = list(uniq.columns)
         uniq['row_hash'] = uniq.apply(hash_tuple, axis=1)
         logging.debug('%u unique voice states', len(uniq))
@@ -276,6 +276,8 @@ def split_vdf(sid, df):
     df = coalesce_near_writes(df, ('fltcoff',))
     # when filter is not routed, cutoff and resonance do not matter.
     df.loc[(df['flthi'] == 0) & (df['fltband'] == 0) & (df['fltlo'] == 0), ['fltcoff', 'fltres']] = pd.NA
+    v_dfs = []
+    ssfs = 0
 
     for v in (1, 2, 3):
         logging.debug('splitting voice %u', v)
@@ -346,15 +348,18 @@ def split_vdf(sid, df):
         v_df['clock_start'] = v_df.groupby(['ssf'], sort=False)['clock'].transform('min')
         v_df['clock'] = v_df.groupby(['ssf'], sort=False)['clock'].transform(lambda x: x - x.min())
         v_df['frame'] = v_df['clock'].floordiv(int(sid.clockq))
+        v_df['v'] = v
+        v_df['ssf'] += ssfs
+        ssfs = v_df['ssf'].max()
+        v_dfs.append(v_df)
 
-        # calculate row hashes
-        logging.debug('calculating row hashes for voice %u', v)
-        v_df = hash_vdf(v_df)
+    v_dfs = pd.concat(v_dfs)
+    logging.debug('calculating row hashes')
+    v_dfs = hash_vdf(v_dfs)
+    logging.debug('calculating clock hashes')
+    v_dfs['hashid_clock'] = v_dfs.groupby(['ssf'], sort=False)['clock'].transform(hash_tuple).astype(np.int64)
 
-        # normalize clock, calculate clock hashes
-        logging.debug('calculating clock hashes for voice %u', v)
-        v_df['hashid_clock'] = v_df.groupby(['ssf'], sort=False)['clock'].transform(hash_tuple).astype(np.int64)
-
+    for v, v_df in v_dfs.groupby('v'):
         yield (v, v_df)
 
 
