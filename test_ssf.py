@@ -65,14 +65,16 @@ clock,gate1,freq1
 100,1,100
 108,1,200
 116,1,300
+124,1,400
 ''')
         df_coalesced = self.str2df('''
 clock,gate1,freq1
-100,1,200
-108,1,300
-116,1,300
+100,1,100
+108,1,400
+116,1,400
+124,1,400
 ''')
-        df = coalesce_near_writes(df, 16, ['freq1'])
+        df = coalesce_near_writes(df, ['freq1'], near=16)
         self.assertEqual(df.to_string(), df_coalesced.to_string())
 
         df = self.str2df('''
@@ -80,12 +82,7 @@ clock,gate1,freq1
 100,1,100
 101,1,200
 ''')
-        df_coalesced = self.str2df('''
-clock,gate1,freq1
-100,1,200
-101,1,200
-''')
-        df = coalesce_near_writes(df, 16, ['freq1'])
+        df_coalesced = coalesce_near_writes(df, ['freq1'], near=16)
         self.assertEqual(df.to_string(), df_coalesced.to_string())
 
         df = self.str2df('''
@@ -93,7 +90,7 @@ clock,gate1,freq1
 100,1,100
 201,1,200
 ''')
-        df_coalesced = coalesce_near_writes(df, 16, ['freq1'])
+        df_coalesced = coalesce_near_writes(df, ['freq1'], near=16)
         self.assertEqual(df.to_string(), df_coalesced.to_string())
 
 
