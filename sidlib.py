@@ -229,6 +229,7 @@ def coalesce_near_writes(vdf, cols, near=16):
 
 def split_vdf(sid, df):
     fltcols = [col for col in df.columns if col.startswith('flt') and not col[-1].isdigit()]
+    mod_cols = ['freq3', 'test3', 'sync1', 'ring1']
 
     def hash_tuple(s):
         return hash(tuple(s))
@@ -290,11 +291,19 @@ def split_vdf(sid, df):
         logging.debug('coalescing near writes for voice %u', v)
         v_df = coalesce_near_writes(v_df, ('freq1', 'pwduty1', 'freq3'))
 
-        logging.debug('removing redundant state for voice %u', v)
-        mod_cols = ['freq3', 'test3', 'sync1', 'ring1']
+        # split on gate on transitions into SSFs
+        logging.debug('splitting to SSFs for voice %u', v)
+        v_df['diff_gate1'] = v_df['gate1'].astype(np.int8).diff(periods=1).fillna(0).astype(pd.Int8Dtype()).fillna(0)
+        v_df['ssf'] = v_df['diff_gate1']
+        v_df.loc[v_df['ssf'] != 1, ['ssf']] = 0
+        v_df['ssf'] = v_df['ssf'].cumsum().astype(np.uint64)
 
-        # remove non-pulse waveform state, while test1 test
-        v_df.loc[(v_df['test1'] == 1) & (v_df['pulse1'] != 1), ['freq1', 'tri1', 'saw1', 'pulse1', 'noise1', 'flt1'] + mod_cols] = pd.NA
+        logging.debug('removing redundant state for voice %u', v)
+        # If test1 is set only at the start of the SSF, remove inaudible state.
+        v_df['test1_mod'] = v_df.groupby(['ssf'], sort=False)['test1'].transform(lambda x: (x.diff() != 0).sum())
+        v_df['test1_initial'] = v_df.groupby(['ssf'], sort=False)['test1'].transform(lambda x: x.iloc[0])
+        v_df.loc[(v_df['test1'] == 1) & (v_df['test1_mod'] == 1) & (v_df['test1_initial'] == 1), ['freq1', 'tri1', 'saw1', 'pulse1', 'noise1', 'flt1'] + mod_cols] = pd.NA
+        v_df = v_df.drop(['test1_mod', 'test1_initial'], axis=1
         # remove modulator voice state while sync1/ring1 not set
         v_df.loc[~((v_df['sync1'] == 1) | ((v_df['ring1'] == 1) & (v_df['tri1'] == 1))), mod_cols] = pd.NA
         # remove carrier state when waveform 0
@@ -303,13 +312,6 @@ def split_vdf(sid, df):
         v_df.loc[(v_df['flt1'] == 0) | v_df['flt1'].isna(), fltcols] = pd.NA
         # remove pwduty state when no pulse1 set.
         v_df.loc[(v_df['pulse1'] == 0) | v_df['pulse1'].isna(), ['pwduty1']] = pd.NA
-
-        # split on gate on transitions into SSFs
-        logging.debug('splitting to SSFs for voice %u', v)
-        v_df['diff_gate1'] = v_df['gate1'].astype(np.int8).diff(periods=1).fillna(0).astype(pd.Int8Dtype()).fillna(0)
-        v_df['ssf'] = v_df['diff_gate1']
-        v_df.loc[v_df['ssf'] != 1, ['ssf']] = 0
-        v_df['ssf'] = v_df['ssf'].cumsum().astype(np.uint64)
 
         # TODO: Skip SSFs with sample playback.
         # http://www.ffd2.com/fridge/chacking/c=hacking20.txt
