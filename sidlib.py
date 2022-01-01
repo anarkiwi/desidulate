@@ -303,7 +303,7 @@ def split_vdf(sid, df):
         v_df['test1_mod'] = v_df.groupby(['ssf'], sort=False)['test1'].transform(lambda x: (x.diff() != 0).sum())
         v_df['test1_initial'] = v_df.groupby(['ssf'], sort=False)['test1'].transform(lambda x: x.iloc[0])
         v_df.loc[(v_df['test1'] == 1) & (v_df['test1_mod'] == 1) & (v_df['test1_initial'] == 1), ['freq1', 'tri1', 'saw1', 'pulse1', 'noise1', 'flt1'] + mod_cols] = pd.NA
-        v_df = v_df.drop(['test1_mod', 'test1_initial'], axis=1
+        v_df = v_df.drop(['test1_mod', 'test1_initial'], axis=1)
         # remove modulator voice state while sync1/ring1 not set
         v_df.loc[~((v_df['sync1'] == 1) | ((v_df['ring1'] == 1) & (v_df['tri1'] == 1))), mod_cols] = pd.NA
         # remove carrier state when waveform 0
