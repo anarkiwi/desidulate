@@ -275,6 +275,8 @@ def split_vdf(sid, df):
 
     df = set_sid_dtype(df)
     df = coalesce_near_writes(df, ('fltcoff',))
+    # when filter is not routed, cutoff and resonance do not matter.
+    df.loc[(df['flthi'] == 0) & (df['fltband'] == 0) & (df['fltlo'] == 0), ['fltcoff', 'fltres']] = pd.NA
 
     for v in (1, 2, 3):
         logging.debug('splitting voice %u', v)
