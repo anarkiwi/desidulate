@@ -264,10 +264,9 @@ def split_vdf(sid, df):
 
     def hash_vdf(vdf):
         uniq = vdf.drop(['clock', 'ssf', 'clock_start', 'frame'], axis=1).drop_duplicates(ignore_index=True)
+        merge_cols = list(uniq.columns)
         uniq['row_hash'] = uniq.apply(hash_tuple, axis=1)
         logging.debug('%u unique voice states', len(uniq))
-        merge_cols = list(uniq.columns)
-        merge_cols.remove('row_hash')
         vdf = vdf.merge(uniq, how='left', on=merge_cols)
         vdf['hashid_noclock'] = vdf.groupby(['ssf'], sort=False)['row_hash'].transform(hash_tuple).astype(np.int64)
         vdf.drop(['row_hash'], inplace=True, axis=1)
