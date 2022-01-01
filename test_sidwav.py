@@ -128,7 +128,7 @@ class SidWavTestCase(unittest.TestCase):
             test_wav = os.path.join(tmpdir, 'test.wav')
 
             df = self._make_wav_df([
-                {'hashid': 1, 'clock': 0, 'freq1': 8192, 'gate1': 1, 'test1': 1, 'atk11': 15, 'dec1': 15, 'vol': 15},
+                {'hashid': 1, 'clock': 0, 'freq1': 8192, 'gate1': 1, 'test1': 1, 'atk1': 1, 'dec1': 15, 'vol': 15},
                 {'hashid': 1, 'clock': 512, 'gate1': 1, 'test1': 1},
                 {'hashid': 1, 'clock': 1024, 'gate1': 1, 'saw1': 1, 'test1': 0},
                 {'hashid': 1, 'clock': 102400, 'gate1': 0},
