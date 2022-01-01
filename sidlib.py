@@ -263,8 +263,9 @@ def split_vdf(sid, df):
             new_cols.append(col)
         return new_cols
 
-    def hash_vdf(vdf):
-        uniq = vdf.drop(['clock', 'ssf', 'clock_start', 'frame', 'v'], axis=1).drop_duplicates(ignore_index=True)
+    def hash_vdf(vdf, non_meta_cols):
+        meta_cols = set(vdf.columns) - non_meta_cols
+        uniq = vdf.drop(list(meta_cols), axis=1).drop_duplicates(ignore_index=True)
         merge_cols = list(uniq.columns)
         uniq['row_hash'] = uniq.apply(hash_tuple, axis=1)
         logging.debug('%u unique voice states', len(uniq))
@@ -279,6 +280,7 @@ def split_vdf(sid, df):
     df.loc[(df['flthi'] == 0) & (df['fltband'] == 0) & (df['fltlo'] == 0), ['fltcoff', 'fltres']] = pd.NA
     v_dfs = []
     ssfs = 0
+    non_meta_cols = set()
 
     for v in (1, 2, 3):
         logging.debug('splitting voice %u', v)
@@ -287,6 +289,7 @@ def split_vdf(sid, df):
         cols = v_cols(v)
         v_df = df[cols].copy()
         v_df.columns = renamed_cols(v, cols)
+        non_meta_cols = set(v_df.columns)
 
         logging.debug('coalescing near writes for voice %u', v)
         v_df = coalesce_near_writes(v_df, ('freq1', 'pwduty1', 'freq3'))
@@ -298,30 +301,9 @@ def split_vdf(sid, df):
         v_df.loc[v_df['ssf'] != 1, ['ssf']] = 0
         v_df['ssf'] = v_df['ssf'].cumsum().astype(np.uint64)
 
-        logging.debug('removing redundant state for voice %u', v)
-        # If test1 is set only at the start of the SSF, remove inaudible state.
-        v_df['test1_mod'] = v_df.groupby(['ssf'], sort=False)['test1'].transform(lambda x: (x.diff() != 0).sum())
-        v_df['test1_initial'] = v_df.groupby(['ssf'], sort=False)['test1'].transform(lambda x: x.iloc[0])
-        v_df.loc[(v_df['test1'] == 1) & (v_df['test1_mod'] == 1) & (v_df['test1_initial'] == 1), ['freq1', 'tri1', 'saw1', 'pulse1', 'noise1', 'flt1'] + mod_cols] = pd.NA
-        v_df = v_df.drop(['test1_mod', 'test1_initial'], axis=1)
-        # remove modulator voice state while sync1/ring1 not set
-        v_df.loc[~((v_df['sync1'] == 1) | ((v_df['ring1'] == 1) & (v_df['tri1'] == 1))), mod_cols] = pd.NA
-        # remove carrier state when waveform 0
-        v_df.loc[~((v_df['tri1'] == 1) | (v_df['saw1'] == 1) | (v_df['noise1'] == 1) | (v_df['pulse1'] == 1)), ['freq1', 'flt1'] + mod_cols] = pd.NA
-        # remove filter state when no filter.
-        v_df.loc[(v_df['flt1'] == 0) | v_df['flt1'].isna(), fltcols] = pd.NA
-        # remove pwduty state when no pulse1 set.
-        v_df.loc[(v_df['pulse1'] == 0) | v_df['pulse1'].isna(), ['pwduty1']] = pd.NA
-
-        # TODO: Skip SSFs with sample playback.
-        # http://www.ffd2.com/fridge/chacking/c=hacking20.txt
-        # http://www.ffd2.com/fridge/chacking/c=hacking21.txt
-        # https://codebase64.org/doku.php?id=base:vicious_sid_demo_routine_explained
-        # https://bitbucket.org/wothke/websid/src/master/docs/digi-samples.txt
-
-        # select ADS from when gate on
         logging.debug('removing redundant ADSR for voice %u', v)
         if v_df['ssf'].max() > 1:
+            # select ADS from when gate on
             ads_df = v_df[v_df['diff_gate1'] == 1][['ssf', 'atk1', 'dec1', 'sus1']]
             # select R from when gate off
             r_df = v_df[v_df['diff_gate1'] == -1][['ssf', 'rel1']]
@@ -333,6 +315,30 @@ def split_vdf(sid, df):
         else:
             v_df = v_df.reset_index()
         v_df = v_df.drop(['diff_gate1'], axis=1)
+
+        # calculate modulation meta cols.
+        # TODO: Skip SSFs with sample playback.
+        # http://www.ffd2.com/fridge/chacking/c=hacking20.txt
+        # http://www.ffd2.com/fridge/chacking/c=hacking21.txt
+        # https://codebase64.org/doku.php?id=base:vicious_sid_demo_routine_explained
+        # https://bitbucket.org/wothke/websid/src/master/docs/digi-samples.txt
+        for col in ('vol', 'test1', 'sync1', 'ring1'):
+            mod_col = '%s_mod' % col
+            v_df[mod_col] = v_df.groupby(['ssf'], sort=False)[col].transform(lambda x: (x.diff() != 0).sum())
+
+        logging.debug('removing redundant state for voice %u', v)
+        # If test1 is set only at the start of the SSF, remove inaudible state.
+        v_df['test1_initial'] = v_df.groupby(['ssf'], sort=False)['test1'].transform(lambda x: x.iloc[0])
+        v_df.loc[(v_df['test1'] == 1) & (v_df['test1_mod'] == 1) & (v_df['test1_initial'] == 1), ['freq1', 'tri1', 'saw1', 'pulse1', 'noise1', 'flt1'] + mod_cols] = pd.NA
+        v_df = v_df.drop(['test1_initial'], axis=1)
+        # remove modulator voice state while sync1/ring1 not set
+        v_df.loc[~((v_df['sync1'] == 1) | ((v_df['ring1'] == 1) & (v_df['tri1'] == 1))), mod_cols] = pd.NA
+        # remove carrier state when waveform 0
+        v_df.loc[~((v_df['tri1'] == 1) | (v_df['saw1'] == 1) | (v_df['noise1'] == 1) | (v_df['pulse1'] == 1)), ['freq1', 'flt1'] + mod_cols] = pd.NA
+        # remove filter state when no filter.
+        v_df.loc[(v_df['flt1'] == 0) | v_df['flt1'].isna(), fltcols] = pd.NA
+        # remove pwduty state when no pulse1 set.
+        v_df.loc[(v_df['pulse1'] == 0) | v_df['pulse1'].isna(), ['pwduty1']] = pd.NA
 
         # extract only changes
         logging.debug('extracting only state changes for voice %u (rows before %u)', v, len(v_df))
@@ -357,7 +363,7 @@ def split_vdf(sid, df):
 
     v_dfs = pd.concat(v_dfs)
     logging.debug('calculating row hashes')
-    v_dfs = hash_vdf(v_dfs)
+    v_dfs = hash_vdf(v_dfs, non_meta_cols)
     logging.debug('calculating clock hashes')
     v_dfs['hashid_clock'] = v_dfs.groupby(['ssf'], sort=False)['clock'].transform(hash_tuple).astype(np.int64)
 
