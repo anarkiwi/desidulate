@@ -61,37 +61,66 @@ clock,gate1,pulse1,noise1
 
     def test_coalesce_near_writes(self):
         df = self.str2df('''
-clock,gate1,freq1
-100,1,100
-108,1,200
-116,1,300
-124,1,400
+clock,freq1
+80,100
+100,100
+108,200
+116,300
+124,400
 ''')
         df_coalesced = self.str2df('''
-clock,gate1,freq1
-100,1,100
-108,1,400
-116,1,400
-124,1,400
+clock,freq1
+80,100
+100,400
+108,400
+116,400
+124,400
 ''')
         df = coalesce_near_writes(df, ['freq1'], near=16)
         self.assertEqual(df.to_string(), df_coalesced.to_string())
 
         df = self.str2df('''
-clock,gate1,freq1
-100,1,100
-101,1,200
+clock,freq1
+80,100
+100,100
+101,200
+120,200
+''')
+        df_coalesced = coalesce_near_writes(df, ['freq1'], near=16)
+        df = self.str2df('''
+clock,freq1
+80,100
+100,200
+101,200
+120,200
+''')
+        self.assertEqual(df.to_string(), df_coalesced.to_string())
+
+        df = self.str2df('''
+clock,freq1
+100,100
+201,200
 ''')
         df_coalesced = coalesce_near_writes(df, ['freq1'], near=16)
         self.assertEqual(df.to_string(), df_coalesced.to_string())
 
         df = self.str2df('''
-clock,gate1,freq1
-100,1,100
-201,1,200
+clock,freq1
+39085,3747
+39123,3594
+39132,3338
+58651,3338
 ''')
         df_coalesced = coalesce_near_writes(df, ['freq1'], near=16)
+        df = self.str2df('''
+clock,freq1
+39085,3747
+39123,3338
+39132,3338
+58651,3338
+''')
         self.assertEqual(df.to_string(), df_coalesced.to_string())
+
 
 
 class SSFTestCase(unittest.TestCase):
