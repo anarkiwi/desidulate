@@ -360,7 +360,7 @@ def split_vdf(sid, df):
     v_dfs['hashid_clock'] = v_dfs.groupby(['ssf'], sort=False)['clock'].transform(hash_tuple).astype(np.int64)
 
     for v, v_df in v_dfs.groupby('v'):
-        yield (v, v_df)
+        yield (v, v_df.drop(['v'], axis=1))
 
 
 def jittermatch_df(df1, df2, jitter_col, jitter_max):
