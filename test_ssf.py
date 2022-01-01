@@ -63,6 +63,22 @@ clock,gate1,pulse1,noise1
         df = self.str2df('''
 clock,gate1,freq1
 100,1,100
+108,1,200
+116,1,300
+''')
+        df_coalesced = self.str2df('''
+clock,gate1,freq1
+100,1,300
+108,1,300
+116,1,300
+''')
+        passes, df = coalesce_near_writes(df, 16, ['freq1'])
+        self.assertEqual(df.to_string(), df_coalesced.to_string())
+        self.assertEqual(3, passes)
+
+        df = self.str2df('''
+clock,gate1,freq1
+100,1,100
 101,1,200
 ''')
         df_coalesced = self.str2df('''
