@@ -68,7 +68,7 @@ clock,gate1,freq1
 ''')
         df_coalesced = self.str2df('''
 clock,gate1,freq1
-100,1,300
+100,1,200
 108,1,300
 116,1,300
 ''')
