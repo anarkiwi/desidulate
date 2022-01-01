@@ -26,6 +26,21 @@ class SidWavTestCase(unittest.TestCase):
         self.assertNotEqual(df1.to_string(), df2.to_string())
         self.assertTrue(np.array_equal(raw_samples, raw_samples2))
 
+    def test_no_flt_route(self):
+        gateoff = {'hashid': 1, 'clock': 1e6 * 10, 'gate1': 0}
+        end = {'hashid': 1, 'clock': 1e6 * 20, 'freq1': 0}
+        df1 = self._make_wav_df([
+            {'hashid': 1, 'clock': 0, 'freq1': 1000, 'sus1': 15, 'gate1': 1, 'tri1': 1, 'vol': 15, 'flt1': 1, 'fltres': 15, 'fltcoff': 16},
+            gateoff,
+            end,
+        ])
+        df2 = self._make_wav_df([
+            {'hashid': 1, 'clock': 0, 'freq1': 1000, 'sus1': 15, 'gate1': 1, 'tri1': 1, 'vol': 15, 'flt1': 1, 'fltres': 8, 'fltcoff': 512},
+            gateoff,
+            end,
+        ])
+        self._same_samples(df1, df2)
+
     def test_rel_change_before_gateoff(self):
         gateoff = {'hashid': 1, 'clock': 1e6 * 10, 'gate1': 0}
         end = {'hashid': 1, 'clock': 1e6 * 20, 'freq1': 0}
