@@ -390,7 +390,7 @@ def normalize_ssf(hashid_clock, hashid_noclock, ssf_df, remap_ssf_dfs, ssf_noclo
                 remap_ssf_dfs[hashid] = remapped_hashid
                 hashid = remapped_hashid
             else:
-                ssf_dfs[hashid] = ssf_df.drop(['ssf', 'clock_start', 'hashid_clock', 'hashid_noclock'], axis=1).reset_index(drop=True)
+                ssf_dfs[hashid] = ssf_df.drop(['ssf', 'clock_start', 'hashid_clock'], axis=1).reset_index(drop=True)
                 ssf_noclock_dfs[remap_hashid_noclock] = hashid
 
     ssf_count[hashid] +=1
