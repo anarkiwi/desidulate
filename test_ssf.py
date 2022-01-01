@@ -70,16 +70,18 @@ clock,gate1,freq1
 100,1,200
 101,1,200
 ''')
-        df = coalesce_near_writes(df, 16, ['freq1'])
+        passes, df = coalesce_near_writes(df, 16, ['freq1'])
         self.assertEqual(df.to_string(), df_coalesced.to_string())
+        self.assertEqual(2, passes)
 
         df = self.str2df('''
 clock,gate1,freq1
 100,1,100
 201,1,200
 ''')
-        df_coalesced = coalesce_near_writes(df, 16, ['freq1'])
+        passes, df_coalesced = coalesce_near_writes(df, 16, ['freq1'])
         self.assertEqual(df.to_string(), df_coalesced.to_string())
+        self.assertEqual(1, passes)
 
 
 class SSFTestCase(unittest.TestCase):

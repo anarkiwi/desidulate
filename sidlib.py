@@ -213,6 +213,7 @@ def coalesce_near_writes(vdf, near, cols):
     vdf = vdf.reset_index()
     clock_diff = vdf['clock'].astype(np.int64).diff(periods=-1).astype(pd.Int64Dtype())
     coalesce_cond = (clock_diff < 0) & (clock_diff > -near)
+    passes = 0
     for b2_reg in cols:
         i = 0
         while True:
@@ -223,8 +224,9 @@ def coalesce_near_writes(vdf, near, cols):
             if b2_diff.empty:
                 break
             vdf.loc[coalesce_cond, [b2_reg]] = b2_shift
+        passes += i
     vdf = vdf.set_index('clock')
-    return vdf
+    return (passes, vdf)
 
 
 def split_vdf(sid, df):
@@ -274,7 +276,7 @@ def split_vdf(sid, df):
         return vdf
 
     df = set_sid_dtype(df)
-    df = coalesce_near_writes(df, 16, ('fltcoff',))
+    _, df = coalesce_near_writes(df, 16, ('fltcoff',))
     for v in (1, 2, 3):
         logging.debug('splitting voice %u', v)
         if df['gate%u' % v].max() == 0:
@@ -282,7 +284,7 @@ def split_vdf(sid, df):
         cols = v_cols(v)
         v_df = df[cols].copy()
         v_df.columns = renamed_cols(v, cols)
-        v_df = coalesce_near_writes(v_df, 16, ('freq1', 'pwduty1', 'freq3'))
+        _, v_df = coalesce_near_writes(v_df, 16, ('freq1', 'pwduty1', 'freq3'))
 
         # split on gate on transitions into SSFs
         logging.debug('splitting to SSFs for voice %u', v)
