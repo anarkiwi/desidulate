@@ -215,15 +215,14 @@ def coalesce_near_writes(vdf, near, cols):
     coalesce_cond = (clock_diff < 0) & (clock_diff > -near)
     for b2_reg in cols:
         i = 0
-        b2_shift = vdf[b2_reg].shift(-1)
         while True:
             i += 1
             logging.debug('coalesce %s pass %u', b2_reg, i)
-            vdf.loc[coalesce_cond, [b2_reg]] = b2_shift
             b2_shift = vdf[b2_reg].shift(-1)
-            if len(vdf[(vdf[b2_reg] != b2_shift) & coalesce_cond]):
-                continue
-            break
+            b2_diff = vdf[(vdf[b2_reg] != b2_shift) & coalesce_cond]
+            if b2_diff.empty:
+                break
+            vdf.loc[coalesce_cond, [b2_reg]] = b2_shift
     vdf = vdf.set_index('clock')
     return vdf
 
