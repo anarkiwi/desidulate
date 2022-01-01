@@ -277,7 +277,23 @@ def split_vdf(sid, df):
         cols = v_cols(v)
         v_df = df[cols].copy()
         v_df.columns = renamed_cols(v, cols)
+
+        logging.debug('coalescing near writes for voice %u', v)
         v_df = coalesce_near_writes(v_df, ('freq1', 'pwduty1', 'freq3'))
+
+        logging.debug('removing redundant state for voice %u', v)
+        mod_cols = ['freq3', 'test3', 'sync1', 'ring1']
+
+        # remove non-pulse waveform state, while test1 test
+        v_df.loc[(v_df['test1'] == 1) & (v_df['pulse1'] != 1), ['freq1', 'tri1', 'saw1', 'pulse1', 'noise1', 'flt1'] + mod_cols] = pd.NA
+        # remove modulator voice state while sync1/ring1 not set
+        v_df.loc[~((v_df['sync1'] == 1) | ((v_df['ring1'] == 1) & (v_df['tri1'] == 1))), mod_cols] = pd.NA
+        # remove carrier state when waveform 0
+        v_df.loc[~((v_df['tri1'] == 1) | (v_df['saw1'] == 1) | (v_df['noise1'] == 1) | (v_df['pulse1'] == 1)), ['freq1', 'flt1'] + mod_cols] = pd.NA
+        # remove filter state when no filter.
+        v_df.loc[(v_df['flt1'] == 0) | v_df['flt1'].isna(), fltcols] = pd.NA
+        # remove pwduty state when no pulse1 set.
+        v_df.loc[(v_df['pulse1'] == 0) | v_df['pulse1'].isna(), ['pwduty1']] = pd.NA
 
         # split on gate on transitions into SSFs
         logging.debug('splitting to SSFs for voice %u', v)
@@ -299,20 +315,6 @@ def split_vdf(sid, df):
         #    v_df = v_df.drop(['coldiff'], axis=1)
         #    after = v_df['ssf'].nunique()
         #    logging.debug('discarded %u SSFs with %s modulation for voice %u', before - after, col, v)
-
-        logging.debug('removing redundant state for voice %u', v)
-        mod_cols = ['freq3', 'test3', 'sync1', 'ring1']
-
-        # remove non-pulse waveform state, while test1 test
-        v_df.loc[(v_df['test1'] == 1) & (v_df['pulse1'] != 1), ['freq1', 'tri1', 'saw1', 'pulse1', 'noise1', 'flt1'] + mod_cols] = pd.NA
-        # remove modulator voice state while sync1/ring1 not set
-        v_df.loc[~((v_df['sync1'] == 1) | ((v_df['ring1'] == 1) & (v_df['tri1'] == 1))), mod_cols] = pd.NA
-        # remove carrier state when waveform 0
-        v_df.loc[~((v_df['tri1'] == 1) | (v_df['saw1'] == 1) | (v_df['noise1'] == 1) | (v_df['pulse1'] == 1)), ['freq1', 'flt1'] + mod_cols] = pd.NA
-        # remove filter state when no filter.
-        v_df.loc[(v_df['flt1'] == 0) | v_df['flt1'].isna(), fltcols] = pd.NA
-        # remove pwduty state when no pulse1 set.
-        v_df.loc[(v_df['pulse1'] == 0) | v_df['pulse1'].isna(), ['pwduty1']] = pd.NA
 
         # select ADS from when gate on
         logging.debug('removing redundant ADSR for voice %u', v)
