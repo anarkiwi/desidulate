@@ -217,7 +217,6 @@ def state2samples(orig_df, sid, skiptest=False, maxclock=None):
             for func in row.diff_funcs:
                 func(row)
             if not row.test1:
-                raw_samples.extend(sid.add_samples(row.diff_clock))
                 break
             sid.add_samples(row.diff_clock)
         df = df[i:]
@@ -226,6 +225,9 @@ def state2samples(orig_df, sid, skiptest=False, maxclock=None):
         raw_samples.extend(sid.add_samples(row.diff_clock))
         for func in row.diff_funcs:
             func(row)
+
+    if not raw_samples:
+        raw_samples.extend(sid.add_samples(sid.clockq))
 
     return np.array(raw_samples, dtype=np.int16)
 

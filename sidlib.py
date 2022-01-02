@@ -15,7 +15,6 @@ from pyresidfp import SoundInterfaceDevice
 from pyresidfp.sound_interface_device import ChipModel
 
 SID_SAMPLE_FREQ = 11025
-MAX_UPDATE_CYCLES = 2048
 # use of external filter will be non deterministic.
 FLTEXT = False
 
