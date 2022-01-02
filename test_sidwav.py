@@ -26,6 +26,22 @@ class SidWavTestCase(unittest.TestCase):
         self.assertNotEqual(df1.to_string(), df2.to_string())
         self.assertTrue(np.array_equal(raw_samples, raw_samples2))
 
+    def test_skiptest(self):
+        sid = get_sid(pal=True)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            test_wav = os.path.join(tmpdir, 'test.wav')
+
+            df = self._make_wav_df([
+                {'hashid': 1, 'clock': 0, 'freq1': 4000, 'sus1': 15, 'rel1': 15, 'vol': 15, 'gate1': 1, 'test1': 1},
+                {'hashid': 1, 'clock': 20000, 'gate1': 0, 'test1': 0, 'tri1': 1},
+                {'hashid': 1, 'clock': 200000},
+            ])
+
+            write_wav(test_wav, sid, state2samples(df, sid, skiptest=True))
+            freq_max = loudestf(test_wav)
+            self.assertEqual(freq_max, 235)
+
     def test_no_flt_route(self):
         gateoff = {'hashid': 1, 'clock': 1e6 * 10, 'gate1': 0}
         end = {'hashid': 1, 'clock': 1e6 * 20, 'freq1': 0}
