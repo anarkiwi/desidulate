@@ -361,14 +361,15 @@ def split_vdf(sid, df):
         ssfs = v_df['ssf'].max()
         v_dfs.append(v_df)
 
-    v_dfs = pd.concat(v_dfs)
-    logging.debug('calculating row hashes')
-    v_dfs = hash_vdf(v_dfs, non_meta_cols)
-    logging.debug('calculating clock hashes')
-    v_dfs['hashid_clock'] = v_dfs.groupby(['ssf'], sort=False)['clock'].transform(hash_tuple).astype(np.int64)
+    if v_dfs:
+        v_dfs = pd.concat(v_dfs)
+        logging.debug('calculating row hashes')
+        v_dfs = hash_vdf(v_dfs, non_meta_cols)
+        logging.debug('calculating clock hashes')
+        v_dfs['hashid_clock'] = v_dfs.groupby(['ssf'], sort=False)['clock'].transform(hash_tuple).astype(np.int64)
 
-    for v, v_df in v_dfs.groupby('v'):
-        yield (v, v_df.drop(['v'], axis=1))
+        for v, v_df in v_dfs.groupby('v'):
+            yield (v, v_df.drop(['v'], axis=1))
 
 
 def jittermatch_df(df1, df2, jitter_col, jitter_max):
