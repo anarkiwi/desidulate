@@ -213,14 +213,13 @@ def state2samples(orig_df, sid, skiptest=False, maxclock=None):
     df = df[1:]
 
     if skiptest and in_test:
-        i = 0
-        for row in df.itertuples():
+        for i, row in enumerate(df.itertuples(), start=1):
             for func in row.diff_funcs:
                 func(row)
-            sid.add_samples(row.diff_clock)
-            i += 1
             if not row.test1:
+                raw_samples.extend(sid.add_samples(row.diff_clock))
                 break
+            sid.add_samples(row.diff_clock)
         df = df[i:]
 
     for row in df.itertuples():

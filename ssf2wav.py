@@ -45,6 +45,7 @@ args = parser.parse_args()
 sid = get_sid(pal=args.pal)
 smf = SidMidiFile(sid, args.bpm)
 df = pd.read_csv(args.ssffile, dtype=pd.Int64Dtype())
+df = add_freq_notes_df(sid, df)
 hashid = np.int64(args.hashid)
 
 if not len(df):
@@ -53,7 +54,6 @@ if not len(df):
 
 
 def render_wav(ssf_df, wavfile):
-    ssf_df = add_freq_notes_df(sid, ssf_df)
     ssf_df = ssf_df.fillna(method='ffill').set_index('clock')
     df2wav(ssf_df, sid, wavfile, skiptest=args.skiptest)
     print(ssf_df.to_string())
