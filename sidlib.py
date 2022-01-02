@@ -350,6 +350,7 @@ def split_vdf(sid, df):
         logging.debug('removing empty SSFs for voice %u', v)
         for col in ('vol', 'gate1', 'freq1'):
             v_df = v_df[v_df.groupby('ssf', sort=False)[col].transform('max') > 0]
+        v_df = v_df[v_df.groupby('ssf', sort=False)['test1'].transform('min') == 0]
 
         logging.debug('calculating clock for voice %u', v)
         v_df.reset_index(level=0, inplace=True)
