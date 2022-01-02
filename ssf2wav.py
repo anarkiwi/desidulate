@@ -43,9 +43,11 @@ midi_args(parser)
 args = parser.parse_args()
 
 sid = get_sid(pal=args.pal)
-smf = SidMidiFile(sid, args.bpm)
+smf = None
 df = pd.read_csv(args.ssffile, dtype=pd.Int64Dtype())
-df = add_freq_notes_df(sid, df)
+if not args.skip_ssf_parser:
+    df = add_freq_notes_df(sid, df)
+    smf = SidMidiFile(sid, args.bpm)
 hashid = np.int64(args.hashid)
 
 if not len(df):
