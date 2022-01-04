@@ -190,7 +190,7 @@ class SSFTestCase(unittest.TestCase):
                 ssf.smf_transcribe(smf, 0, 1)
                 smf.write(os.devnull)
                 self.assertEqual(ssf.midi_pitches, (95,))
-                self.assertEqual(ssf.total_duration, 98525)
+                self.assertEqual(ssf.total_duration, 118230)
 
 
 if __name__ == '__main__':
