@@ -354,6 +354,7 @@ def split_vdf(sid, df):
         logging.debug('calculating clock for voice %u', v)
         v_df.reset_index(level=0, inplace=True)
         v_df['clock_start'] = v_df.groupby(['ssf'], sort=False)['clock'].transform('min')
+        v_df['next_clock_start'] = v_df['clock_start'].shift(-1).astype(pd.Int64Dtype())
         v_df['clock'] = v_df.groupby(['ssf'], sort=False)['clock'].transform(lambda x: x - x.min())
         v_df['frame'] = v_df['clock'].floordiv(int(sid.clockq))
         v_df['v'] = v
@@ -367,7 +368,6 @@ def split_vdf(sid, df):
         v_dfs = hash_vdf(v_dfs, non_meta_cols)
         logging.debug('calculating clock hashes')
         v_dfs['hashid_clock'] = v_dfs.groupby(['ssf'], sort=False)['clock'].transform(hash_tuple).astype(np.int64)
-        v_dfs['next_clock_start'] = v_dfs['clock_start'].shift(-1)
 
         for v, v_df in v_dfs.groupby('v'):
             yield (v, v_df.drop(['v'], axis=1))
