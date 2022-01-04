@@ -15,7 +15,7 @@ import pandas as pd
 from fileio import out_path
 from sidlib import set_sid_dtype
 from sidmidi import ELECTRIC_SNARE, BASS_DRUM, LOW_TOM, HIGH_TOM, PEDAL_HIHAT, CLOSED_HIHAT, OPEN_HIHAT, ACCOUSTIC_SNARE, closest_midi
-from sidwav import state2samples, samples_loudestf
+from sidwav import state2samples, samples_loudestf, readwav
 
 INITIAL_PERIOD_FRAMES = 4
 
@@ -44,7 +44,7 @@ class SidSoundFragment:
             if pd.notna(getattr(row, waveform)) and getattr(row, waveform) > 0)
                 for row in ssf.itertuples()]
 
-    def __init__(self, percussion, sid, df, smf):
+    def __init__(self, percussion, sid, df, smf, wav_file=None):
         self.df = df
         self.percussion = percussion
         waveform_states = self._waveform_state(self.df)
@@ -89,9 +89,13 @@ class SidSoundFragment:
         self.one_4n_clocks = smf.one_4n_clocks
         self.one_8n_clocks = smf.one_8n_clocks
         self.one_16n_clocks = smf.one_16n_clocks
-        self.samples = state2samples(self.df, sid, skiptest=True, maxclock=self.one_2n_clocks)
+        if wav_file is not None:
+            rate, self.samples = readwav(wav_file)
+        else:
+            rate = sid.resid.sampling_frequency
+            self.samples = state2samples(self.df, sid, skiptest=True, maxclock=self.one_2n_clocks)
         if len(self.samples):
-            self.loudestf = samples_loudestf(self.samples, sid)
+            self.loudestf = samples_loudestf(self.samples, rate)
             self._set_pitches(sid)
             if self.drum_pitches:
                 self.drum_instrument = self.drum_pitches[0][2]

@@ -10,6 +10,7 @@
 # http://www.ucapps.de/howto_sid_wavetables_1.html
 
 import argparse
+import os
 import sys
 import pandas as pd
 from fileio import midi_path, out_path
@@ -63,7 +64,10 @@ for row in ssf_log_df.itertuples():
     ssf = ssf_cache.get(row.hashid, None)
     if ssf is None:
         ssf_df = parser.ssf_dfs[row.hashid]
-        ssf = SidSoundFragment(args.percussion, sid, ssf_df, smf)
+        wav_file = out_path(args.ssflogfile, '%d.wav' % row.hashid)
+        if not os.path.exists(wav_file):
+            wav_file = None
+        ssf = SidSoundFragment(args.percussion, sid, ssf_df, smf, wav_file)
         ssf_cache[row.hashid] = ssf
         ssf_instruments.append(ssf.instrument({'hashid': row.hashid}))
     ssf.smf_transcribe(smf, row.clock, row.voice)

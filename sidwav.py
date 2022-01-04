@@ -22,8 +22,12 @@ def psfromsamples(samplerate, data):
     return e
 
 
+def readwav(wav_file_name):
+    return wavfile.read(wav_file_name)
+
+
 def psfromwav(wav_file_name):
-    samplerate, data = wavfile.read(wav_file_name)
+    samplerate, data = readwav(wav_file_name)
     return psfromsamples(samplerate, data)
 
 
@@ -47,8 +51,8 @@ def loudestf(wav_file_name):
     return 0
 
 
-def samples_loudestf(data, sid):
-    e = psfromsamples(sid.resid.sampling_frequency, data)
+def samples_loudestf(data, sample_rate):
+    e = psfromsamples(sample_rate, data)
     for f, _ in sorted(e.items(), key=lambda x: x[1], reverse=True):
         if f <= 1:
             continue

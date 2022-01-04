@@ -55,16 +55,18 @@ if not len(df):
     sys.exit(0)
 
 
-def render_wav(ssf_df, wavfile):
+def render_wav(ssf_df, wavfile, verbose):
     ssf_df = ssf_df.fillna(method='ffill').set_index('clock')
     df2wav(ssf_df, sid, wavfile, skiptest=args.skiptest)
-    print(ssf_df.to_string())
+    if verbose:
+        print(ssf_df.to_string())
     if args.play:
         os.system(' '.join(['aplay', wavfile]))
     if args.skip_ssf_parser:
         return
     ssf = SidSoundFragment(args.percussion, sid, ssf_df, smf)
-    print(ssf.instrument({}))
+    if verbose:
+        print(ssf.instrument({}))
 
 if hashid:
     wavfile = args.wavfile
@@ -74,7 +76,7 @@ if hashid:
     ssf_df = df[df['hashid'] == hashid].copy()
 
     if len(ssf_df):
-        render_wav(ssf_df, wavfile)
+        render_wav(ssf_df, wavfile, True)
     else:
         print('SSF %d not found' % hashid)
 else:
@@ -103,4 +105,4 @@ else:
         if args.skip_waveform0 and waveform0(ssf_df):
             continue
         wavfile = out_path(args.ssffile, '%u.wav' % hashid)
-        render_wav(ssf_df, wavfile)
+        render_wav(ssf_df, wavfile, False)
