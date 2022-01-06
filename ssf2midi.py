@@ -53,6 +53,14 @@ if args.minclock:
 if voicemask != ALL_VOICES:
     ssf_log_df = ssf_log_df[ssf_log_df['voice'].isin(voicemask)]
 
+vdfs = []
+for v, vdf in ssf_log_df.groupby('voice'):
+    vdf['duration'] = vdf['clock'].shift(-1)
+    vdf['duration'] -= vdf['clock']
+    vdf['duration'] -= 1
+    vdfs.append(vdf)
+ssf_log_df = pd.concat(vdfs)
+
 sid = get_sid(args.pal)
 smf = SidMidiFile(sid, args.bpm)
 parser = SidSoundFragmentParser(args.ssflogfile, args.percussion, sid)
@@ -67,7 +75,10 @@ for row in ssf_log_df.itertuples():
         wav_file = out_path(args.ssflogfile, '%d.wav' % row.hashid)
         if not os.path.exists(wav_file):
             wav_file = None
-        ssf = SidSoundFragment(args.percussion, sid, ssf_df, smf, wav_file)
+        duration = row.duration
+        if pd.notna(duration):
+            ssf_df.loc[ssf_df.index[-1], ['clock']] = duration
+        ssf = SidSoundFragment(args.percussion, sid, ssf_df, smf, wav_file=wav_file)
         ssf_cache[row.hashid] = ssf
         ssf_instruments.append(ssf.instrument({'hashid': row.hashid}))
     ssf.smf_transcribe(smf, row.clock, row.voice)
