@@ -32,9 +32,6 @@ skiptest_parser.add_argument('--no-skiptest', dest='skiptest', action='store_fal
 single_waveform_parser = parser.add_mutually_exclusive_group(required=False)
 single_waveform_parser.add_argument('--skip-single-waveform', dest='skip_single_waveform', action='store_true', help='skip SSFs that use only a single waveform')
 single_waveform_parser.add_argument('--no-skip-single-waveform', dest='skip_single_waveform', action='store_false', help='do not skip SSFs that use only a single waveform')
-waveform0_parser = parser.add_mutually_exclusive_group(required=False)
-waveform0_parser.add_argument('--skip-waveform0', dest='skip_waveform0', action='store_true', help='skip SSFs that use waveform 0')
-waveform0_parser.add_argument('--no-skip-waveform0', dest='skip_waveform0', action='store_false', help='do not skip SSFs that use waveform 0')
 ssf_parser = parser.add_mutually_exclusive_group(required=False)
 ssf_parser.add_argument('--skip-ssf-parser', dest='skip_ssf_parser', action='store_true', help='skip parsing of SSF')
 ssf_parser.add_argument('--no-skip-ssf-parser', dest='skip_ssf_parser', action='store_false', help='do not skip parsing of SSF')
@@ -92,17 +89,8 @@ else:
                 return True
         return False
 
-    def waveform0(ssf_df):
-        test0_df = ssf_df[ssf_df['test1'] == 0]
-        if len(test0_df):
-            first_row = test0_df.iloc[0]
-            return first_row.pulse1 != 1 and first_row.saw1 != 1 and first_row.tri1 != 1 and first_row.noise1 != 1
-        return True
-
     for hashid, ssf_df in df.groupby('hashid'):
         if args.skip_single_waveform and single_waveform(ssf_df):
-            continue
-        if args.skip_waveform0 and waveform0(ssf_df):
             continue
         wavfile = out_path(args.ssffile, '%u.wav' % hashid)
         render_wav(ssf_df, wavfile, False)

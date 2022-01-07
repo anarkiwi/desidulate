@@ -125,49 +125,6 @@ class SidWavTestCase(unittest.TestCase):
         ])
         self._same_samples(df1, df2)
 
-    def test_start_waveform0(self):
-        sid = get_sid(pal=True)
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            test_wav = os.path.join(tmpdir, 'test.wav')
-
-            gateon = {'hashid': 1, 'clock': 0, 'gate1': 1, 'dec1': 2, 'rel1': 2, 'vol': 15}
-            sawon = {'hashid': 1, 'clock': 20000, 'saw1': 1, 'freq1': 1000}
-            gateoff = {'hashid': 1, 'clock': 60000, 'gate1': 0}
-            df = self._make_wav_df([
-                gateon,
-                sawon,
-                gateoff,
-            ])
-            write_wav(test_wav, sid, state2samples(df, sid))
-            freq_max = loudestf(test_wav)
-            self.assertEqual(freq_max, 0)
-            gateon['sus1'] = 15
-            df = self._make_wav_df([
-                gateon,
-                sawon,
-                gateoff,
-            ])
-            write_wav(test_wav, sid, state2samples(df, sid))
-            freq_max = loudestf(test_wav)
-            self.assertEqual(freq_max, 16)
-
-    def test_start_waveform0_atk(self):
-        sid = get_sid(pal=True)
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            test_wav = os.path.join(tmpdir, 'test.wav')
-
-            df = self._make_wav_df([
-                {'hashid': 1, 'clock': 0, 'freq1': 8192, 'gate1': 1, 'test1': 1, 'atk1': 1, 'dec1': 15, 'vol': 15},
-                {'hashid': 1, 'clock': 512, 'gate1': 1, 'test1': 1},
-                {'hashid': 1, 'clock': 1024, 'gate1': 1, 'saw1': 1, 'test1': 0},
-                {'hashid': 1, 'clock': 102400, 'gate1': 0},
-            ])
-            write_wav(test_wav, sid, state2samples(df, sid))
-            freq_max = loudestf(test_wav)
-            self.assertEqual(freq_max, 481)
-
     def test_df2wav(self):
         sid = get_sid(pal=True)
 
