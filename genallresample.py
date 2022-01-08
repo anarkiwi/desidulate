@@ -22,8 +22,8 @@ MAX_WORKERS = multiprocessing.cpu_count()
 def scrape_resample_dir(dir_max, resample_dir, resample_dir_dfs):
     dfs = []
     hashids = defaultdict(set)
-    for resample_df_file in resample_dir_dfs[resample_dir]:
-        if dir_max not in resample_df_file:
+    for df_max, resample_df_file in resample_dir_dfs[resample_dir]:
+        if df_max != dir_max:
             continue
         resample_df = pd.read_csv(resample_df_file, dtype=pd.Int64Dtype()).drop(['count'], axis=1)
         if len(resample_df) < 1:
@@ -31,7 +31,9 @@ def scrape_resample_dir(dir_max, resample_dir, resample_dir_dfs):
         for hashid in resample_df['hashid'].unique():
             hashids[int(hashid)].add(resample_df_file[:resample_df_file.find('.')])
         dfs.append(resample_df)
-    return (hashids, pd.concat(dfs).drop_duplicates())
+    if dfs:
+        return (hashids, pd.concat(dfs).drop_duplicates())
+    return (None, None)
 
 
 def scrape_paths():
@@ -42,7 +44,7 @@ def scrape_paths():
         resample_df_file = str(resample_df_path)
         maxes_match = MAXES_RE.match(resample_df_file)
         maxes.add(maxes_match.group(1))
-        resample_dir_dfs[os.path.dirname(resample_df_file)].add(str(resample_df_file))
+        resample_dir_dfs[os.path.dirname(resample_df_file)].add((maxes_match.group(1), str(resample_df_file)))
     resample_dirs = resample_dir_dfs.keys()
     return (maxes, resample_dirs, resample_dir_dfs)
 
@@ -51,9 +53,10 @@ def scrape_resample_dfs(dir_max, resample_dirs, resample_dir_dfs):
     with concurrent.futures.ProcessPoolExecutor(max_workers=min(MAX_WORKERS, len(resample_dirs))) as executor:
         result_futures = map(lambda x: executor.submit(scrape_resample_dir, dir_max, x, resample_dir_dfs), resample_dirs)
         results = [future.result() for future in concurrent.futures.as_completed(result_futures)]
+    results = [result for result in results if result[0] is not None]
 
     hashids = defaultdict(set)
-    resample_df = pd.concat([i[1] for i in results]).drop_duplicates()
+    resample_df = pd.concat([result[1] for result in results]).drop_duplicates()
     for result in results:
         for hashid, source in result[0].items():
             hashids[hashid].update(source)
