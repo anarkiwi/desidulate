@@ -54,9 +54,10 @@ def scrape_paths():
     _, df_path = first_file_pair[1]
     df = pd.read_csv(df_path, dtype=pd.Int64Dtype(), nrows=1)
     dtype = df.dtypes.to_dict()
-    dtype.update({col: pd.UInt8Dtype() for col in df.columns if not col.startswith('hashid')})
-    dtype.update({col: pd.UInt16Dtype() for col in df.columns if col.startswith(('freq', 'fltcoff', 'pwduty'))})
-    dtype.update({col: pd.UInt32Dtype() for col in df.columns if col.endswith('mod')})
+    cols = list(df.columns)  # pylint: disable=no-member
+    dtype.update({col: pd.UInt8Dtype() for col in cols if not col.startswith('hashid')})
+    dtype.update({col: pd.UInt16Dtype() for col in cols if col.startswith(('freq', 'fltcoff', 'pwduty'))})
+    dtype.update({col: pd.UInt32Dtype() for col in cols if col.endswith('mod')})
     del dtype['count']
     return (dtype, maxes, resample_dirs, resample_dir_dfs)
 
