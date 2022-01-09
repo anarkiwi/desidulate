@@ -21,12 +21,17 @@ parser.add_argument('--max_cycles', default=1e5, type=int, help='include number 
 args = parser.parse_args()
 sample_count = int(args.max_cycles / args.sample_cycles) + 1
 waveform_cols = {'sync1', 'ring1', 'tri1', 'saw1', 'pulse1', 'noise1'}
+adsr_cols = {'atk1', 'dec1', 'sus1', 'rel1'}
 sid_cols = {
     'freq1', 'pwduty1', 'gate1', 'test1', 'vol',
     'fltlo', 'fltband', 'flthi', 'flt1', 'fltext', 'fltres', 'fltcoff',
-    'freq3', 'test3', 'atk1', 'dec1', 'sus1', 'rel1'}.union(waveform_cols)
+    'freq3', 'test3'}.union(waveform_cols).union(adsr_cols)
 sample_df = pd.DataFrame([{'clock': i * args.sample_cycles} for i in range(sample_count)], dtype=np.int64)
 sample_max = sample_df['clock'].max()
+redundant_adsr_cols = set()
+for col in adsr_cols:
+    for clock in sample_df[sample_df['clock'] > 0]['clock'].unique():
+        redundant_adsr_cols.add('_'.join((col, str(clock))))
 
 df = pd.read_csv(args.ssffile, dtype=pd.Int64Dtype())
 if len(df) < 1:
@@ -46,11 +51,14 @@ for hashid, ssf_df in df.groupby(['hashid']):  # pylint: disable=no-member
         maxes = {'zero'}
     maxes = tuple(sorted(maxes))
     resample_df = pd.merge_asof(sample_df, ssf_df).astype(pd.Int64Dtype())
-    cols = set(resample_df.columns) - meta_cols
+    cols = (set(resample_df.columns) - meta_cols) - redundant_adsr_cols
     df_raw = {col: resample_df[col].iat[-1] for col in meta_cols - {'clock', 'frame'}}
     for row in resample_df.itertuples():
         for col in cols:
-            df_raw['%s_%u' % (col, row.clock)] = getattr(row, col)
+            time_col = '%s_%u' % (col, row.clock)
+            if time_col in redundant_adsr_cols:
+                continue
+            df_raw[time_col] = getattr(row, col)
     df_raws[maxes].append(df_raw)
 
 for maxes, dfs in df_raws.items():
