@@ -160,7 +160,5 @@ def scrape_sids():
 
     return df
 
-
 df = scrape_sids()
-df[df.pal == 1].to_csv('sidinfo-pal.csv', index=False, quoting=csv.QUOTE_NONNUMERIC)
-df[df.pal == 0].to_csv('sidinfo-ntsc.csv', index=False, quoting=csv.QUOTE_NONNUMERIC)
+df.to_csv('sidinfo.csv', index=False, quoting=csv.QUOTE_NONNUMERIC)
