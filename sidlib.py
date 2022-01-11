@@ -311,6 +311,8 @@ def split_vdf(sid, df):
             v_df = v_df.merge(ads_df, on='ssf', right_index=False)
             v_df = v_df.merge(r_df, on='ssf', right_index=False)
             v_df.loc[v_df['diff_gate1'] != 1, ['atk1', 'dec1', 'sus1', 'rel1']] = pd.NA
+            # workaround faulty restart.
+            v_df.loc[v_df['sus1'] == 0, 'sus1'] = 15
         else:
             v_df = v_df.reset_index()
         v_df = v_df.drop(['diff_gate1'], axis=1)
