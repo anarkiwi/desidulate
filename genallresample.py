@@ -35,7 +35,10 @@ def scrape_resample_dir(dtype, dir_max, resample_dir, resample_dir_dfs):
             hashids[int(hashid)].add(resample_df_file_base)
         dfs.append(resample_df)
     if dfs:
-        return (hashids, pd.concat(dfs).drop_duplicates())
+        df = pd.concat(dfs)
+        nacols = [col for col in df.columns if df[col].isnull().all() or df[col].max() == 0]
+        df = df.drop(nacols, axis=1).drop_duplicates()
+        return (hashids, df)
     return (None, None)
 
 
@@ -67,7 +70,6 @@ def scrape_resample_dfs(dtype, dir_max, resample_dirs, resample_dir_dfs):
         result_futures = map(lambda x: executor.submit(scrape_resample_dir, dtype, dir_max, x, resample_dir_dfs), resample_dirs)
         results = [future.result() for future in concurrent.futures.as_completed(result_futures)]
     results = [result for result in results if result[0] is not None]
-
     hashids = defaultdict(set)
     resample_df = pd.concat([result[1] for result in results]).drop_duplicates()
     for result in results:
