@@ -39,6 +39,8 @@ if len(df) < 1:
     sys.exit(0)
 df['clock'] = df['clock'].astype(np.int64)
 df = df[df['clock'] <= sample_max]
+for col, bits in (('freq1', 8), ('freq3', 8), ('pwduty1', 4), ('fltcoff', 3)):
+    df[col] = np.left_shift(np.right_shift(df[col], bits), bits)
 meta_cols = set(df.columns) - sid_cols
 df_raws = defaultdict(list)
 for hashid, ssf_df in df.groupby(['hashid']):  # pylint: disable=no-member
@@ -63,5 +65,7 @@ for hashid, ssf_df in df.groupby(['hashid']):  # pylint: disable=no-member
 
 for maxes, dfs in df_raws.items():
     df = pd.DataFrame(dfs, dtype=pd.Int64Dtype()).set_index('hashid')
+    nacols = [col for col in df.columns if df[col].isnull().all() or df[col].max() == 0]
+    df = df.drop(nacols, axis=1).drop_duplicates()
     outfile = out_path(args.ssffile, 'resample_ssf.%s.xz' % '-'.join(maxes))
     df.to_csv(outfile)

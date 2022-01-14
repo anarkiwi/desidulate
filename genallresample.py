@@ -36,8 +36,7 @@ def scrape_resample_dir(dtype, dir_max, resample_dir, resample_dir_dfs):
         dfs.append(resample_df)
     if dfs:
         df = pd.concat(dfs)
-        nacols = [col for col in df.columns if df[col].isnull().all() or df[col].max() == 0]
-        df = df.drop(nacols, axis=1).drop_duplicates()
+        df = df.drop_duplicates()
         return (hashids, df)
     return (None, None)
 
