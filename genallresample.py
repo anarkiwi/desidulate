@@ -20,14 +20,14 @@ MAXES_RE = re.compile(r'.+\.([^\.]+)\.xz$')
 MAX_WORKERS = multiprocessing.cpu_count()
 
 
-def scrape_resample_dir(dtype, dir_max, resample_dir, resample_dir_dfs):
+def scrape_resample_dir(dir_max, resample_dir, resample_dir_dfs):
     dfs = []
     hashids = defaultdict(set)
     resample_df_files = [
         resample_df_file for df_max, resample_df_file in resample_dir_dfs[resample_dir]
         if df_max == dir_max]
     for resample_df_file in resample_df_files:
-        resample_df = pd.read_csv(resample_df_file, dtype=dtype, usecols=dtype.keys())
+        resample_df = pd.read_csv(resample_df_file, dtype=pd.Int64Dtype())
         if len(resample_df) < 1:
             continue
         resample_df_file_base = resample_df_file[:resample_df_file.find('.')]
@@ -36,6 +36,22 @@ def scrape_resample_dir(dtype, dir_max, resample_dir, resample_dir_dfs):
         dfs.append(resample_df)
     if dfs:
         df = pd.concat(dfs)
+        drop_cols = set()
+        for col in df.columns:
+            if col.startswith(('vol', 'count')):
+                drop_cols.add(col)
+                continue
+            if col.endswith('mod'):
+                df[col] = df[col].astype(pd.UInt32Dtype())
+                continue
+            if col.startswith(('freq', 'fltcoff', 'pwduty')):
+                df[col] = df[col].astype(pd.UInt16Dtype())
+                continue
+            if not col.startswith('hashid'):
+                df[col] = df[col].astype(pd.UInt8Dtype())
+                continue
+        if drop_cols:
+            df = df.drop(drop_cols, axis=1)
         df = df.drop_duplicates()
         return (hashids, df)
     return (None, None)
@@ -51,22 +67,12 @@ def scrape_paths():
         maxes.add(maxes_match.group(1))
         resample_dir_dfs[os.path.dirname(resample_df_file)].append((maxes_match.group(1), str(resample_df_file)))
     resample_dirs = list(resample_dir_dfs.keys())
-    first_dir = resample_dirs[0]
-    first_file_pair = resample_dir_dfs[first_dir]
-    _, df_path = first_file_pair[1]
-    df = pd.read_csv(df_path, dtype=pd.Int64Dtype(), nrows=1)
-    dtype = df.dtypes.to_dict()
-    cols = list(df.columns)  # pylint: disable=no-member
-    dtype.update({col: pd.UInt8Dtype() for col in cols if not col.startswith('hashid')})
-    dtype.update({col: pd.UInt16Dtype() for col in cols if col.startswith(('freq', 'fltcoff', 'pwduty'))})
-    dtype.update({col: pd.UInt32Dtype() for col in cols if col.endswith('mod')})
-    del dtype['count']
-    return (dtype, maxes, resample_dirs, resample_dir_dfs)
+    return (maxes, resample_dirs, resample_dir_dfs)
 
 
-def scrape_resample_dfs(dtype, dir_max, resample_dirs, resample_dir_dfs):
+def scrape_resample_dfs(dir_max, resample_dirs, resample_dir_dfs):
     with concurrent.futures.ProcessPoolExecutor(max_workers=min(MAX_WORKERS, len(resample_dirs))) as executor:
-        result_futures = map(lambda x: executor.submit(scrape_resample_dir, dtype, dir_max, x, resample_dir_dfs), resample_dirs)
+        result_futures = map(lambda x: executor.submit(scrape_resample_dir, dir_max, x, resample_dir_dfs), resample_dirs)
         results = [future.result() for future in concurrent.futures.as_completed(result_futures)]
     results = [result for result in results if result[0] is not None]
     hashids = defaultdict(set)
@@ -79,10 +85,10 @@ def scrape_resample_dfs(dtype, dir_max, resample_dirs, resample_dir_dfs):
     return resample_df
 
 
-dtype, maxes, resample_dirs, resample_dir_dfs = scrape_paths()
+maxes, resample_dirs, resample_dir_dfs = scrape_paths()
 if len(sys.argv) > 1:
     maxes = sys.argv[1:]
 for dir_max in sorted(maxes):
     print(dir_max)
-    resample_df = scrape_resample_dfs(dtype, dir_max, resample_dirs, resample_dir_dfs)
+    resample_df = scrape_resample_dfs(dir_max, resample_dirs, resample_dir_dfs)
     resample_df.to_csv('resample_ssf.%s.xz' % dir_max, index=False)
