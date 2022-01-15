@@ -303,16 +303,17 @@ def split_vdf(sid, df, near=16, guard=96):
         logging.debug('removing redundant ADSR for voice %u', v)
         if v_df['ssf'].max() > 1:
             # select AD from when gate on
-            ads_df = v_df[v_df['diff_gate1'] == 1][['ssf', 'atk1', 'dec1']]
-            # select SR from when gate off
-            r_df = v_df[v_df['diff_gate1'] == -1][['ssf', 'sus1', 'rel1']]
-            v_df = v_df.drop(['atk1', 'dec1', 'sus1', 'rel1'], axis=1)
+            ad_df = v_df[v_df['diff_gate1'] == 1][['ssf', 'atk1', 'dec1']]
+            # select R from when gate off
+            r_df = v_df[v_df['diff_gate1'] == -1][['ssf', 'rel1']]
+            # use first non-zero S while gate on.
+            v_df.loc[v_df['sus1'] == 0, 'sus1'] = pd.NA
+            v_df['sus1'] = v_df['sus1'].fillna(method='bfill')
+            v_df = v_df.drop(['atk1', 'dec1', 'rel1'], axis=1)
             v_df = v_df.reset_index()
-            v_df = v_df.merge(ads_df, on='ssf', right_index=False)
+            v_df = v_df.merge(ad_df, on='ssf', right_index=False)
             v_df = v_df.merge(r_df, on='ssf', right_index=False)
             v_df.loc[v_df['diff_gate1'] != 1, ['atk1', 'dec1', 'sus1', 'rel1']] = pd.NA
-            # workaround faulty restart.
-            v_df.loc[v_df['sus1'] == 0, 'sus1'] = 15
         else:
             v_df = v_df.reset_index()
         v_df = v_df.drop(['diff_gate1'], axis=1)
