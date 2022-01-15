@@ -226,7 +226,7 @@ def coalesce_near_writes(vdf, cols, near=16):
     return vdf
 
 
-def split_vdf(sid, df):
+def split_vdf(sid, df, near=16, guard=96):
     fltcols = [col for col in df.columns if col.startswith('flt') and not col[-1].isdigit()]
     mod_cols = ['freq3', 'test3', 'sync1', 'ring1']
 
@@ -274,7 +274,7 @@ def split_vdf(sid, df):
         return vdf
 
     df = set_sid_dtype(df)
-    df = coalesce_near_writes(df, ('fltcoff',))
+    df = coalesce_near_writes(df, ('fltcoff',), near=near)
     # when filter is not routed, cutoff and resonance do not matter.
     df.loc[(df['flthi'] == 0) & (df['fltband'] == 0) & (df['fltlo'] == 0), ['fltcoff', 'fltres']] = pd.NA
     v_dfs = []
@@ -291,7 +291,7 @@ def split_vdf(sid, df):
         non_meta_cols = set(v_df.columns)
 
         logging.debug('coalescing near writes for voice %u', v)
-        v_df = coalesce_near_writes(v_df, ('freq1', 'pwduty1', 'freq3'))
+        v_df = coalesce_near_writes(v_df, ('freq1', 'pwduty1', 'freq3'), near=near)
 
         # split on gate on transitions into SSFs
         logging.debug('splitting to SSFs for voice %u', v)
@@ -357,6 +357,11 @@ def split_vdf(sid, df):
         v_df.reset_index(level=0, inplace=True)
         v_df['clock_start'] = v_df.groupby(['ssf'], sort=False)['clock'].transform('min')
         v_df['next_clock_start'] = v_df['clock_start'].shift(-1).astype(pd.Int64Dtype())
+        v_df['next_clock_start'] = v_df.groupby(['ssf'], sort=False)['next_clock_start'].transform('max')
+        v_df['next_clock_start'] = v_df['next_clock_start'].fillna(v_df['clock'].max())
+        # discard state changes within N cycles of next SSF.
+        guard_start = v_df['next_clock_start'] - v_df['clock'].astype(pd.Int64Dtype())
+        v_df = v_df[~((guard_start > 0) & (guard_start < guard))]
         v_df['clock'] = v_df.groupby(['ssf'], sort=False)['clock'].transform(lambda x: x - x.min())
         v_df['frame'] = v_df['clock'].floordiv(int(sid.clockq))
         v_df['v'] = v
@@ -404,7 +409,8 @@ def normalize_ssf(sid, hashid_clock, hashid_noclock, ssf_df, remap_ssf_dfs, ssf_
                 next_clock_start = ssf_df['next_clock_start'].iat[-1]
                 clock_start = ssf_df['clock_start'].iat[-1]
                 if pd.notna(next_clock_start):
-                    clock_duration = next_clock_start - clock_start - 1
+                    if next_clock_start > clock_start:
+                        clock_duration = next_clock_start - clock_start - 1
                 normalized_ssf_df = ssf_df.drop(['ssf', 'clock_start', 'next_clock_start', 'hashid_clock'], axis=1)
                 last_row_df = normalized_ssf_df[-1:].copy()
                 last_row_df['clock'] = clock_duration
@@ -415,7 +421,7 @@ def normalize_ssf(sid, hashid_clock, hashid_noclock, ssf_df, remap_ssf_dfs, ssf_
                 ssf_dfs[hashid] = normalized_ssf_df
                 ssf_noclock_dfs[remap_hashid_noclock] = hashid
 
-    ssf_count[hashid] +=1
+    ssf_count[hashid] += 1
     return hashid
 
 
