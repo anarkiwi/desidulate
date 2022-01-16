@@ -19,6 +19,15 @@ SID_SAMPLE_FREQ = 11025
 FLTEXT = False
 
 
+def remove_end_repeats(waveforms, repeats):
+    for lookback in repeats:
+        while len(waveforms) >= lookback * 2:
+            if waveforms[-lookback:] != waveforms[-(lookback*2):-lookback]:
+                break
+            waveforms = waveforms[:-lookback]
+    return waveforms
+
+
 def timer_args(parser):
     pal_parser = parser.add_mutually_exclusive_group(required=False)
     pal_parser.add_argument('--pal', dest='pal', action='store_true', help='Use PAL clock')

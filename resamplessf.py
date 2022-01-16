@@ -10,8 +10,10 @@ import argparse
 import sys
 import numpy as np
 import pandas as pd
-from fileio import out_path
 from collections import defaultdict
+
+from fileio import out_path
+from sidlib import remove_end_repeats
 
 parser = argparse.ArgumentParser(description='Downsample SSFs')
 parser.add_argument('ssffile', help='SSF file')
@@ -43,28 +45,29 @@ for col, bits in (('freq1', 8), ('freq3', 8), ('pwduty1', 4), ('fltcoff', 3)):
 meta_cols = set(df.columns) - sid_cols
 df_raws = defaultdict(list)
 for hashid, ssf_df in df.groupby(['hashid']):  # pylint: disable=no-member
-    maxes = set()
-    for waveform in waveform_cols:
-        waveform_max = ssf_df[waveform].max()
-        if pd.notna(waveform_max) and waveform_max > 0:
-            maxes.add(waveform)
-    if not maxes:
-        maxes = {'zero'}
-    maxes = tuple(sorted(maxes))
     resample_df = pd.merge_asof(sample_df, ssf_df).astype(pd.Int64Dtype())
-    cols = (set(resample_df.columns) - meta_cols) - redundant_adsr_cols
+    cols = (set(resample_df.columns) - meta_cols)
     df_raw = {col: resample_df[col].iat[-1] for col in meta_cols - {'clock', 'frame'}}
+    waveforms = []
     for row in resample_df.itertuples():
-        for col in cols:
-            time_col = '%s_%u' % (col, row.clock)
-            if time_col in redundant_adsr_cols:
-                continue
-            df_raw[time_col] = getattr(row, col)
-    df_raws[maxes].append(df_raw)
+        row_waveforms = {waveform_col: getattr(row, waveform_col, 0) for waveform_col in waveform_cols}
+        row_waveforms = sorted([
+        waveform_col for waveform_col, waveform_val in row_waveforms.items() if pd.notna(waveform_val) and waveform_val != 0])
+        if not row_waveforms:
+            row_waveforms = ['zero']
+        row_waveforms = '-'.join(row_waveforms)
+        if not waveforms or row_waveforms != waveforms[-1]:
+            waveforms.append(row_waveforms)
+            waveforms = remove_end_repeats(waveforms, (3, 2))
+        time_cols = {(col, '%s_%u' % (col, row.clock)) for col in cols} - redundant_adsr_cols
+        df_raw.update({time_col: getattr(row, col) for col, time_col in time_cols})
 
-for maxes, dfs in df_raws.items():
+    waveforms = '_'.join(waveforms)
+    df_raws[waveforms].append(df_raw)
+
+for waveforms, dfs in df_raws.items():
     df = pd.DataFrame(dfs, dtype=pd.Int64Dtype()).set_index('hashid')
     nacols = [col for col in df.columns if df[col].isnull().all() or df[col].max() == 0]
     df = df.drop(nacols, axis=1).drop_duplicates()
-    outfile = out_path(args.ssffile, 'resample_ssf.%s.xz' % '-'.join(maxes))
+    outfile = out_path(args.ssffile, 'resample_ssf.%s.xz' % waveforms)
     df.to_csv(outfile)
