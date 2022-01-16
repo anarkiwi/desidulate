@@ -16,7 +16,7 @@ from collections import defaultdict
 parser = argparse.ArgumentParser(description='Downsample SSFs')
 parser.add_argument('ssffile', help='SSF file')
 parser.add_argument('--sample_cycles', default=7000, type=int, help='sample interval in CPU cycles')
-parser.add_argument('--max_cycles', default=1e5, type=int, help='include number of CPU cycles')
+parser.add_argument('--max_cycles', default=25e4, type=int, help='include number of CPU cycles')
 
 args = parser.parse_args()
 sample_count = int(args.max_cycles / args.sample_cycles) + 1
