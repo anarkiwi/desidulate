@@ -35,7 +35,6 @@ for col in adsr_cols:
 
 df = pd.read_csv(args.ssffile, dtype=pd.Int64Dtype())
 if len(df) < 1:
-    print('ignore empty %s' % args.ssffile)
     sys.exit(0)
 df['clock'] = df['clock'].astype(np.int64)
 df = df[df['clock'] <= sample_max]
