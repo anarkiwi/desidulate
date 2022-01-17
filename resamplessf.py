@@ -50,7 +50,7 @@ for hashid, ssf_df in df.groupby(['hashid']):  # pylint: disable=no-member
     df_raw = {col: resample_df[col].iat[-1] for col in meta_cols - {'clock', 'frame'}}
     waveforms = []
     for row in resample_df.itertuples():
-        row_waveforms = {waveform_col: getattr(row, waveform_col, 0) for waveform_col in waveform_cols}
+        row_waveforms = {waveform_col[:-1]: getattr(row, waveform_col, 0) for waveform_col in waveform_cols}
         row_waveforms = sorted([
         waveform_col for waveform_col, waveform_val in row_waveforms.items() if pd.notna(waveform_val) and waveform_val != 0])
         if not row_waveforms:
@@ -58,12 +58,13 @@ for hashid, ssf_df in df.groupby(['hashid']):  # pylint: disable=no-member
         row_waveforms = '-'.join(row_waveforms)
         if not waveforms or row_waveforms != waveforms[-1]:
             waveforms.append(row_waveforms)
-            waveforms = remove_end_repeats(waveforms, (3, 2))
+            waveforms = remove_end_repeats(waveforms)
         time_cols = {(col, '%s_%u' % (col, row.clock)) for col in cols} - redundant_adsr_cols
         df_raw.update({time_col: getattr(row, col) for col, time_col in time_cols})
 
     waveforms = '_'.join(waveforms)
     df_raws[waveforms].append(df_raw)
+
 
 for waveforms, dfs in df_raws.items():
     df = pd.DataFrame(dfs, dtype=pd.Int64Dtype()).set_index('hashid')

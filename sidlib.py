@@ -19,12 +19,15 @@ SID_SAMPLE_FREQ = 11025
 FLTEXT = False
 
 
-def remove_end_repeats(waveforms, repeats):
-    for lookback in repeats:
-        while len(waveforms) >= lookback * 2:
-            if waveforms[-lookback:] != waveforms[-(lookback*2):-lookback]:
-                break
-            waveforms = waveforms[:-lookback]
+def remove_end_repeats(waveforms):
+    repeat_len = int(len(waveforms) / 2)
+    if repeat_len > 1:
+        repeat_range = [i for i in reversed(range(repeat_len + 1)) if i > 1]
+        for lookback in repeat_range:
+            while len(waveforms) >= lookback * 2:
+                if waveforms[-lookback:] != waveforms[-(lookback*2):-lookback]:
+                    break
+                waveforms = waveforms[:-lookback]
     return waveforms
 
 

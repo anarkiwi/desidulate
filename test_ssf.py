@@ -16,9 +16,9 @@ class SIDLibTestCase(unittest.TestCase):
         return pd.read_csv(StringIO(df_str), dtype=pd.UInt64Dtype()).set_index('clock')
 
     def test_remove_end_repeats(self):
-        self.assertEqual([1, 2], remove_end_repeats([1, 2], (1,)))
-        self.assertEqual([1, 2, 3, 1, 2], remove_end_repeats([1, 2, 3, 1, 2, 1, 2, 1, 2], (2,)))
-        self.assertEqual([1, 2, 3], remove_end_repeats([1, 2, 3, 1, 2, 3], (3, 2)))
+        self.assertEqual([1, 2], remove_end_repeats([1, 2]))
+        self.assertEqual([1, 2, 3, 1, 2], remove_end_repeats([1, 2, 3, 1, 2, 1, 2, 1, 2]))
+        self.assertEqual([1, 2, 3], remove_end_repeats([1, 2, 3, 1, 2, 3]))
 
     def test_jittermatch(self):
         df1 = self.str2df('''
