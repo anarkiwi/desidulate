@@ -23,6 +23,7 @@ parser = argparse.ArgumentParser(description='Convert .ssf into a WAV file')
 parser.add_argument('ssffile', default='', help='ssf to read')
 parser.add_argument('hashid', default=0, help='hashid to reproduce, or 0 if all')
 parser.add_argument('--wavfile', default='', help='WAV file to write')
+parser.add_argument('--maxclock', default=0, type=int, help='max clock value to render, 0 for no limit')
 play_parser = parser.add_mutually_exclusive_group(required=False)
 play_parser.add_argument('--play', dest='play', action='store_true', help='play the wavfile')
 play_parser.add_argument('--no-play', dest='play', action='store_false', help='do not play the wavfile')
@@ -39,17 +40,22 @@ timer_args(parser)
 midi_args(parser)
 args = parser.parse_args()
 
-sid = get_sid(pal=args.pal)
-smf = None
 df = pd.read_csv(args.ssffile, dtype=pd.Int64Dtype())
-if not args.skip_ssf_parser:
-    df = add_freq_notes_df(sid, df)
-    smf = SidMidiFile(sid, args.bpm)
-hashid = np.int64(args.hashid)
 
 if not len(df):
     print('empty SSF file')
     sys.exit(0)
+
+if args.maxclock:
+    df = df[df['clock'] < args.maxclock]
+
+sid = get_sid(pal=args.pal)
+smf = None
+
+if not args.skip_ssf_parser:
+    df = add_freq_notes_df(sid, df)
+    smf = SidMidiFile(sid, args.bpm)
+hashid = np.int64(args.hashid)
 
 
 def render_wav(ssf_df, wavfile, verbose):
