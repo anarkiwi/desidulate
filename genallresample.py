@@ -57,15 +57,19 @@ def scrape_resample_dir(dir_max, resample_dir, resample_dir_dfs):
     return (None, None)
 
 
-def scrape_paths():
+def scrape_paths(maxes_filter):
     current = pathlib.Path(r'./')
     resample_dir_dfs = defaultdict(list)
+    globs = [SSF_GLOB]
+    if maxes_filter:
+        globs = [r'*.resample_ssf.%s.*' % i for i in maxes_filter]
     maxes = set()
-    for resample_df_path in current.rglob(SSF_GLOB):
-        resample_df_file = str(resample_df_path)
-        maxes_match = MAXES_RE.match(resample_df_file)
-        maxes.add(maxes_match.group(1))
-        resample_dir_dfs[os.path.dirname(resample_df_file)].append((maxes_match.group(1), str(resample_df_file)))
+    for glob in globs:
+        for resample_df_path in current.rglob(glob):
+            resample_df_file = str(resample_df_path)
+            maxes_match = MAXES_RE.match(resample_df_file)
+            maxes.add(maxes_match.group(1))
+            resample_dir_dfs[os.path.dirname(resample_df_file)].append((maxes_match.group(1), str(resample_df_file)))
     resample_dirs = list(resample_dir_dfs.keys())
     return (maxes, resample_dirs, resample_dir_dfs)
 
@@ -84,10 +88,10 @@ def scrape_resample_dfs(dir_max, resample_dirs, resample_dir_dfs):
     resample_df = resample_df.merge(hashids_df, on='hashid')
     return resample_df
 
-
-maxes, resample_dirs, resample_dir_dfs = scrape_paths()
+maxes_filter = None
 if len(sys.argv) > 1:
-    maxes = sys.argv[1:]
+    maxes_filter = sys.argv[1:]
+maxes, resample_dirs, resample_dir_dfs = scrape_paths(maxes_filter)
 for dir_max in sorted(maxes):
     print(dir_max)
     resample_df = scrape_resample_dfs(dir_max, resample_dirs, resample_dir_dfs)
