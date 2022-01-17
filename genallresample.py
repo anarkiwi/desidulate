@@ -38,11 +38,11 @@ def scrape_resample_dir(dir_max, resample_dir, resample_dir_dfs):
         df = pd.concat(dfs)
         drop_cols = set()
         for col in df.columns:
-            if col.startswith(('vol', 'count')):
-                drop_cols.add(col)
-                continue
             if col.endswith('mod'):
                 df[col] = df[col].astype(pd.UInt32Dtype())
+                continue
+            if col.startswith(('vol', 'count')):
+                drop_cols.add(col)
                 continue
             if col.startswith(('freq', 'fltcoff', 'pwduty')):
                 df[col] = df[col].astype(pd.UInt16Dtype())
