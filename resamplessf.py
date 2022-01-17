@@ -50,11 +50,11 @@ for hashid, ssf_df in df.groupby(['hashid']):  # pylint: disable=no-member
     df_raw = {col: resample_df[col].iat[-1] for col in meta_cols - {'clock', 'frame'}}
     waveforms = []
     for row in resample_df.itertuples():
-        row_waveforms = {waveform_col[:-1]: getattr(row, waveform_col, 0) for waveform_col in waveform_cols}
+        row_waveforms = {waveform_col[:3]: getattr(row, waveform_col, 0) for waveform_col in waveform_cols}
         row_waveforms = sorted([
         waveform_col for waveform_col, waveform_val in row_waveforms.items() if pd.notna(waveform_val) and waveform_val != 0])
         if not row_waveforms:
-            row_waveforms = ['zero']
+            row_waveforms = ['0']
         row_waveforms = '-'.join(row_waveforms)
         if not waveforms or row_waveforms != waveforms[-1]:
             waveforms.append(row_waveforms)
