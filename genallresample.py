@@ -38,18 +38,22 @@ def scrape_resample_dir(dir_max, resample_dir, resample_dir_dfs):
         df = pd.concat(dfs)
         drop_cols = set()
         for col in df.columns:
-            if col.endswith('mod'):
-                df[col] = df[col].astype(pd.UInt32Dtype())
+            if col.startswith('hashid'):
+                df[col] = df[col].astype(pd.Int64Dtype())
                 continue
-            if col.startswith(('vol', 'count')):
-                drop_cols.add(col)
+            if not col[-1].isdigit():
+                if col in ('count,'):
+                    drop_cols.add(col)
+                else:
+                    df[col] = df[col].astype(pd.Int32Dtype())
                 continue
             if col.startswith(('freq', 'fltcoff', 'pwduty')):
                 df[col] = df[col].astype(pd.UInt16Dtype())
                 continue
-            if not col.startswith('hashid'):
-                df[col] = df[col].astype(pd.UInt8Dtype())
+            if col.startswith(('vol',)):
+                drop_cols.add(col)
                 continue
+            df[col] = df[col].astype(pd.UInt8Dtype())
         if drop_cols:
             df = df.drop(drop_cols, axis=1)
         df = df.drop_duplicates()

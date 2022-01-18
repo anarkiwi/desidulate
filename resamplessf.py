@@ -28,19 +28,20 @@ sid_cols = {
     'freq1', 'pwduty1', 'gate1', 'test1', 'vol',
     'fltlo', 'fltband', 'flthi', 'flt1', 'fltext', 'fltres', 'fltcoff',
     'freq3', 'test3'}.union(waveform_cols.keys()).union(adsr_cols)
+big_regs = {'freq1': 8, 'freq3': 8, 'pwduty1': 4, 'fltcoff': 3}
 sample_df = pd.DataFrame([{'clock': i * args.sample_cycles} for i in range(sample_count)], dtype=np.int64)
 sample_max = sample_df['clock'].max()
 redundant_adsr_cols = set()
 for col in adsr_cols:
     for clock in sample_df[sample_df['clock'] > 0]['clock'].unique():
-        redundant_adsr_cols.add('_'.join((col, str(clock))))
+        redundant_adsr_cols.add((col, '_'.join((col, str(clock)))))
 
 df = pd.read_csv(args.ssffile, dtype=pd.Int64Dtype())
 if len(df) < 1:
     sys.exit(0)
 df['clock'] = df['clock'].astype(np.int64)
 df = df[df['clock'] <= sample_max]
-for col, bits in (('freq1', 8), ('freq3', 8), ('pwduty1', 4), ('fltcoff', 3)):
+for col, bits in big_regs.items():
     df[col] = np.left_shift(np.right_shift(df[col], bits), bits)
 meta_cols = set(df.columns) - sid_cols
 df_raws = defaultdict(list)
@@ -62,6 +63,17 @@ for hashid, ssf_df in df.groupby(['hashid']):  # pylint: disable=no-member
             waveforms = remove_end_repeats(waveforms)
         time_cols = {(col, '%s_%u' % (col, row.clock)) for col in cols} - redundant_adsr_cols
         df_raw.update({time_col: getattr(row, col) for col, time_col in time_cols})
+    for col in big_regs:
+        col_raw = resample_df[resample_df[col].notna()][col]
+        col_diff = col_raw.diff()
+        for col_title, col_var in (
+                ('%s_mindiff' % col, col_diff.min()),
+                ('%s_maxdiff' % col, col_diff.max()),
+                ('%s_meandiff' % col, col_diff.mean()),
+                ('%s_nunique' % col, col_raw.nunique())):
+            df_raw[col_title] = pd.NA
+            if pd.notna(col_var):
+                df_raw[col_title] = int(col_var)
 
     waveforms = '-'.join(waveforms)
     df_raws[waveforms].append(df_raw)
