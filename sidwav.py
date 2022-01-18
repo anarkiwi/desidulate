@@ -216,7 +216,7 @@ def state2samples(orig_df, sid, skiptest=False, maxclock=None):
     in_test = row.test1
     df = df[1:]
 
-    if skiptest and in_test:
+    if skiptest and in_test and not df.empty:
         for i, row in enumerate(df.itertuples(), start=1):
             sid.add_samples(row.diff_clock)
             for func in row.diff_funcs:
