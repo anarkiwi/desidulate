@@ -13,6 +13,7 @@ import pandas as pd
 import numpy as np
 from pyresidfp import SoundInterfaceDevice
 from pyresidfp.sound_interface_device import ChipModel
+from fileio import read_csv
 
 SID_SAMPLE_FREQ = 11025
 # use of external filter will be non deterministic.
@@ -142,12 +143,12 @@ def reg2state(snd_log_name, nrows=(10 * 1e6)):
 
     def compress_writes():
         logging.debug('reading %s', snd_log_name)
-        df = pd.read_csv(
+        # TODO: pyarrow can't do nrows
+        df = read_csv(
             snd_log_name,
             sep=' ',
             names=['clock_offset', 'reg', 'val'],
-            dtype={'clock_offset': np.uint64, 'reg': np.uint8, 'val': np.uint8},
-            nrows=nrows)
+            dtype={'clock_offset': np.uint64, 'reg': np.uint8, 'val': np.uint8})[:int(nrows)]
         logging.debug('read %u rows from %s', len(df), snd_log_name)
         df['clock'] = df['clock_offset'].cumsum()
         assert df['reg'].min() >= 0

@@ -5,6 +5,7 @@ import tempfile
 import unittest
 from io import StringIO
 import pandas as pd
+from fileio import read_csv
 from sidlib import get_sid, jittermatch_df, reg2state, state2ssfs, squeeze_diffs, coalesce_near_writes, remove_end_repeats
 from sidmidi import SidMidiFile, DEFAULT_BPM
 from ssf import SidSoundFragment, add_freq_notes_df
@@ -13,7 +14,7 @@ from ssf import SidSoundFragment, add_freq_notes_df
 class SIDLibTestCase(unittest.TestCase):
 
     def str2df(self, df_str):
-        return pd.read_csv(StringIO(df_str), dtype=pd.UInt64Dtype()).set_index('clock')
+        return read_csv(StringIO(df_str), dtype=pd.UInt64Dtype()).set_index('clock')
 
     def test_remove_end_repeats(self):
         self.assertEqual([1, 2], remove_end_repeats([1, 2]))

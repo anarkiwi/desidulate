@@ -12,7 +12,7 @@
 from collections import Counter
 from itertools import groupby
 import pandas as pd
-from fileio import out_path
+from fileio import out_path, read_csv
 from sidlib import set_sid_dtype
 from sidmidi import ELECTRIC_SNARE, BASS_DRUM, LOW_TOM, HIGH_TOM, PEDAL_HIHAT, CLOSED_HIHAT, OPEN_HIHAT, ACCOUSTIC_SNARE, closest_midi
 from sidwav import state2samples, samples_loudestf, readwav
@@ -179,7 +179,7 @@ class SidSoundFragmentParser:
 
     def read_patches(self, dfext):
         patch_log = out_path(self.logfile, '.'.join(('ssf', dfext)))
-        ssfs_df = add_freq_notes_df(self.sid, pd.read_csv(patch_log, dtype=pd.Int64Dtype()))
+        ssfs_df = add_freq_notes_df(self.sid, read_csv(patch_log, dtype=pd.Int64Dtype()))
         for hashid, ssf_df in ssfs_df.groupby('hashid', sort=False):
             self.patch_count[hashid] = ssf_df['count'].max()
             self.ssf_dfs[hashid] = ssf_df.drop(

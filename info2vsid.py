@@ -5,12 +5,13 @@ import os
 import sys
 from pyresidfp import SoundInterfaceDevice
 import pandas as pd
+from fileio import read_csv
 
 TUNEDEFAULT = True
 VICEIMAGE = 'anarkiwi/headlessvice'
 
 csv = sys.argv[1]
-df = pd.read_csv(csv)
+df = read_csv(csv)
 cwd = os.getcwd()
 
 for row in df.itertuples():

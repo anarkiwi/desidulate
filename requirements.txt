@@ -1,6 +1,7 @@
 music21
 numpy
 pandas
+pyarrow
 pyresidfp
 pytest
 scipy

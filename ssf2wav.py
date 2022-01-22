@@ -12,7 +12,7 @@ import sys
 import numpy as np
 import pandas as pd
 
-from fileio import wav_path, out_path
+from fileio import wav_path, out_path, read_csv
 from sidlib import get_sid, timer_args
 from sidwav import df2wav
 from sidmidi import SidMidiFile, midi_args
@@ -40,7 +40,7 @@ timer_args(parser)
 midi_args(parser)
 args = parser.parse_args()
 
-df = pd.read_csv(args.ssffile, dtype=pd.Int64Dtype())
+df = read_csv(args.ssffile, dtype=pd.Int64Dtype())
 
 if not len(df):
     print('empty SSF file')

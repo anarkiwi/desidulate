@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 from collections import defaultdict
 
-from fileio import out_path
+from fileio import out_path, read_csv
 from sidlib import remove_end_repeats
 
 parser = argparse.ArgumentParser(description='Downsample SSFs')
@@ -36,7 +36,7 @@ for col in adsr_cols:
     for clock in sample_df[sample_df['clock'] > 0]['clock'].unique():
         redundant_adsr_cols.add((col, '_'.join((col, str(clock)))))
 
-df = pd.read_csv(args.ssffile, dtype=pd.Int64Dtype())
+df = read_csv(args.ssffile, dtype=pd.Int64Dtype())
 if len(df) < 1:
     sys.exit(0)
 df['clock'] = df['clock'].astype(np.int64)

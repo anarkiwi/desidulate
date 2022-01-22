@@ -13,7 +13,7 @@ import argparse
 import os
 import sys
 import pandas as pd
-from fileio import midi_path, out_path
+from fileio import midi_path, out_path, read_csv
 from sidlib import get_sid, timer_args
 from sidmidi import SidMidiFile, midi_args
 from ssf import SidSoundFragment, SidSoundFragmentParser
@@ -32,7 +32,7 @@ midi_args(parser)
 args = parser.parse_args()
 voicemask = frozenset([int(v) for v in args.voicemask.split(',')])
 
-ssf_log_df = pd.read_csv(args.ssflogfile, dtype=pd.Int64Dtype())
+ssf_log_df = read_csv(args.ssflogfile, dtype=pd.Int64Dtype())
 cols = set(ssf_log_df.columns)
 
 if len(ssf_log_df) == 0:

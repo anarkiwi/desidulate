@@ -14,6 +14,7 @@ import pathlib
 import concurrent.futures
 from collections import defaultdict
 import pandas as pd
+from fileio import read_csv
 
 SSF_GLOB = r'*.resample_ssf.*xz'
 MAXES_RE = re.compile(r'.+\.([^\.]+)\.xz$')
@@ -27,7 +28,7 @@ def scrape_resample_dir(dir_max, resample_dir, resample_dir_dfs):
         resample_df_file for df_max, resample_df_file in resample_dir_dfs[resample_dir]
         if df_max == dir_max]
     for resample_df_file in resample_df_files:
-        resample_df = pd.read_csv(resample_df_file, dtype=pd.Int64Dtype())
+        resample_df = read_csv(resample_df_file, dtype=pd.Int64Dtype())
         if len(resample_df) < 1:
             continue
         resample_df_file_base = resample_df_file[:resample_df_file.find('.')]
