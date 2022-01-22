@@ -6,10 +6,10 @@
 
 ## The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 
+import argparse
 import re
 import multiprocessing
 import os
-import sys
 import pathlib
 import concurrent.futures
 from collections import defaultdict
@@ -67,14 +67,20 @@ def scrape_paths(maxes_filter):
     resample_dir_dfs = defaultdict(list)
     globs = [SSF_GLOB]
     if maxes_filter:
-        globs = [r'*.resample_ssf.%s.*' % i for i in maxes_filter]
+        globs = [(i, r'*.resample_ssf.%s.*' % i) for i in maxes_filter]
     maxes = set()
-    for glob in globs:
-        for resample_df_path in current.rglob(glob):
-            resample_df_file = str(resample_df_path)
-            maxes_match = MAXES_RE.match(resample_df_file)
-            maxes.add(maxes_match.group(1))
-            resample_dir_dfs[os.path.dirname(resample_df_file)].append((maxes_match.group(1), str(resample_df_file)))
+    for glob_name, glob in globs:
+        resample_df_files = [(glob_name, str(resample_df_file)) for resample_df_file in current.rglob(glob)]
+        if glob == SSF_GLOB:
+            resample_df_files = [
+                (MAXES_RE.match(resample_df_file).group(1), resample_df_file) for _i, resample_df_file in resample_df_files]
+            maxes = {i for i, _resample_df_file in resample_df_files}
+        else:
+            maxes.add(glob_name)
+
+        for i, resample_df_file in resample_df_files:
+            resample_dir_dfs[os.path.dirname(resample_df_file)].append((i, resample_df_file))
+
     resample_dirs = list(resample_dir_dfs.keys())
     return (maxes, resample_dirs, resample_dir_dfs)
 
@@ -90,14 +96,20 @@ def scrape_resample_dfs(dir_max, resample_dirs, resample_dir_dfs):
         for hashid, source in result[0].items():
             hashids[hashid].update(source)
     hashids_df = pd.DataFrame(hashids.items(), columns=['hashid', 'sources'])
-    resample_df = resample_df.merge(hashids_df, on='hashid')
-    return resample_df
+    return (resample_df, hashids_df)
 
-maxes_filter = None
-if len(sys.argv) > 1:
-    maxes_filter = sys.argv[1:]
-maxes, resample_dirs, resample_dir_dfs = scrape_paths(maxes_filter)
-for dir_max in sorted(maxes):
-    print(dir_max)
-    resample_df = scrape_resample_dfs(dir_max, resample_dirs, resample_dir_dfs)
-    resample_df.to_csv('resample_ssf.%s.xz' % dir_max, index=False)
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--maxes', nargs='+', default=None)
+    args = parser.parse_args()
+    maxes, resample_dirs, resample_dir_dfs = scrape_paths(args.maxes)
+    for dir_max in sorted(maxes):
+        print(dir_max)
+        resample_df, hashids_df = scrape_resample_dfs(dir_max, resample_dirs, resample_dir_dfs)
+        resample_df.to_csv('resample_ssf.%s.xz' % dir_max, index=False)
+        hashids_df.to_csv('resample_ssf.hashid.%s.xz' % dir_max, index=False)
+
+
+if __name__ == '__main__':
+    main()
