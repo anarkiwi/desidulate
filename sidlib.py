@@ -18,7 +18,8 @@ from fileio import read_csv
 SID_SAMPLE_FREQ = 11025
 # use of external filter will be non deterministic.
 FLTEXT = False
-WAVEFORM_COLS = {'sync1': 'S', 'ring1': 'R', 'tri1': 't', 'saw1': 's', 'pulse1': 'p', 'noise1': 'n'}
+WAVEFORM_COLS = tuple(sorted((('S', 'sync1'), ('R', 'ring1'), ('t', 'tri1'), ('s', 'saw1'), ('p', 'pulse1'), ('n', 'noise1'))))
+WAVEFORM_COLS_ORIG = [col[1] for col in WAVEFORM_COLS]
 
 
 def remove_end_repeats(waveforms):
@@ -35,12 +36,12 @@ def remove_end_repeats(waveforms):
 
 def df_waveform_order(df):
     waveforms = []
-    squeeze_df = df[WAVEFORM_COLS.keys()].fillna(0)
+    squeeze_df = df[WAVEFORM_COLS_ORIG].fillna(0)
     for row in squeeze_df.itertuples():
-        row_waveforms = {
-            mapped_col: getattr(row, waveform_col) for waveform_col, mapped_col in WAVEFORM_COLS.items()}
-        row_waveforms = sorted([
-            waveform_col for waveform_col, waveform_val in row_waveforms.items() if waveform_val])
+        row_waveforms = (
+            (mapped_col, getattr(row, waveform_col)) for mapped_col, waveform_col in WAVEFORM_COLS)
+        row_waveforms = [
+            waveform_col for waveform_col, waveform_val in row_waveforms if waveform_val]
         if row_waveforms:
             row_waveforms = ''.join(row_waveforms)
         else:
