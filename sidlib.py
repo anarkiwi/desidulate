@@ -397,6 +397,9 @@ def split_vdf(sid, df, near=16, guard=96):
         guard_start = v_df['next_clock_start'] - v_df['clock'].astype(pd.Int64Dtype())
         v_df = v_df[~((guard_start > 0) & (guard_start < guard))]
         v_df['clock'] = v_df.groupby(['ssf'], sort=False)['clock'].transform(lambda x: x - x.min())
+        v_df['gateoff_clock'] = v_df['clock']
+        v_df.loc[v_df['gate1'] == 1, ['gateoff_clock']] = pd.NA
+        v_df['gateoff_clock'] = v_df.groupby(['ssf'], sort=False)['gateoff_clock'].transform('min')
         v_df['frame'] = v_df['clock'].floordiv(int(sid.clockq))
         v_df['v'] = v
         v_df['ssf'] += ssfs
