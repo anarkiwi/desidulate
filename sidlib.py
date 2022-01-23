@@ -32,6 +32,25 @@ def remove_end_repeats(waveforms):
     return waveforms
 
 
+def df_waveform_order(df):
+    waveform_cols = {'sync1': 'S', 'ring1': 'R', 'tri1': 't', 'saw1': 's', 'pulse1': 'p', 'noise1': 'n'}
+    waveforms = []
+    squeeze_df = df[waveform_cols.keys()].fillna(0)
+    for row in squeeze_df.itertuples():
+        row_waveforms = {
+            mapped_col: getattr(row, waveform_col) for waveform_col, mapped_col in waveform_cols.items()}
+        row_waveforms = sorted([
+            waveform_col for waveform_col, waveform_val in row_waveforms.items() if waveform_val != 0])
+        if row_waveforms:
+            row_waveforms = ''.join(row_waveforms)
+        else:
+            row_waveforms = '0'
+        if not waveforms or row_waveforms != waveforms[-1]:
+            waveforms.append(row_waveforms)
+            waveforms = remove_end_repeats(waveforms)
+    return waveforms
+
+
 def timer_args(parser):
     pal_parser = parser.add_mutually_exclusive_group(required=False)
     pal_parser.add_argument('--pal', dest='pal', action='store_true', help='Use PAL clock')
@@ -430,7 +449,7 @@ def normalize_ssf(sid, hashid_clock, hashid_noclock, ssf_df, remap_ssf_dfs, ssf_
                 last_row_df['clock'] = clock_duration
                 last_row_df['frame'] = int(clock_duration / sid.clockq)
                 last_row_df = last_row_df.astype(normalized_ssf_df.dtypes.to_dict())
-                normalized_ssf_df = normalized_ssf_df.append(last_row_df, ignore_index=True)
+                normalized_ssf_df = pd.concat([normalized_ssf_df, last_row_df], ignore_index=True)
                 normalized_ssf_df = normalized_ssf_df.reset_index(drop=True)
                 ssf_dfs[hashid] = normalized_ssf_df
                 ssf_noclock_dfs[remap_hashid_noclock] = hashid

@@ -6,7 +6,7 @@ import unittest
 from io import StringIO
 import pandas as pd
 from fileio import read_csv
-from sidlib import get_sid, jittermatch_df, reg2state, state2ssfs, squeeze_diffs, coalesce_near_writes, remove_end_repeats
+from sidlib import get_sid, jittermatch_df, reg2state, state2ssfs, squeeze_diffs, coalesce_near_writes, remove_end_repeats, df_waveform_order
 from sidmidi import SidMidiFile, DEFAULT_BPM
 from ssf import SidSoundFragment, add_freq_notes_df
 
@@ -20,6 +20,27 @@ class SIDLibTestCase(unittest.TestCase):
         self.assertEqual([1, 2], remove_end_repeats([1, 2]))
         self.assertEqual([1, 2, 3, 1, 2], remove_end_repeats([1, 2, 3, 1, 2, 1, 2, 1, 2]))
         self.assertEqual([1, 2, 3], remove_end_repeats([1, 2, 3, 1, 2, 3]))
+
+    def test_df_waveform_order(self):
+        df = self.str2df('''
+clock,pulse1,noise1,sync1,ring1,test1,tri1,saw1
+0,1,0,,,,,
+100,0,1,,,,,
+150,0,1,,,,,
+200,1,0,,,,,
+250,1,0,,,,,
+''').reset_index()
+        self.assertEqual(['p', 'n', 'p'], df_waveform_order(df))
+
+        df = self.str2df('''
+clock,pulse1,noise1,sync1,ring1,test1,tri1,saw1
+0,1,0,,,,,
+50,,,,,,,
+75,,,,,,,
+100,0,1,,,,,
+200,1,0,,,,,
+''').reset_index()
+        self.assertEqual(['p', '0', 'n', 'p'], df_waveform_order(df))
 
     def test_jittermatch(self):
         df1 = self.str2df('''

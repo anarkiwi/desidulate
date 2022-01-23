@@ -13,7 +13,7 @@ import pandas as pd
 from collections import defaultdict
 
 from fileio import out_path, read_csv
-from sidlib import remove_end_repeats
+from sidlib import df_waveform_order
 
 parser = argparse.ArgumentParser(description='Downsample SSFs')
 parser.add_argument('ssffile', help='SSF file')
@@ -49,18 +49,8 @@ for hashid, ssf_df in df.groupby(['hashid']):  # pylint: disable=no-member
     resample_df = pd.merge_asof(sample_df, ssf_df).astype(pd.Int64Dtype())
     cols = (set(resample_df.columns) - meta_cols)
     df_raw = {col: resample_df[col].iat[-1] for col in meta_cols - {'clock', 'frame'}}
-    waveforms = []
+    waveforms = df_waveform_order(resample_df)
     for row in resample_df.itertuples():
-        row_waveforms = {mapped_col: getattr(row, waveform_col, 0) for waveform_col, mapped_col in waveform_cols.items()}
-        row_waveforms = sorted([
-            waveform_col for waveform_col, waveform_val in row_waveforms.items() if pd.notna(waveform_val) and waveform_val != 0])
-        if row_waveforms:
-            row_waveforms = ''.join(row_waveforms)
-        else:
-            row_waveforms = '0'
-        if not waveforms or row_waveforms != waveforms[-1]:
-            waveforms.append(row_waveforms)
-            waveforms = remove_end_repeats(waveforms)
         time_cols = {(col, '%s_%u' % (col, row.clock)) for col in cols} - redundant_adsr_cols
         df_raw.update({time_col: getattr(row, col) for col, time_col in time_cols})
     for col in big_regs:
@@ -79,9 +69,14 @@ for hashid, ssf_df in df.groupby(['hashid']):  # pylint: disable=no-member
     df_raws[waveforms].append(df_raw)
 
 
-for waveforms, dfs in df_raws.items():
-    df = pd.DataFrame(dfs, dtype=pd.Int64Dtype()).set_index('hashid')
-    nacols = [col for col in df.columns if df[col].isnull().all() or df[col].max() == 0]
-    df = df.drop(nacols, axis=1).drop_duplicates()
-    outfile = out_path(args.ssffile, 'resample_ssf.%s.xz' % waveforms)
-    df.to_csv(outfile)
+def main():
+    for waveforms, dfs in df_raws.items():
+        df = pd.DataFrame(dfs, dtype=pd.Int64Dtype()).set_index('hashid')
+        nacols = [col for col in df.columns if df[col].isnull().all() or df[col].max() == 0]
+        df = df.drop(nacols, axis=1).drop_duplicates()
+        outfile = out_path(args.ssffile, 'resample_ssf.%s.xz' % waveforms)
+        df.to_csv(outfile)
+
+
+if __name__ == '__main__':
+    main()
