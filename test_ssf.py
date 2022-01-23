@@ -54,6 +54,17 @@ clock,pulse1,noise1,sync1,ring1,test1,tri1,saw1
 
         df = self.str2df('''
 clock,pulse1,noise1,sync1,ring1,test1,tri1,saw1
+0,,,,,,,
+100,0,1,,,,,
+150,0,1,,,,,
+200,1,1,,,,,
+250,1,0,,,,,
+300,,,,,,,
+''').reset_index()
+        self.assertEqual(['0', 'n', 'np', 'p', '0'], df_waveform_order(df))
+
+        df = self.str2df('''
+clock,pulse1,noise1,sync1,ring1,test1,tri1,saw1
 0,1,0,,,,,
 50,,,,,,,
 75,,,,,,,
