@@ -78,7 +78,7 @@ def scrape_paths(maxes_filter, fromssfs):
         else:
             opener = open
         with opener(fromssfs) as f:
-            fromssfs_files = f.read().decode('utf8').splitlines()  # pylint: disable=attribute-error
+            fromssfs_files = f.read().decode('utf8').splitlines()  # pytype: disable=attribute-error
     for glob in globs:
         if fromssfs_files:
             globber = fromssfs_files
