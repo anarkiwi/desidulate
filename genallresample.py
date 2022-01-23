@@ -62,15 +62,24 @@ def scrape_resample_dir(dir_max, resample_dir, resample_dir_dfs):
     return (None, None)
 
 
-def scrape_paths(maxes_filter):
+def scrape_paths(maxes_filter, fromssfs):
     current = pathlib.Path(r'./')
     resample_dir_dfs = defaultdict(list)
     globs = [SSF_GLOB]
     if maxes_filter:
         globs = [(i, r'*.resample_ssf.%s.*' % i) for i in maxes_filter]
     maxes = set()
+    fromssfs_files = None
+    if fromssfs:
+        with open(fromssfs) as f:
+            fromssfs_files = f.read().splitlines()
     for glob_name, glob in globs:
-        resample_df_files = [(glob_name, str(resample_df_file)) for resample_df_file in current.rglob(glob)]
+        globber = current.rglob(glob)
+        if fromssfs_files:
+            globber = fromssfs_files
+        else:
+            globber = current.rglob(glob)
+        resample_df_files = [(glob_name, str(resample_df_file)) for resample_df_file in globber]
         if glob == SSF_GLOB:
             resample_df_files = [
                 (MAXES_RE.match(resample_df_file).group(1), resample_df_file) for _i, resample_df_file in resample_df_files]
@@ -102,8 +111,9 @@ def scrape_resample_dfs(dir_max, resample_dirs, resample_dir_dfs):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--maxes', nargs='+', default=None)
+    parser.add_argument('--fromssfs', type=str, default=None)
     args = parser.parse_args()
-    maxes, resample_dirs, resample_dir_dfs = scrape_paths(args.maxes)
+    maxes, resample_dirs, resample_dir_dfs = scrape_paths(args.maxes, args.fromssfs)
     for dir_max in sorted(maxes):
         print(dir_max)
         resample_df, hashids_df = scrape_resample_dfs(dir_max, resample_dirs, resample_dir_dfs)
