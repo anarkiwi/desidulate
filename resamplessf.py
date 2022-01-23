@@ -24,7 +24,7 @@ sample_count = int(args.max_cycles / args.sample_cycles) + 1
 waveform_cols = {'sync1', 'ring1', 'tri1', 'saw1', 'pulse1', 'noise1'}
 adsr_cols = {'atk1', 'dec1', 'sus1', 'rel1'}
 sid_cols = {
-    'freq1', 'pwduty1', 'gate1', 'test1', 'vol',
+    'freq1', 'pwduty1', 'test1', 'vol',
     'fltlo', 'fltband', 'flthi', 'flt1', 'fltext', 'fltres', 'fltcoff',
     'freq3', 'test3'}.union(waveform_cols).union(adsr_cols)
 big_regs = {'freq1': 8, 'freq3': 8, 'pwduty1': 4, 'fltcoff': 3}
@@ -42,9 +42,12 @@ def resample():
         return df_raws
     df['clock'] = df['clock'].astype(np.int64)
     df = df[df['clock'] <= sample_max]
+    df = df.drop(['gate1'], axis=1)
     for col, bits in big_regs.items():
         df[col] = np.left_shift(np.right_shift(df[col], bits), bits)
     meta_cols = set(df.columns) - sid_cols
+    gateoff_clock = df['gateoff_clock'].astype(pd.Float32Dtype()) / float(args.sample_cycles)
+    df['gateoff_clock'] = gateoff_clock.round().astype(pd.Int64Dtype()) * args.sample_cycles
 
     for _, ssf_df in df.groupby(['hashid']):  # pylint: disable=no-member
         resample_df = pd.merge_asof(sample_df, ssf_df).astype(pd.Int64Dtype())
