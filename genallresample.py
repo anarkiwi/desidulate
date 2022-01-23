@@ -7,6 +7,7 @@
 ## The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 
 import argparse
+import gzip
 import re
 import multiprocessing
 import os
@@ -65,32 +66,37 @@ def scrape_resample_dir(dir_max, resample_dir, resample_dir_dfs):
 def scrape_paths(maxes_filter, fromssfs):
     current = pathlib.Path(r'./')
     resample_dir_dfs = defaultdict(list)
+    resample_maxes_files = defaultdict(list)
     globs = [SSF_GLOB]
     if maxes_filter:
-        globs = [(i, r'*.resample_ssf.%s.*' % i) for i in maxes_filter]
-    maxes = set()
+        maxes_filter = set(maxes_filter)
+        globs = [r'*.resample_ssf.%s.*' % i for i in maxes_filter]
     fromssfs_files = None
     if fromssfs:
-        with open(fromssfs) as f:
-            fromssfs_files = f.read().splitlines()
-    for glob_name, glob in globs:
-        globber = current.rglob(glob)
+        if fromssfs.endswith('.gz'):
+            opener = gzip.open
+        else:
+            opener = open
+        with opener(fromssfs) as f:
+            fromssfs_files = f.read().decode('utf8').splitlines()
+    for glob in globs:
         if fromssfs_files:
             globber = fromssfs_files
         else:
             globber = current.rglob(glob)
-        resample_df_files = [(glob_name, str(resample_df_file)) for resample_df_file in globber]
-        if glob == SSF_GLOB:
-            resample_df_files = [
-                (MAXES_RE.match(resample_df_file).group(1), resample_df_file) for _i, resample_df_file in resample_df_files]
-            maxes = {i for i, _resample_df_file in resample_df_files}
-        else:
-            maxes.add(glob_name)
+        for resample_df_file in globber:
+            resample_df_file = str(resample_df_file)
+            match = MAXES_RE.match(resample_df_file).group(1)
+            if maxes_filter and match not in maxes_filter:
+                continue
+            resample_maxes_files[match].append(resample_df_file)
 
-        for i, resample_df_file in resample_df_files:
-            resample_dir_dfs[os.path.dirname(resample_df_file)].append((i, resample_df_file))
+        for match, resample_df_files in resample_maxes_files.items():
+            for resample_df_file in resample_df_files:
+                resample_dir_dfs[os.path.dirname(resample_df_file)].append((match, resample_df_file))
 
     resample_dirs = list(resample_dir_dfs.keys())
+    maxes = set(resample_maxes_files.keys())
     return (maxes, resample_dirs, resample_dir_dfs)
 
 
