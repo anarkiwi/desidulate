@@ -22,12 +22,9 @@ MAXES_RE = re.compile(r'.+\.([^\.]+)\.xz$')
 MAX_WORKERS = multiprocessing.cpu_count()
 
 
-def scrape_resample_dir(dir_max, resample_dir, resample_dir_dfs):
+def scrape_resample_dir(resample_df_files):
     dfs = []
     hashids = defaultdict(set)
-    resample_df_files = [
-        resample_df_file for df_max, resample_df_file in resample_dir_dfs[resample_dir]
-        if df_max == dir_max]
     for resample_df_file in resample_df_files:
         resample_df = read_csv(resample_df_file, dtype=pd.Int64Dtype())
         if len(resample_df) < 1:
@@ -65,7 +62,6 @@ def scrape_resample_dir(dir_max, resample_dir, resample_dir_dfs):
 
 def scrape_paths(maxes_filter, fromssfs):
     current = pathlib.Path(r'./')
-    resample_dir_dfs = defaultdict(list)
     resample_maxes_files = defaultdict(list)
     globs = [SSF_GLOB]
     if maxes_filter:
@@ -85,24 +81,18 @@ def scrape_paths(maxes_filter, fromssfs):
         else:
             globber = current.rglob(glob)
         for resample_df_file in globber:
-            resample_df_file = str(resample_df_file)
+            resample_df_file = os.path.normpath(str(resample_df_file))
             match = MAXES_RE.match(resample_df_file).group(1)
             if maxes_filter and match not in maxes_filter:
                 continue
             resample_maxes_files[match].append(resample_df_file)
 
-        for match, resample_df_files in resample_maxes_files.items():
-            for resample_df_file in resample_df_files:
-                resample_dir_dfs[os.path.dirname(resample_df_file)].append((match, resample_df_file))
-
-    resample_dirs = list(resample_dir_dfs.keys())
-    maxes = set(resample_maxes_files.keys())
-    return (maxes, resample_dirs, resample_dir_dfs)
+    return resample_maxes_files
 
 
-def scrape_resample_dfs(dir_max, resample_dirs, resample_dir_dfs):
-    with concurrent.futures.ProcessPoolExecutor(max_workers=min(MAX_WORKERS, len(resample_dirs))) as executor:
-        result_futures = map(lambda x: executor.submit(scrape_resample_dir, dir_max, x, resample_dir_dfs), resample_dirs)
+def scrape_resample_dfs(resample_dir_dfs):
+    with concurrent.futures.ProcessPoolExecutor(max_workers=min(MAX_WORKERS, len(resample_dir_dfs))) as executor:
+        result_futures = map(lambda x: executor.submit(scrape_resample_dir, x), resample_dir_dfs.values())
         results = [future.result() for future in concurrent.futures.as_completed(result_futures)]
     results = [result for result in results if result[0] is not None]
     hashids = defaultdict(set)
@@ -114,17 +104,24 @@ def scrape_resample_dfs(dir_max, resample_dirs, resample_dir_dfs):
     return (resample_df, hashids_df)
 
 
+def write_df(df, name):
+    df.to_csv(name, index=False)
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--maxes', nargs='+', default=None)
     parser.add_argument('--fromssfs', type=str, default=None)
     args = parser.parse_args()
-    maxes, resample_dirs, resample_dir_dfs = scrape_paths(args.maxes, args.fromssfs)
-    for dir_max in sorted(maxes):
+    resample_maxes_files = scrape_paths(args.maxes, args.fromssfs)
+    for dir_max, resample_df_files in sorted(resample_maxes_files.items()):
         print(dir_max)
-        resample_df, hashids_df = scrape_resample_dfs(dir_max, resample_dirs, resample_dir_dfs)
-        resample_df.to_csv('resample_ssf.%s.xz' % dir_max, index=False)
-        hashids_df.to_csv('resample_ssf.hashid.%s.xz' % dir_max, index=False)
+        resample_dir_dfs = defaultdict(list)
+        for resample_df_file in resample_df_files:
+            resample_dir_dfs[os.path.dirname(resample_df_file)].append(resample_df_file)
+        resample_df, hashids_df = scrape_resample_dfs(resample_dir_dfs)
+        write_df(resample_df, 'resample_ssf.%s.xz' % dir_max)
+        write_df(hashids_df, 'resample_ssf.hashid.%s.xz' % dir_max)
 
 
 if __name__ == '__main__':
