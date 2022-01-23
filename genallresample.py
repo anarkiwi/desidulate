@@ -95,7 +95,7 @@ def scrape_resample_dfs(dir_max, resample_dirs, resample_dir_dfs):
     for result in results:
         for hashid, source in result[0].items():
             hashids[hashid].update(source)
-    hashids_df = pd.DataFrame(hashids.items(), columns=['hashid', 'hashid_noclock', 'sources'])
+    hashids_df = pd.DataFrame(hashids.items(), columns=['hashid', 'sources'])
     return (resample_df, hashids_df)
 
 
