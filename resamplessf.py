@@ -7,10 +7,9 @@
 ## The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 
 import argparse
-import sys
+from collections import defaultdict
 import numpy as np
 import pandas as pd
-from collections import defaultdict
 
 from fileio import out_path, read_csv
 from sidlib import df_waveform_order
@@ -22,12 +21,12 @@ parser.add_argument('--max_cycles', default=25e4, type=int, help='include number
 
 args = parser.parse_args()
 sample_count = int(args.max_cycles / args.sample_cycles) + 1
-waveform_cols = {'sync1': 'S', 'ring1': 'R', 'tri1': 't', 'saw1': 's', 'pulse1': 'p', 'noise1': 'n'}
+waveform_cols = {'sync1', 'ring1', 'tri1', 'saw1', 'pulse1', 'noise1'}
 adsr_cols = {'atk1', 'dec1', 'sus1', 'rel1'}
 sid_cols = {
     'freq1', 'pwduty1', 'gate1', 'test1', 'vol',
     'fltlo', 'fltband', 'flthi', 'flt1', 'fltext', 'fltres', 'fltcoff',
-    'freq3', 'test3'}.union(waveform_cols.keys()).union(adsr_cols)
+    'freq3', 'test3'}.union(waveform_cols).union(adsr_cols)
 big_regs = {'freq1': 8, 'freq3': 8, 'pwduty1': 4, 'fltcoff': 3}
 sample_df = pd.DataFrame([{'clock': i * args.sample_cycles} for i in range(sample_count)], dtype=np.int64)
 sample_max = sample_df['clock'].max()
@@ -36,40 +35,44 @@ for col in adsr_cols:
     for clock in sample_df[sample_df['clock'] > 0]['clock'].unique():
         redundant_adsr_cols.add((col, '_'.join((col, str(clock)))))
 
-df = read_csv(args.ssffile, dtype=pd.Int64Dtype())
-if len(df) < 1:
-    sys.exit(0)
-df['clock'] = df['clock'].astype(np.int64)
-df = df[df['clock'] <= sample_max]
-for col, bits in big_regs.items():
-    df[col] = np.left_shift(np.right_shift(df[col], bits), bits)
-meta_cols = set(df.columns) - sid_cols
-df_raws = defaultdict(list)
-for hashid, ssf_df in df.groupby(['hashid']):  # pylint: disable=no-member
-    resample_df = pd.merge_asof(sample_df, ssf_df).astype(pd.Int64Dtype())
-    cols = (set(resample_df.columns) - meta_cols)
-    df_raw = {col: resample_df[col].iat[-1] for col in meta_cols - {'clock', 'frame'}}
-    waveforms = df_waveform_order(resample_df)
-    for row in resample_df.itertuples():
-        time_cols = {(col, '%s_%u' % (col, row.clock)) for col in cols} - redundant_adsr_cols
-        df_raw.update({time_col: getattr(row, col) for col, time_col in time_cols})
-    for col in big_regs:
-        col_raw = resample_df[resample_df[col].notna()][col]
-        col_diff = col_raw.diff()
-        for col_title, col_var in (
-                ('%s_mindiff' % col, col_diff.min()),
-                ('%s_maxdiff' % col, col_diff.max()),
-                ('%s_meandiff' % col, col_diff.mean()),
-                ('%s_nunique' % col, col_raw.nunique())):
-            df_raw[col_title] = pd.NA
-            if pd.notna(col_var):
-                df_raw[col_title] = int(col_var)
+def resample():
+    df = read_csv(args.ssffile, dtype=pd.Int64Dtype())
+    df_raws = defaultdict(list)
+    if len(df) < 1:
+        return df_raws
+    df['clock'] = df['clock'].astype(np.int64)
+    df = df[df['clock'] <= sample_max]
+    for col, bits in big_regs.items():
+        df[col] = np.left_shift(np.right_shift(df[col], bits), bits)
+    meta_cols = set(df.columns) - sid_cols
 
-    waveforms = '-'.join(waveforms)
-    df_raws[waveforms].append(df_raw)
+    for _, ssf_df in df.groupby(['hashid']):  # pylint: disable=no-member
+        resample_df = pd.merge_asof(sample_df, ssf_df).astype(pd.Int64Dtype())
+        cols = (set(resample_df.columns) - meta_cols)
+        df_raw = {col: resample_df[col].iat[-1] for col in meta_cols - {'clock', 'frame'}}
+        waveforms = df_waveform_order(resample_df)
+        for row in resample_df.itertuples():
+            time_cols = {(col, '%s_%u' % (col, row.clock)) for col in cols} - redundant_adsr_cols
+            df_raw.update({time_col: getattr(row, col) for col, time_col in time_cols})
+        for col in big_regs:
+            col_raw = resample_df[resample_df[col].notna()][col]
+            col_diff = col_raw.diff()
+            for col_title, col_var in (
+                    ('%s_mindiff' % col, col_diff.min()),
+                    ('%s_maxdiff' % col, col_diff.max()),
+                    ('%s_meandiff' % col, col_diff.mean()),
+                    ('%s_nunique' % col, col_raw.nunique())):
+                df_raw[col_title] = pd.NA
+                if pd.notna(col_var):
+                    df_raw[col_title] = int(col_var)
+
+        waveforms = '-'.join(waveforms)
+        df_raws[waveforms].append(df_raw)
+    return df_raws
 
 
 def main():
+    df_raws = resample()
     for waveforms, dfs in df_raws.items():
         df = pd.DataFrame(dfs, dtype=pd.Int64Dtype()).set_index('hashid')
         nacols = [col for col in df.columns if df[col].isnull().all() or df[col].max() == 0]
