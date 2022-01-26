@@ -10,6 +10,7 @@
 import csv
 import hashlib
 import multiprocessing
+import os
 import pathlib
 import re
 import subprocess
@@ -35,7 +36,7 @@ def scrape_sidinfo(sidfile, all_tunelengths):
     assert md5_hash in all_tunelengths, (md5_hash, sidfile)
 
     result = {
-        'path': str(sidfile),
+        'path': str(os.path.normpath(sidfile)),
         'mtime': sidfile.stat().st_mtime,
         'md5': md5_hash,
     }
@@ -54,6 +55,13 @@ def scrape_sidinfo(sidfile, all_tunelengths):
             field, val = fields_match.group(1).strip(), fields_match.group(2).strip()
             field = field.replace(' ', '')
 
+            if field == 'Released':
+                year_match = year_re.match(val)
+                year_val = pd.NA
+                if year_match:
+                    year_val = year_match.group(1)
+                result['ReleasedYear'] = year_val
+
             if field in ('Title', 'Author', 'Released'):
                 result[field] = val
                 continue
@@ -69,12 +77,6 @@ def scrape_sidinfo(sidfile, all_tunelengths):
             if val.startswith('None'):
                 val = pd.NA
 
-            if field == 'Released':
-                year_match = year_re.match(val)
-                year_val = pd.NA
-                if year_match:
-                    year_val = year_match.group(1)
-                result['ReleasedYear'] = year_val
             if field == 'Playlist':
                 playlist_match = playlist_re.match(val)
                 result.update({
@@ -124,10 +126,11 @@ def scrape_tunelengths(tunelengthfile):
 
 
 def scrape_sids():
-    current = pathlib.Path(r'./')
+    current = pathlib.Path(r'.')
+    currentdocs = pathlib.Path(r'./C64Music/DOCUMENTS')
     sidfiles = current.rglob(r'*.sid')
     all_tunelengths = {}
-    for tunelengthfile in current.rglob(r'Songlengths.md5'):
+    for tunelengthfile in currentdocs.rglob(r'Songlengths.md5'):
         all_tunelengths.update(scrape_tunelengths(tunelengthfile))
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
