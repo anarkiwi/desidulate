@@ -33,12 +33,18 @@ def fuzzy_match(hashid, df, match_cols):
 
 
 def describe_matches(match_df, waveform_order, dbdir):
+    sidinfo = pd.read_csv('%s/sidinfo.csv' % dbdir)
+    print(sidinfo)
     hash_df = pd.read_csv('%s/resample_ssf.hashid.%s.xz' % (dbdir, waveform_order), engine='pyarrow', index_col='hashid')
     xdf = match_df.join(hash_df)
     xdf['sources'] = xdf['sources'].apply(ast.literal_eval)
+    all = set()
     for row in xdf.itertuples():
         for source in row.sources:
             print('%s/%s.%d.wav' % (dbdir, source, row.Index))
+            all.add('%s.sid' % source)
+    print(sidinfo[sidinfo.path.isin(all)][['path', 'Released']])
+    
 
 
 waveform_order = 'p-n-p'
