@@ -333,8 +333,8 @@ def split_vdf(sid, df, near=16, guard=96):
         v_df.loc[v_df['ssf'] != 1, ['ssf']] = 0
         v_df['ssf'] = v_df['ssf'].cumsum().astype(np.uint64)
 
-        logging.debug('removing redundant ADSR for voice %u', v)
         if v_df['ssf'].max() > 1:
+            logging.debug('removing redundant ADSR for voice %u', v)
             # select AD from when gate on
             ad_df = v_df[v_df['diff_gate1'] == 1][['ssf', 'atk1', 'dec1']]
             # select R from when gate off
@@ -374,6 +374,18 @@ def split_vdf(sid, df, near=16, guard=96):
         v_df.loc[(v_df['flt1'] == 0) | v_df['flt1'].isna(), fltcols] = pd.NA
         # remove pwduty state when no pulse1 set.
         v_df.loc[(v_df['pulse1'] == 0) | v_df['pulse1'].isna(), ['pwduty1']] = pd.NA
+
+        # remove trailing rows when test1 set.
+        v_df['test1_last'] = v_df['clock']
+        v_df.loc[v_df['test1'] == 1, ['test1_last']] = pd.NA
+        v_df['test1_last'] = v_df.groupby(['ssf'], sort=False)['test1_last'].transform(max)
+        v_df = v_df[(v_df['clock'] <= v_df['test1_last'])]
+
+        # remove trailing rows when no waveform set.
+        v_df['waveform_last'] = v_df['clock']
+        v_df.loc[(v_df['pulse1'] == 0) & (v_df['tri1'] == 0) & (v_df['noise1'] == 0) & (v_df['saw1'] == 0), ['waveform_last']] = pd.NA
+        v_df['waveform_last'] = v_df.groupby(['ssf'], sort=False)['waveform_last'].transform(max)
+        v_df = v_df[(v_df['clock'] <= v_df['waveform_last'])]
 
         # extract only changes
         logging.debug('extracting only state changes for voice %u (rows before %u)', v, len(v_df))

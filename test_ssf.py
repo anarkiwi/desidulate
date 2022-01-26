@@ -226,7 +226,7 @@ class SSFTestCase(unittest.TestCase):
                     '1 8 128',
                     '1 13 255',
                     '100 11 129',
-                    '100000 11 0',
+                    '100000 11 128',
                     '')))
             ssf_log_df, ssf_dfs, = state2ssfs(sid, reg2state(test_log))
             ssf_log_df.reset_index(level=0, inplace=True)
