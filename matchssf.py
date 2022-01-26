@@ -44,13 +44,14 @@ def add_sources(match_df, waveform_order, dbdir):
 
 def describe_matches(match_df, waveform_order, dbdir):
     sidinfo = pd.read_csv('%s/sidinfo.csv' % dbdir)
+    sidinfo['path'] = sidinfo['path'].apply(lambda x: x[:-4]) 
     match_df = add_sources(match_df, waveform_order, dbdir)
-    all = set()
+    sources = set()
     for row in match_df.itertuples():
         for source in row.sources:
             print('%s/%s.%d.wav' % (dbdir, source, row.Index))
-            all.add('%s.sid' % source)
-    print(sidinfo[sidinfo.path.isin(all)][['path', 'ReleasedYear']])
+            sources .add(source)
+    print(sidinfo[sidinfo.path.isin(sources)][['path', 'ReleasedYear']])
 
 
 def main():
