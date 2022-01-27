@@ -66,7 +66,7 @@ def scrape_paths(maxes_filter, fromssfs):
     globs = [SSF_GLOB]
     if maxes_filter:
         maxes_filter = set(maxes_filter)
-        globs = [r'*.resample_ssf.%s.*' % i for i in maxes_filter]
+        globs = [r'*.resample_ssf.0-%s.*' % i for i in maxes_filter] + [r'*.resample_ssf.%s.*' % i for i in maxes_filter]
     fromssfs_files = None
     if fromssfs:
         if fromssfs.endswith('.gz'):
@@ -83,6 +83,8 @@ def scrape_paths(maxes_filter, fromssfs):
         for resample_df_file in globber:
             resample_df_file = os.path.normpath(str(resample_df_file))
             match = MAXES_RE.match(resample_df_file).group(1)
+            if match.startswith('0-'):
+                match = match[2:]
             if maxes_filter and match not in maxes_filter:
                 continue
             resample_maxes_files[match].append(resample_df_file)
