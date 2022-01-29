@@ -20,6 +20,11 @@ SID_SAMPLE_FREQ = 11025
 FLTEXT = False
 WAVEFORM_COLS = tuple(sorted((('S', 'sync1'), ('R', 'ring1'), ('t', 'tri1'), ('s', 'saw1'), ('p', 'pulse1'), ('n', 'noise1'))))
 WAVEFORM_COLS_ORIG = [col[1] for col in WAVEFORM_COLS]
+CANON_REG_ORDER = (
+    'gate1', 'freq1', 'pwduty1', 'pulse1', 'noise1', 'tri1', 'saw1', 'test1',
+    'sync1', 'ring1', 'freq3', 'test3',
+    'flt1', 'fltcoff', 'fltres', 'fltlo', 'fltband', 'flthi', 'fltext',
+    'atk1', 'dec1', 'sus1', 'rel1', 'vol')
 
 
 def remove_end_repeats(waveforms):
@@ -380,13 +385,13 @@ def split_vdf(sid, df, near=16, guard=96):
         v_df['test1_last'] = v_df['clock']
         v_df.loc[v_df['test1'] == 1, ['test1_last']] = pd.NA
         v_df['test1_last'] = v_df.groupby(['ssf'], sort=False)['test1_last'].transform(max)
-        v_df = v_df[(v_df['clock'] <= v_df['test1_last'])]
+        v_df = v_df[(v_df['clock'] <= v_df['test1_last'])].drop(['test1_last'], axis=1)
 
         # remove trailing rows when no waveform set.
         v_df['waveform_last'] = v_df['clock']
         v_df.loc[(v_df['pulse1'] == 0) & (v_df['tri1'] == 0) & (v_df['noise1'] == 0) & (v_df['saw1'] == 0), ['waveform_last']] = pd.NA
         v_df['waveform_last'] = v_df.groupby(['ssf'], sort=False)['waveform_last'].transform(max)
-        v_df = v_df[(v_df['clock'] <= v_df['waveform_last'])]
+        v_df = v_df[(v_df['clock'] <= v_df['waveform_last'])].drop(['waveform_last'], axis=1)
 
         # extract only changes
         logging.debug('extracting only state changes for voice %u (rows before %u)', v, len(v_df))
@@ -403,17 +408,15 @@ def split_vdf(sid, df, near=16, guard=96):
         logging.debug('calculating clock for voice %u', v)
         v_df.reset_index(level=0, inplace=True)
         v_df['clock_start'] = v_df.groupby(['ssf'], sort=False)['clock'].transform('min')
+        v_df['frame'] = (v_df['clock'] - v_df['clock_start'].floordiv(int(sid.clockq))).floordiv(int(sid.clockq))
         v_df['next_clock_start'] = v_df['clock_start'].shift(-1).astype(pd.Int64Dtype())
         v_df['next_clock_start'] = v_df.groupby(['ssf'], sort=False)['next_clock_start'].transform('max')
         v_df['next_clock_start'] = v_df['next_clock_start'].fillna(v_df['clock'].max())
         # discard state changes within N cycles of next SSF.
         guard_start = v_df['next_clock_start'] - v_df['clock'].astype(pd.Int64Dtype())
         v_df = v_df[~((guard_start > 0) & (guard_start < guard))]
-        v_df['clock'] = v_df.groupby(['ssf'], sort=False)['clock'].transform(lambda x: x - x.min())
-        v_df['gateoff_clock'] = v_df['clock']
-        v_df.loc[v_df['gate1'] == 1, ['gateoff_clock']] = pd.NA
-        v_df['gateoff_clock'] = v_df.groupby(['ssf'], sort=False)['gateoff_clock'].transform('min')
-        v_df['frame'] = v_df['clock'].floordiv(int(sid.clockq))
+        for col in (('clock', 'frame')):
+            v_df[col] = v_df.groupby(['ssf'], sort=False)[col].transform(lambda x: x - x.min())
         v_df['v'] = v
         v_df['ssf'] += ssfs
         ssfs = v_df['ssf'].max()
@@ -425,6 +428,8 @@ def split_vdf(sid, df, near=16, guard=96):
         v_dfs = hash_vdf(v_dfs, non_meta_cols)
         logging.debug('calculating clock hashes')
         v_dfs['hashid_clock'] = v_dfs.groupby(['ssf'], sort=False)['clock'].transform(hash_tuple).astype(np.int64)
+        meta_cols = [col for col in v_dfs.columns if col not in CANON_REG_ORDER and col != 'frame']
+        v_dfs = v_dfs[['frame'] + [col for col in CANON_REG_ORDER if col in v_dfs.columns] + meta_cols]
 
         for v, v_df in v_dfs.groupby('v'):
             yield (v, v_df.drop(['v'], axis=1))
