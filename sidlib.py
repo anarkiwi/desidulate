@@ -403,6 +403,8 @@ def split_vdf(sid, df, near=16, guard=96):
         logging.debug('calculating clock for voice %u', v)
         v_df.reset_index(level=0, inplace=True)
         v_df['clock_start'] = v_df.groupby(['ssf'], sort=False)['clock'].transform('min')
+        v_df['waveform_last'] -= v_df['clock_start'].astype(pd.Int64Dtype())
+        v_df['test1_last'] -= v_df['clock_start'].astype(pd.Int64Dtype())
         v_df['next_clock_start'] = v_df['clock_start'].shift(-1).astype(pd.Int64Dtype())
         v_df['next_clock_start'] = v_df.groupby(['ssf'], sort=False)['next_clock_start'].transform('max')
         v_df['next_clock_start'] = v_df['next_clock_start'].fillna(v_df['clock'].max())
