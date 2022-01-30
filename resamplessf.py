@@ -37,18 +37,18 @@ def resample():
     if len(df) < 1:
         return df_raws
     df = df.drop(['clock', 'vol'], axis=1)
-    df = df[df['frame'] <= args.max_frames]
+    df = df[df['vbi_frame'] <= args.max_frames]
     for col, bits in big_regs.items():
         df[col] = np.left_shift(np.right_shift(df[col], bits), bits)
     meta_cols = set(df.columns) - sid_cols
 
     for _, ssf_df in df.groupby(['hashid']):  # pylint: disable=no-member
-        resample_df = ssf_df.drop_duplicates('frame', keep='last')
+        resample_df = ssf_df.drop_duplicates('vbi_frame', keep='last')
         cols = (set(resample_df.columns) - meta_cols)
-        df_raw = {col: resample_df[col].iat[-1] for col in meta_cols - {'frame'}}
+        df_raw = {col: resample_df[col].iat[-1] for col in meta_cols - {'vbi_frame'}}
         waveforms = df_waveform_order(resample_df)
         for row in resample_df.itertuples():
-            time_cols = {(col, '%s_%u' % (col, row.frame)) for col in cols} - redundant_adsr_cols
+            time_cols = {(col, '%s_%u' % (col, row.vbi_frame)) for col in cols} - redundant_adsr_cols
             df_raw.update({time_col: getattr(row, col) for col, time_col in time_cols})
         for col in big_regs:
             col_raw = resample_df[resample_df[col].notna()][col]

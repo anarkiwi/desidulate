@@ -408,15 +408,16 @@ def split_vdf(sid, df, near=16, guard=96):
         logging.debug('calculating clock for voice %u', v)
         v_df.reset_index(level=0, inplace=True)
         v_df['clock_start'] = v_df.groupby(['ssf'], sort=False)['clock'].transform('min')
-        v_df['frame'] = (v_df['clock'] - v_df['clock_start'].floordiv(int(sid.clockq))).floordiv(int(sid.clockq))
+        v_df['vbi_frame'] = (v_df['clock'] - v_df['clock_start'].floordiv(int(sid.clockq))).floordiv(int(sid.clockq))
         v_df['next_clock_start'] = v_df['clock_start'].shift(-1).astype(pd.Int64Dtype())
         v_df['next_clock_start'] = v_df.groupby(['ssf'], sort=False)['next_clock_start'].transform('max')
         v_df['next_clock_start'] = v_df['next_clock_start'].fillna(v_df['clock'].max())
         # discard state changes within N cycles of next SSF.
         guard_start = v_df['next_clock_start'] - v_df['clock'].astype(pd.Int64Dtype())
         v_df = v_df[~((guard_start > 0) & (guard_start < guard))]
-        for col in (('clock', 'frame')):
+        for col in (('clock', 'vbi_frame')):
             v_df[col] = v_df.groupby(['ssf'], sort=False)[col].transform(lambda x: x - x.min())
+
         v_df['v'] = v
         v_df['ssf'] += ssfs
         ssfs = v_df['ssf'].max()
@@ -428,8 +429,8 @@ def split_vdf(sid, df, near=16, guard=96):
         v_dfs = hash_vdf(v_dfs, non_meta_cols)
         logging.debug('calculating clock hashes')
         v_dfs['hashid_clock'] = v_dfs.groupby(['ssf'], sort=False)['clock'].transform(hash_tuple).astype(np.int64)
-        meta_cols = [col for col in v_dfs.columns if col not in CANON_REG_ORDER and col != 'frame']
-        v_dfs = v_dfs[['frame'] + [col for col in CANON_REG_ORDER if col in v_dfs.columns] + meta_cols]
+        meta_cols = [col for col in v_dfs.columns if col not in CANON_REG_ORDER and col != 'vbi_frame']
+        v_dfs = v_dfs[['vbi_frame'] + [col for col in CANON_REG_ORDER if col in v_dfs.columns] + meta_cols]
 
         for v, v_df in v_dfs.groupby('v'):
             yield (v, v_df.drop(['v'], axis=1))
@@ -453,8 +454,8 @@ def normalize_ssf(sid, hashid_clock, hashid_noclock, ssf_df, remap_ssf_dfs, ssf_
             remapped_hashid = remap_ssf_dfs[hashid]
             hashid = remapped_hashid
         else:
-            last_even_frame = ssf_df['frame'].iat[-1]
-            remap_hashid_noclock = (last_even_frame, hashid_noclock)
+            last_vbi_frame = ssf_df['vbi_frame'].iat[-1]
+            remap_hashid_noclock = (last_vbi_frame, hashid_noclock)
             remapped_hashid = ssf_noclock_dfs.get(remap_hashid_noclock, None)
             if remapped_hashid is not None and jittermatch_df(ssf_dfs[remapped_hashid][:-1], ssf_df, 'clock', 1024):
                 remap_ssf_dfs[hashid] = remapped_hashid
@@ -469,7 +470,7 @@ def normalize_ssf(sid, hashid_clock, hashid_noclock, ssf_df, remap_ssf_dfs, ssf_
                 normalized_ssf_df = ssf_df.drop(['ssf', 'clock_start', 'next_clock_start', 'hashid_clock'], axis=1)
                 last_row_df = normalized_ssf_df[-1:].copy()
                 last_row_df['clock'] = clock_duration
-                last_row_df['frame'] = int(clock_duration / sid.clockq)
+                last_row_df['vbi_frame'] = int(clock_duration / sid.clockq)
                 last_row_df = last_row_df.astype(normalized_ssf_df.dtypes.to_dict())
                 normalized_ssf_df = pd.concat([normalized_ssf_df, last_row_df], ignore_index=True)
                 normalized_ssf_df = normalized_ssf_df.reset_index(drop=True)

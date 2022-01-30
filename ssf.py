@@ -113,7 +113,7 @@ class SidSoundFragment:
         return noise_pitch
 
     def _set_nondrum_pitches(self):
-        for clock, _frame, pitch, duration, velocity, _ in self.midi_notes:
+        for clock, _vbi_frame, pitch, duration, velocity, _ in self.midi_notes:
             assert duration > 0, self.midi_notes
             self.pitches.append((clock, duration, pitch, velocity))
 
@@ -123,7 +123,7 @@ class SidSoundFragment:
 
         # Percussion must be no longer than one half note.
         if self.total_clocks <= self.one_2n_clocks:
-            clock, _frame, _pitch, _duration, velocity, _ = self.midi_notes[0]
+            clock, _vbi_frame, _pitch, _duration, velocity, _ = self.midi_notes[0]
 
             # TODO: pitched noise percussion.
             if self.all_noise or self.noisephases > 1:
