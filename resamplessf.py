@@ -32,10 +32,11 @@ for col in adsr_cols:
 
 
 def resample():
-    df = read_csv(args.ssffile, dtype=pd.Int64Dtype()).drop(['clock', 'vol'], axis=1)
+    df = read_csv(args.ssffile, dtype=pd.Int64Dtype())
     df_raws = defaultdict(list)
     if len(df) < 1:
         return df_raws
+    df = df.drop(['clock', 'vol'], axis=1)
     df = df[df['frame'] <= args.max_frames]
     for col, bits in big_regs.items():
         df[col] = np.left_shift(np.right_shift(df[col], bits), bits)
