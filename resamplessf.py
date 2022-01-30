@@ -14,48 +14,40 @@ import pandas as pd
 from fileio import out_path, read_csv
 from sidlib import df_waveform_order
 
-parser = argparse.ArgumentParser(description='Downsample SSFs')
+parser = argparse.ArgumentParser(description='Downsample SSFs to frames')
 parser.add_argument('ssffile', help='SSF file')
-parser.add_argument('--sample_cycles', default=7000, type=int, help='sample interval in CPU cycles')
-parser.add_argument('--max_cycles', default=25e4, type=int, help='include number of CPU cycles')
+parser.add_argument('--max_frames', default=15, type=int, help='include number of frames')
 
 args = parser.parse_args()
-sample_count = int(args.max_cycles / args.sample_cycles) + 1
 waveform_cols = {'sync1', 'ring1', 'tri1', 'saw1', 'pulse1', 'noise1'}
 adsr_cols = {'atk1', 'dec1', 'sus1', 'rel1'}
-sid_cols = {
-    'freq1', 'pwduty1', 'test1', 'vol',
-    'fltlo', 'fltband', 'flthi', 'flt1', 'fltext', 'fltres', 'fltcoff',
+sid_cols = { # exclude vol, fltext
+    'freq1', 'pwduty1', 'test1',
+    'fltlo', 'fltband', 'flthi', 'flt1', 'fltres', 'fltcoff',
     'freq3', 'test3'}.union(waveform_cols).union(adsr_cols)
 big_regs = {'freq1': 8, 'freq3': 8, 'pwduty1': 4, 'fltcoff': 3}
-sample_df = pd.DataFrame([{'clock': i * args.sample_cycles} for i in range(sample_count)], dtype=np.int64)
-sample_max = sample_df['clock'].max()
 redundant_adsr_cols = set()
 for col in adsr_cols:
-    for clock in sample_df[sample_df['clock'] > 0]['clock'].unique():
-        redundant_adsr_cols.add((col, '_'.join((col, str(clock)))))
+    redundant_adsr_cols.update({' '.join((col, str(i+1))) for i in range(args.max_frames)})
+
 
 def resample():
-    df = read_csv(args.ssffile, dtype=pd.Int64Dtype())
+    df = read_csv(args.ssffile, dtype=pd.Int64Dtype()).drop(['clock', 'vol'], axis=1)
     df_raws = defaultdict(list)
     if len(df) < 1:
         return df_raws
-    df['clock'] = df['clock'].astype(np.int64)
-    df = df[df['clock'] <= sample_max]
-    df = df.drop(['gate1'], axis=1)
+    df = df[df['frame'] <= args.max_frames]
     for col, bits in big_regs.items():
         df[col] = np.left_shift(np.right_shift(df[col], bits), bits)
     meta_cols = set(df.columns) - sid_cols
-    gateoff_clock = df['gateoff_clock'].astype(pd.Float32Dtype()) / float(args.sample_cycles)
-    df['gateoff_clock'] = gateoff_clock.round().astype(pd.Int64Dtype()) * args.sample_cycles
 
     for _, ssf_df in df.groupby(['hashid']):  # pylint: disable=no-member
-        resample_df = pd.merge_asof(sample_df, ssf_df).astype(pd.Int64Dtype())
+        resample_df = ssf_df.drop_duplicates('frame', keep='last')
         cols = (set(resample_df.columns) - meta_cols)
-        df_raw = {col: resample_df[col].iat[-1] for col in meta_cols - {'clock', 'frame'}}
+        df_raw = {col: resample_df[col].iat[-1] for col in meta_cols - {'frame'}}
         waveforms = df_waveform_order(resample_df)
         for row in resample_df.itertuples():
-            time_cols = {(col, '%s_%u' % (col, row.clock)) for col in cols} - redundant_adsr_cols
+            time_cols = {(col, '%s_%u' % (col, row.frame)) for col in cols} - redundant_adsr_cols
             df_raw.update({time_col: getattr(row, col) for col, time_col in time_cols})
         for col in big_regs:
             col_raw = resample_df[resample_df[col].notna()][col]
