@@ -415,7 +415,8 @@ def split_vdf(sid, df, near=16, guard=96, ratemin=1024):
         # discard state changes within N cycles of next SSF.
         guard_start = v_df['next_clock_start'] - v_df['clock'].astype(pd.Int64Dtype())
         v_df = v_df[~((guard_start > 0) & (guard_start < guard))]
-        v_df[['clock', 'vbi_frame']] = v_df.groupby(['ssf'], sort=False)[['clock', 'vbi_frame']].transform(lambda x: x - x.min())
+        if v_df['ssf'].max() > 1:
+            v_df[['clock', 'vbi_frame']] = v_df.groupby(['ssf'], sort=False)[['clock', 'vbi_frame']].transform(lambda x: x - x.min())
 
         logging.debug('calculating rates for voice %u', v)
         rate_cols = []
@@ -430,8 +431,12 @@ def split_vdf(sid, df, near=16, guard=96, ratemin=1024):
             v_df[rate_col] = v_df['clock']
             v_df.loc[((diff == 0) | (diff.isna()) & (v_df.clock != 0)), [rate_col]] = pd.NA
 
-        v_df[rate_cols] = v_df.groupby(['ssf'], sort=False)[rate_cols].transform(
-            lambda x: x.fillna(method='ffill').diff()).astype(pd.Int64Dtype())
+        if v_df['ssf'].max() > 1:
+            v_df[rate_cols] = v_df.groupby(['ssf'], sort=False)[rate_cols].transform(
+                lambda x: x.fillna(method='ffill').diff()).astype(pd.Int64Dtype())
+        else:
+            v_df[rate_cols] = v_df[rate_cols].transform(
+                lambda x: x.fillna(method='ffill').diff()).astype(pd.Int64Dtype())
         for col in rate_cols:
             v_df.loc[v_df[col] <= ratemin, col] = pd.NA
         v_df[rate_cols] = v_df.groupby(['ssf'], sort=False)[rate_cols].transform('min')
