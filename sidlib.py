@@ -264,7 +264,7 @@ def coalesce_near_writes(vdf, cols, near=16):
     return vdf
 
 
-def split_vdf(sid, df, near=16, guard=96):
+def split_vdf(sid, df, near=16, guard=96, ratemin=1024):
     fltcols = [col for col in df.columns if col.startswith('flt') and not col[-1].isdigit()]
     mod_cols = ['freq3', 'test3', 'sync1', 'ring1']
 
@@ -430,7 +430,11 @@ def split_vdf(sid, df, near=16, guard=96):
             v_df[rate_col] = v_df['clock']
             v_df.loc[((diff == 0) | (diff.isna()) & (v_df.clock != 0)), [rate_col]] = pd.NA
 
-        v_df[rate_cols] = v_df.groupby(['ssf'], sort=False)[rate_cols].transform(lambda x: x.dropna().diff().min()).astype(pd.Int64Dtype())
+        v_df[rate_cols] = v_df.groupby(['ssf'], sort=False)[rate_cols].transform(
+            lambda x: x.fillna(method='ffill').diff()).astype(pd.Int64Dtype())
+        for col in rate_cols:
+            v_df.loc[v_df[col] <= ratemin, col] = pd.NA
+        v_df[rate_cols] = v_df.groupby(['ssf'], sort=False)[rate_cols].transform('min')
         v_df['rate'] = v_df[rate_cols].min(axis=1).astype(pd.Int64Dtype())
         v_df = v_df.drop(rate_cols, axis=1)
         v_df['v'] = v
