@@ -367,16 +367,6 @@ def split_vdf(sid, df, near=16, guard=96, ratemin=1024):
         # https://codebase64.org/doku.php?id=base:vicious_sid_demo_routine_explained
         # https://bitbucket.org/wothke/websid/src/master/docs/digi-samples.txt
 
-        # calculate modulation meta cols.
-        for col in ('vol', 'test1', 'sync1', 'ring1'):
-            mod_col = '%s_mod' % col
-            col_max = v_df[col].max()
-            if pd.notna(col_max) and col_max > 0:
-                logging.debug('calculating SSF modulation of %s for voice %u', col, v)
-                v_df[mod_col] = v_df.groupby(['ssf'], sort=False)[col].transform(lambda x: (x.diff() != 0).sum())
-            else:
-                v_df[mod_col] = int(0)
-
         v_df.set_index('ssf', inplace=True)
 
         logging.debug('removing redundant state for voice %u', v)
@@ -415,6 +405,27 @@ def split_vdf(sid, df, near=16, guard=96, ratemin=1024):
         guard_start = v_df['next_clock_start'] - v_df['clock'].astype(pd.Int64Dtype())
         v_df = v_df[~((guard_start > 0) & (guard_start < guard))]
 
+        rate_cols = []
+        rate_col_pairs = []
+        for col in sorted(non_meta_cols - {'atk1', 'dec1', 'sus1', 'gate1', 'fltext'}):
+            logging.debug('calculating %s rates for voice %u', col, v)
+            rate_col = '%s_rate' % col
+            rate_cols.append(rate_col)
+            rate_col_pairs.append((col, rate_col))
+
+        for col, rate_col in rate_col_pairs:
+            diff = v_df.groupby(['ssf'], sort=False)[col].diff()
+            v_df[rate_col] = v_df['clock']
+            v_df.loc[((diff == 0) | (diff.isna()) & (v_df.clock != 0)), [rate_col]] = pd.NA
+
+        v_df[rate_cols] = v_df.groupby(['ssf'], sort=False)[rate_cols].fillna(
+            method='ffill').diff().astype(pd.Int64Dtype())
+        for col in rate_cols:
+            v_df.loc[v_df[col] <= ratemin, col] = pd.NA
+        v_df[rate_cols] = v_df.groupby(['ssf'], sort=False)[rate_cols].min()
+        v_df['rate'] = v_df[rate_cols].min(axis=1).astype(pd.Int64Dtype())
+        v_df = v_df.drop(rate_cols, axis=1)
+
         # remove empty SSFs
         logging.debug('removing empty SSFs for voice %u', v)
         for col in ('vol', 'gate1', 'freq1'):
@@ -430,34 +441,10 @@ def split_vdf(sid, df, near=16, guard=96, ratemin=1024):
         v_df.reset_index(level=0, inplace=True)
 
         v_df['vbi_frame'] = (v_df['clock'] - v_df['clock_start'].floordiv(int(sid.clockq))).floordiv(int(sid.clockq))
+        v_df['clock'] = v_df['clock'] - v_df['clock_start']
         if v_df['ssf'].max() > 1:
-            v_df['clock'] = v_df['clock'] - v_df['clock_start']
             v_df['vbi_frame'] = v_df.groupby(['ssf'], sort=False)['vbi_frame'].transform(lambda x: x - x.min())
 
-        logging.debug('calculating rates for voice %u', v)
-        rate_cols = []
-        rate_col_pairs = []
-        for col in non_meta_cols - {'atk1', 'dec1', 'sus1', 'gate1', 'fltext'}:
-            rate_col = '%s_rate' % col
-            rate_cols.append(rate_col)
-            rate_col_pairs.append((col, rate_col))
-
-        for col, rate_col in rate_col_pairs:
-            diff = v_df.groupby(['ssf'], sort=False)[col].diff()
-            v_df[rate_col] = v_df['clock']
-            v_df.loc[((diff == 0) | (diff.isna()) & (v_df.clock != 0)), [rate_col]] = pd.NA
-
-        if v_df['ssf'].max() > 1:
-            v_df[rate_cols] = v_df.groupby(['ssf'], sort=False)[rate_cols].transform(
-                lambda x: x.fillna(method='ffill').diff()).astype(pd.Int64Dtype())
-        else:
-            v_df[rate_cols] = v_df[rate_cols].transform(
-                lambda x: x.fillna(method='ffill').diff()).astype(pd.Int64Dtype())
-        for col in rate_cols:
-            v_df.loc[v_df[col] <= ratemin, col] = pd.NA
-        v_df[rate_cols] = v_df.groupby(['ssf'], sort=False)[rate_cols].transform('min')
-        v_df['rate'] = v_df[rate_cols].min(axis=1).astype(pd.Int64Dtype())
-        v_df = v_df.drop(rate_cols, axis=1)
         v_df['v'] = v
         v_df['ssf'] += ssfs
         ssfs = v_df['ssf'].max()
