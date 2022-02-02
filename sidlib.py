@@ -345,11 +345,13 @@ def split_vdf(sid, df, near=16, guard=96, ratemin=1024):
             # select AD from when gate on
             ad_df = v_df[v_df['diff_gate1'] == 1][['ssf', 'atk1', 'dec1']]
             v_df = v_df.drop(['atk1', 'dec1'], axis=1).merge(ad_df, on='ssf', right_index=False)
+
         if v_df['rel1'].max():
             logging.debug('removing redundant R for voice %u', v)
             # select R from when gate off
             r_df = v_df[v_df['diff_gate1'] == -1][['ssf', 'rel1']]
-            v_df = v_df.drop(['rel1'], axis=1).merge(r_df, on='ssf', right_index=False)
+            if not r_df.empty:
+                v_df = v_df.drop(['rel1'], axis=1).merge(r_df, on='ssf', right_index=False)
 
         # use first non-zero S while gate on.
         logging.debug('removing redundant S for voice %u', v)
@@ -448,8 +450,9 @@ def split_vdf(sid, df, near=16, guard=96, ratemin=1024):
 
         v_df['v'] = v
         v_df['ssf'] += ssfs
-        ssfs = v_df['ssf'].max()
-        v_dfs.append(v_df)
+        if not v_df.empty:
+            ssfs = v + v_df['ssf'].max()
+            v_dfs.append(v_df)
 
     if v_dfs:
         v_dfs = pd.concat(v_dfs)
