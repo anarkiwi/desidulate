@@ -338,6 +338,7 @@ def split_vdf(sid, df, near=16, guard=96, ratemin=1024):
         v_df.loc[v_df['ssf'] != 1, ['ssf']] = 0
         v_df['ssf'] = v_df['ssf'].cumsum().astype(np.uint64)
         v_df = v_df.reset_index()
+        logging.debug('%u raw SSFs for voice %u', v_df['ssf'].tail(1), v)
 
         if v_df['atk1'].max() or v_df['dec1'].max():
             logging.debug('removing redundant AD for voice %u', v)
@@ -392,6 +393,7 @@ def split_vdf(sid, df, near=16, guard=96, ratemin=1024):
         v_df['waveform_last'] = v_df['clock']
         v_df.loc[(v_df['pulse1'] == 0) & (v_df['tri1'] == 0) & (v_df['noise1'] == 0) & (v_df['saw1'] == 0), ['waveform_last']] = pd.NA
         v_df['waveform_last'] = v_df.groupby(['ssf'], sort=False)['waveform_last'].max()
+        # also removes SSFs with no waveform.
         v_df = v_df[(v_df['clock'] <= v_df['waveform_last'])].drop(['waveform_last'], axis=1)
 
         logging.debug('calculating clock for voice %u', v)
@@ -406,13 +408,15 @@ def split_vdf(sid, df, near=16, guard=96, ratemin=1024):
 
         rate_cols = []
         rate_col_pairs = []
-        for col in sorted(non_meta_cols - {'atk1', 'dec1', 'sus1', 'gate1', 'fltext'}):
-            logging.debug('calculating %s rates for voice %u', col, v)
-            rate_col = '%s_rate' % col
-            rate_cols.append(rate_col)
-            rate_col_pairs.append((col, rate_col))
+        for col in sorted(non_meta_cols - {'atk1', 'dec1', 'sus1', 'rel1', 'gate1', 'fltext'}):
+            col_max = v_df[col].max()
+            if pd.notna(col_max) and col_max:
+                rate_col = '%s_rate' % col
+                rate_cols.append(rate_col)
+                rate_col_pairs.append((col, rate_col))
 
         for col, rate_col in rate_col_pairs:
+            logging.debug('calculating %s rates for voice %u', col, v)
             diff = v_df.groupby(['ssf'], sort=False)[col].diff()
             v_df[rate_col] = v_df['clock']
             v_df.loc[((diff == 0) | (diff.isna()) & (v_df.clock != 0)), [rate_col]] = pd.NA
