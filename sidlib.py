@@ -418,7 +418,8 @@ def split_vdf(sid, df, near=16, guard=96, ratemin=1024):
         guard_start = v_df['next_clock_start'] - v_df['clock'].astype(pd.Int64Dtype())
         v_df = v_df[~((guard_start > 0) & (guard_start < guard))]
         if v_df['ssf'].max() > 1:
-            v_df[['clock', 'vbi_frame']] = v_df.groupby(['ssf'], sort=False)[['clock', 'vbi_frame']].transform(lambda x: x - x.min())
+            v_df['clock'] = v_df['clock'] - v_df['clock_start']
+            v_df['vbi_frame'] = v_df.groupby(['ssf'], sort=False)['vbi_frame'].transform(lambda x: x - x.min())
 
         logging.debug('calculating rates for voice %u', v)
         rate_cols = []
