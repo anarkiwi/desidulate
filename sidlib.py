@@ -369,9 +369,13 @@ def split_vdf(sid, df, near=16, guard=96, ratemin=1024):
 
         # calculate modulation meta cols.
         for col in ('vol', 'test1', 'sync1', 'ring1'):
-            logging.debug('calculating SSF modulation of %s for voice %u', col, v)
             mod_col = '%s_mod' % col
-            v_df[mod_col] = v_df.groupby(['ssf'], sort=False)[col].transform(lambda x: (x.diff() != 0).sum())
+            col_max = v_df[col].max()
+            if pd.notna(col_max) and col_max > 0:
+                logging.debug('calculating SSF modulation of %s for voice %u', col, v)
+                v_df[mod_col] = v_df.groupby(['ssf'], sort=False)[col].transform(lambda x: (x.diff() != 0).sum())
+            else:
+                v_df[mod_col] = int(0)
 
         v_df.set_index('ssf', inplace=True)
 
@@ -401,10 +405,15 @@ def split_vdf(sid, df, near=16, guard=96, ratemin=1024):
         v_df['waveform_last'] = v_df.groupby(['ssf'], sort=False)['waveform_last'].max()
         v_df = v_df[(v_df['clock'] <= v_df['waveform_last'])].drop(['waveform_last'], axis=1)
 
+        logging.debug('calculating clock for voice %u', v)
         v_df['clock_start'] = v_df.groupby(['ssf'], sort=False)['clock'].min()
         v_df['next_clock_start'] = v_df['clock_start'].shift(-1).astype(pd.Int64Dtype())
         v_df['next_clock_start'] = v_df.groupby(['ssf'], sort=False)['next_clock_start'].max()
         v_df['next_clock_start'] = v_df['next_clock_start'].fillna(v_df['clock'].max())
+
+        # discard state changes within N cycles of next SSF.
+        guard_start = v_df['next_clock_start'] - v_df['clock'].astype(pd.Int64Dtype())
+        v_df = v_df[~((guard_start > 0) & (guard_start < guard))]
 
         # remove empty SSFs
         logging.debug('removing empty SSFs for voice %u', v)
@@ -418,12 +427,9 @@ def split_vdf(sid, df, near=16, guard=96, ratemin=1024):
         v_df = squeeze_diffs(v_df, v_df.columns)
         logging.debug('extracted only state changes for voice %u (rows after %u)', v, len(v_df))
 
-        logging.debug('calculating clock for voice %u', v)
         v_df.reset_index(level=0, inplace=True)
+
         v_df['vbi_frame'] = (v_df['clock'] - v_df['clock_start'].floordiv(int(sid.clockq))).floordiv(int(sid.clockq))
-        # discard state changes within N cycles of next SSF.
-        guard_start = v_df['next_clock_start'] - v_df['clock'].astype(pd.Int64Dtype())
-        v_df = v_df[~((guard_start > 0) & (guard_start < guard))]
         if v_df['ssf'].max() > 1:
             v_df['clock'] = v_df['clock'] - v_df['clock_start']
             v_df['vbi_frame'] = v_df.groupby(['ssf'], sort=False)['vbi_frame'].transform(lambda x: x - x.min())
