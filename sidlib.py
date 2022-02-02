@@ -406,6 +406,12 @@ def split_vdf(sid, df, near=16, guard=96, ratemin=1024):
         guard_start = v_df['next_clock_start'] - v_df['clock'].astype(pd.Int64Dtype())
         v_df = v_df[~((guard_start > 0) & (guard_start < guard))]
 
+        # remove empty SSFs
+        for col in ('freq1', 'vol', 'gate1'):
+            logging.debug('removing empty SSFs with no %s for voice %u (%u rows before)', col, v, len(v_df))
+            v_df = v_df[v_df[col].notna() & (v_df.groupby('ssf', sort=False)[col].max() > 0)]
+        v_df = v_df[v_df['test1'].notna() & (v_df.groupby('ssf', sort=False)['test1'].min() == 0)]
+
         rate_cols = []
         rate_col_pairs = []
         for col in sorted(non_meta_cols - {'atk1', 'dec1', 'sus1', 'rel1', 'gate1', 'fltext'}):
@@ -428,12 +434,6 @@ def split_vdf(sid, df, near=16, guard=96, ratemin=1024):
         v_df[rate_cols] = v_df.groupby(['ssf'], sort=False)[rate_cols].min()
         v_df['rate'] = v_df[rate_cols].min(axis=1).astype(pd.Int64Dtype())
         v_df = v_df.drop(rate_cols, axis=1)
-
-        # remove empty SSFs
-        logging.debug('removing empty SSFs for voice %u', v)
-        for col in ('vol', 'gate1', 'freq1'):
-            v_df = v_df[v_df[col].notna() & (v_df.groupby('ssf', sort=False)[col].max() > 0)]
-        v_df = v_df[v_df['test1'].notna() & (v_df.groupby('ssf', sort=False)['test1'].min() == 0)]
 
         # extract only changes
         logging.debug('extracting only state changes for voice %u (rows before %u)', v, len(v_df))
@@ -517,7 +517,7 @@ def state2ssfs(sid, df):
     ssf_noclock_dfs = {}
 
     for v, v_df in split_vdf(sid, df):
-        ssfs = v_df['ssf'].max()
+        ssfs = v_df['ssf'].nunique()
         if pd.isna(ssfs):
             continue
         logging.debug('splitting %u SSFs for voice %u', ssfs, v)
