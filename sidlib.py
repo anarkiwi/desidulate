@@ -361,13 +361,15 @@ def split_vdf(sid, df, near=16, guard=96, ratemin=1024):
         v_df.loc[(v_df['diff_gate1'] == 1) & (v_df['test1'] == 1), ['test1_initial']] = 1
         v_df = v_df.drop(['diff_gate1'], axis=1)
 
-        # calculate modulation meta cols.
         # TODO: Skip SSFs with sample playback.
         # http://www.ffd2.com/fridge/chacking/c=hacking20.txt
         # http://www.ffd2.com/fridge/chacking/c=hacking21.txt
         # https://codebase64.org/doku.php?id=base:vicious_sid_demo_routine_explained
         # https://bitbucket.org/wothke/websid/src/master/docs/digi-samples.txt
+
+        # calculate modulation meta cols.
         for col in ('vol', 'test1', 'sync1', 'ring1'):
+            logging.debug('calculating SSF modulation of %s for voice %u', col, v)
             mod_col = '%s_mod' % col
             v_df[mod_col] = v_df.groupby(['ssf'], sort=False)[col].transform(lambda x: (x.diff() != 0).sum())
 
