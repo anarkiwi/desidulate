@@ -340,14 +340,15 @@ def split_vdf(sid, df, near=16, guard=96, ratemin=1024):
         v_df = v_df.reset_index()
 
         if v_df['ssf'].max() > 1:
-            logging.debug('removing redundant ADSR for voice %u', v)
-            # select AD from when gate on
-            ad_df = v_df[v_df['diff_gate1'] == 1][['ssf', 'atk1', 'dec1']]
-            # select R from when gate off
-            r_df = v_df[v_df['diff_gate1'] == -1][['ssf', 'rel1']]
-            v_df = v_df.drop(['atk1', 'dec1', 'rel1'], axis=1)
-            v_df = v_df.merge(ad_df, on='ssf', right_index=False)
-            v_df = v_df.merge(r_df, on='ssf', right_index=False)
+            if v_df['atk1'].max() or v_df['dec1'].max():
+                logging.debug('removing redundant ADSR for voice %u', v)
+                # select AD from when gate on
+                ad_df = v_df[v_df['diff_gate1'] == 1][['ssf', 'atk1', 'dec1']]
+                v_df = v_df.drop(['atk1', 'dec1'], axis=1).merge(ad_df, on='ssf', right_index=False)
+            if v_df['rel1'].max():
+                # select R from when gate off
+                r_df = v_df[v_df['diff_gate1'] == -1][['ssf', 'rel1']]
+                v_df = v_df.drop(['rel1'], axis=1).merge(r_df, on='ssf', right_index=False)
 
         # use first non-zero S while gate on.
         v_df.loc[v_df['sus1'] == 0, 'sus1'] = pd.NA
