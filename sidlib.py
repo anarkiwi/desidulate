@@ -345,13 +345,14 @@ def split_vdf(sid, df, near=16, guard=96, ratemin=1024):
             ad_df = v_df[v_df['diff_gate1'] == 1][['ssf', 'atk1', 'dec1']]
             # select R from when gate off
             r_df = v_df[v_df['diff_gate1'] == -1][['ssf', 'rel1']]
-            # use first non-zero S while gate on.
-            v_df.loc[v_df['sus1'] == 0, 'sus1'] = pd.NA
-            v_df['sus1'] = v_df['sus1'].fillna(method='bfill').fillna(0)
             v_df = v_df.drop(['atk1', 'dec1', 'rel1'], axis=1)
             v_df = v_df.merge(ad_df, on='ssf', right_index=False)
             v_df = v_df.merge(r_df, on='ssf', right_index=False)
-            v_df.loc[(v_df['sus1'] == 0) & (v_df['atk1'] == 0), ['sus1']] = 15
+
+        # use first non-zero S while gate on.
+        v_df.loc[v_df['sus1'] == 0, 'sus1'] = pd.NA
+        v_df['sus1'] = v_df['sus1'].fillna(method='bfill').fillna(0)
+        v_df.loc[(v_df['diff_gate1'] == 1) & (v_df['sus1'] == 0) & (v_df['atk1'] == 0), ['sus1']] = 15
 
         v_df.loc[v_df['diff_gate1'] != 1, ['atk1', 'dec1', 'sus1', 'rel1']] = pd.NA
         v_df.loc[(v_df['diff_gate1'] == 1) & (v_df['test1'] == 1), ['test1_initial']] = 1
