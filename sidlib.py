@@ -337,6 +337,7 @@ def split_vdf(sid, df, near=16, guard=96, ratemin=1024):
         v_df['ssf'] = v_df['diff_gate1']
         v_df.loc[v_df['ssf'] != 1, ['ssf']] = 0
         v_df['ssf'] = v_df['ssf'].cumsum().astype(np.uint64)
+        v_df = v_df.reset_index()
 
         if v_df['ssf'].max() > 1:
             logging.debug('removing redundant ADSR for voice %u', v)
@@ -348,13 +349,12 @@ def split_vdf(sid, df, near=16, guard=96, ratemin=1024):
             v_df.loc[v_df['sus1'] == 0, 'sus1'] = pd.NA
             v_df['sus1'] = v_df['sus1'].fillna(method='bfill').fillna(0)
             v_df = v_df.drop(['atk1', 'dec1', 'rel1'], axis=1)
-            v_df = v_df.reset_index()
             v_df = v_df.merge(ad_df, on='ssf', right_index=False)
             v_df = v_df.merge(r_df, on='ssf', right_index=False)
-            v_df.loc[v_df['diff_gate1'] != 1, ['atk1', 'dec1', 'sus1', 'rel1']] = pd.NA
             v_df.loc[(v_df['sus1'] == 0) & (v_df['atk1'] == 0), ['sus1']] = 15
-        else:
-            v_df = v_df.reset_index()
+
+        v_df.loc[v_df['diff_gate1'] != 1, ['atk1', 'dec1', 'sus1', 'rel1']] = pd.NA
+        v_df.loc[(v_df['diff_gate1'] == 1) & (v_df['test1'] == 1), ['test1_initial']] = 1
         v_df = v_df.drop(['diff_gate1'], axis=1)
 
         # calculate modulation meta cols.
@@ -369,9 +369,9 @@ def split_vdf(sid, df, near=16, guard=96, ratemin=1024):
 
         logging.debug('removing redundant state for voice %u', v)
         # If test1 is set only at the start of the SSF, remove inaudible state.
-        v_df['test1_initial'] = v_df.groupby(['ssf'], sort=False)['test1'].transform(lambda x: x.iloc[0])
-        v_df.loc[(v_df['test1'] == 1) & (v_df['test1_mod'] == 1) & (v_df['test1_initial'] == 1), ['freq1', 'tri1', 'saw1', 'pulse1', 'noise1', 'flt1'] + mod_cols] = pd.NA
+        v_df.loc[v_df['test1_initial'] == 1, ['freq1', 'tri1', 'saw1', 'pulse1', 'noise1', 'flt1'] + mod_cols] = pd.NA
         v_df = v_df.drop(['test1_initial'], axis=1)
+
         # remove modulator voice state while sync1/ring1 not set
         v_df.loc[~((v_df['sync1'] == 1) | ((v_df['ring1'] == 1) & (v_df['tri1'] == 1))), mod_cols] = pd.NA
         # remove carrier state when waveform 0
