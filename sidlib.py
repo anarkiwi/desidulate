@@ -440,10 +440,8 @@ def split_vdf(sid, df, near=16, guard=96, ratemin=1024):
 
         v_df.reset_index(level=0, inplace=True)
 
-        v_df['vbi_frame'] = (v_df['clock'] - v_df['clock_start'].floordiv(int(sid.clockq))).floordiv(int(sid.clockq))
+        v_df['vbi_frame'] = v_df['clock'].floordiv(int(sid.clockq)) - v_df['clock_start'].floordiv(int(sid.clockq))
         v_df['clock'] = v_df['clock'] - v_df['clock_start']
-        if v_df['ssf'].max() > 1:
-            v_df['vbi_frame'] = v_df.groupby(['ssf'], sort=False)['vbi_frame'].transform(lambda x: x - x.min())
 
         v_df['v'] = v
         v_df['ssf'] += ssfs
@@ -497,7 +495,7 @@ def normalize_ssf(sid, hashid_clock, hashid_noclock, ssf_df, remap_ssf_dfs, ssf_
                 normalized_ssf_df = ssf_df.drop(['ssf', 'clock_start', 'next_clock_start', 'hashid_clock'], axis=1)
                 last_row_df = normalized_ssf_df[-1:].copy()
                 last_row_df['clock'] = clock_duration
-                last_row_df['vbi_frame'] = int(clock_duration / sid.clockq)
+                last_row_df['vbi_frame'] = int((clock_start + clock_duration) / sid.clockq) - int(clock_start / sid.clockq)
                 last_row_df = last_row_df.astype(normalized_ssf_df.dtypes.to_dict())
                 normalized_ssf_df = pd.concat([normalized_ssf_df, last_row_df], ignore_index=True)
                 normalized_ssf_df = normalized_ssf_df.reset_index(drop=True)
