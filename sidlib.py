@@ -337,41 +337,43 @@ def split_vdf(sid, df, near=16, guard=96, ratemin=1024):
         v_df['ssf'] = v_df['diff_gate1']
         v_df.loc[v_df['ssf'] != 1, ['ssf']] = 0
         v_df['ssf'] = v_df['ssf'].cumsum().astype(np.uint64)
+        v_df = v_df.reset_index()
+        logging.debug('%u raw SSFs for voice %u', v_df['ssf'].tail(1), v)
 
-        if v_df['ssf'].max() > 1:
-            logging.debug('removing redundant ADSR for voice %u', v)
+        if v_df['atk1'].max() or v_df['dec1'].max():
+            logging.debug('removing redundant AD for voice %u', v)
             # select AD from when gate on
             ad_df = v_df[v_df['diff_gate1'] == 1][['ssf', 'atk1', 'dec1']]
+            v_df = v_df.drop(['atk1', 'dec1'], axis=1).merge(ad_df, on='ssf', right_index=False)
+        if v_df['rel1'].max():
+            logging.debug('removing redundant R for voice %u', v)
             # select R from when gate off
             r_df = v_df[v_df['diff_gate1'] == -1][['ssf', 'rel1']]
-            # use first non-zero S while gate on.
-            v_df.loc[v_df['sus1'] == 0, 'sus1'] = pd.NA
-            v_df['sus1'] = v_df['sus1'].fillna(method='bfill').fillna(0)
-            v_df = v_df.drop(['atk1', 'dec1', 'rel1'], axis=1)
-            v_df = v_df.reset_index()
-            v_df = v_df.merge(ad_df, on='ssf', right_index=False)
-            v_df = v_df.merge(r_df, on='ssf', right_index=False)
-            v_df.loc[v_df['diff_gate1'] != 1, ['atk1', 'dec1', 'sus1', 'rel1']] = pd.NA
-            v_df.loc[(v_df['sus1'] == 0) & (v_df['atk1'] == 0), ['sus1']] = 15
-        else:
-            v_df = v_df.reset_index()
+            v_df = v_df.drop(['rel1'], axis=1).merge(r_df, on='ssf', right_index=False)
+
+        # use first non-zero S while gate on.
+        logging.debug('removing redundant S for voice %u', v)
+        v_df.loc[v_df['sus1'] == 0, 'sus1'] = pd.NA
+        v_df['sus1'] = v_df['sus1'].fillna(method='bfill').fillna(0)
+        v_df.loc[(v_df['diff_gate1'] == 1) & (v_df['sus1'] == 0) & (v_df['atk1'] == 0), ['sus1']] = 15
+
+        v_df.loc[v_df['diff_gate1'] != 1, ['atk1', 'dec1', 'sus1', 'rel1']] = pd.NA
+        v_df.loc[(v_df['diff_gate1'] == 1) & (v_df['test1'] == 1), ['test1_initial']] = 1
         v_df = v_df.drop(['diff_gate1'], axis=1)
 
-        # calculate modulation meta cols.
         # TODO: Skip SSFs with sample playback.
         # http://www.ffd2.com/fridge/chacking/c=hacking20.txt
         # http://www.ffd2.com/fridge/chacking/c=hacking21.txt
         # https://codebase64.org/doku.php?id=base:vicious_sid_demo_routine_explained
         # https://bitbucket.org/wothke/websid/src/master/docs/digi-samples.txt
-        for col in ('vol', 'test1', 'sync1', 'ring1'):
-            mod_col = '%s_mod' % col
-            v_df[mod_col] = v_df.groupby(['ssf'], sort=False)[col].transform(lambda x: (x.diff() != 0).sum())
+
+        v_df.set_index('ssf', inplace=True)
 
         logging.debug('removing redundant state for voice %u', v)
         # If test1 is set only at the start of the SSF, remove inaudible state.
-        v_df['test1_initial'] = v_df.groupby(['ssf'], sort=False)['test1'].transform(lambda x: x.iloc[0])
-        v_df.loc[(v_df['test1'] == 1) & (v_df['test1_mod'] == 1) & (v_df['test1_initial'] == 1), ['freq1', 'tri1', 'saw1', 'pulse1', 'noise1', 'flt1'] + mod_cols] = pd.NA
+        v_df.loc[v_df['test1_initial'] == 1, ['freq1', 'tri1', 'saw1', 'pulse1', 'noise1', 'flt1'] + mod_cols] = pd.NA
         v_df = v_df.drop(['test1_initial'], axis=1)
+
         # remove modulator voice state while sync1/ring1 not set
         v_df.loc[~((v_df['sync1'] == 1) | ((v_df['ring1'] == 1) & (v_df['tri1'] == 1))), mod_cols] = pd.NA
         # remove carrier state when waveform 0
@@ -384,64 +386,66 @@ def split_vdf(sid, df, near=16, guard=96, ratemin=1024):
         # remove trailing rows when test1 set.
         v_df['test1_last'] = v_df['clock']
         v_df.loc[v_df['test1'] == 1, ['test1_last']] = pd.NA
-        v_df['test1_last'] = v_df.groupby(['ssf'], sort=False)['test1_last'].transform(max)
+        v_df['test1_last'] = v_df.groupby(['ssf'], sort=False)['test1_last'].max()
         v_df = v_df[(v_df['clock'] <= v_df['test1_last'])].drop(['test1_last'], axis=1)
 
         # remove trailing rows when no waveform set.
         v_df['waveform_last'] = v_df['clock']
         v_df.loc[(v_df['pulse1'] == 0) & (v_df['tri1'] == 0) & (v_df['noise1'] == 0) & (v_df['saw1'] == 0), ['waveform_last']] = pd.NA
-        v_df['waveform_last'] = v_df.groupby(['ssf'], sort=False)['waveform_last'].transform(max)
+        v_df['waveform_last'] = v_df.groupby(['ssf'], sort=False)['waveform_last'].max()
+        # also removes SSFs with no waveform.
         v_df = v_df[(v_df['clock'] <= v_df['waveform_last'])].drop(['waveform_last'], axis=1)
 
-        # extract only changes
-        logging.debug('extracting only state changes for voice %u (rows before %u)', v, len(v_df))
-        v_df = v_df.set_index('clock')
-        v_df = squeeze_diffs(v_df, v_df.columns)
-        logging.debug('extracted only state changes for voice %u (rows after %u)', v, len(v_df))
-
-        # remove empty SSFs
-        logging.debug('removing empty SSFs for voice %u', v)
-        for col in ('vol', 'gate1', 'freq1'):
-            v_df = v_df[v_df.groupby('ssf', sort=False)[col].transform('max') > 0]
-        v_df = v_df[v_df.groupby('ssf', sort=False)['test1'].transform('min') == 0]
-
         logging.debug('calculating clock for voice %u', v)
-        v_df.reset_index(level=0, inplace=True)
-        v_df['clock_start'] = v_df.groupby(['ssf'], sort=False)['clock'].transform('min')
-        v_df['vbi_frame'] = (v_df['clock'] - v_df['clock_start'].floordiv(int(sid.clockq))).floordiv(int(sid.clockq))
+        v_df['clock_start'] = v_df.groupby(['ssf'], sort=False)['clock'].min()
         v_df['next_clock_start'] = v_df['clock_start'].shift(-1).astype(pd.Int64Dtype())
-        v_df['next_clock_start'] = v_df.groupby(['ssf'], sort=False)['next_clock_start'].transform('max')
+        v_df['next_clock_start'] = v_df.groupby(['ssf'], sort=False)['next_clock_start'].max()
         v_df['next_clock_start'] = v_df['next_clock_start'].fillna(v_df['clock'].max())
+
         # discard state changes within N cycles of next SSF.
         guard_start = v_df['next_clock_start'] - v_df['clock'].astype(pd.Int64Dtype())
         v_df = v_df[~((guard_start > 0) & (guard_start < guard))]
-        if v_df['ssf'].max() > 1:
-            v_df[['clock', 'vbi_frame']] = v_df.groupby(['ssf'], sort=False)[['clock', 'vbi_frame']].transform(lambda x: x - x.min())
 
-        logging.debug('calculating rates for voice %u', v)
         rate_cols = []
         rate_col_pairs = []
-        for col in non_meta_cols - {'atk1', 'dec1', 'sus1', 'gate1', 'fltext'}:
-            rate_col = '%s_rate' % col
-            rate_cols.append(rate_col)
-            rate_col_pairs.append((col, rate_col))
+        for col in sorted(non_meta_cols - {'atk1', 'dec1', 'sus1', 'rel1', 'gate1', 'fltext'}):
+            col_max = v_df[col].max()
+            if pd.notna(col_max) and col_max:
+                rate_col = '%s_rate' % col
+                rate_cols.append(rate_col)
+                rate_col_pairs.append((col, rate_col))
 
         for col, rate_col in rate_col_pairs:
+            logging.debug('calculating %s rates for voice %u', col, v)
             diff = v_df.groupby(['ssf'], sort=False)[col].diff()
             v_df[rate_col] = v_df['clock']
             v_df.loc[((diff == 0) | (diff.isna()) & (v_df.clock != 0)), [rate_col]] = pd.NA
 
-        if v_df['ssf'].max() > 1:
-            v_df[rate_cols] = v_df.groupby(['ssf'], sort=False)[rate_cols].transform(
-                lambda x: x.fillna(method='ffill').diff()).astype(pd.Int64Dtype())
-        else:
-            v_df[rate_cols] = v_df[rate_cols].transform(
-                lambda x: x.fillna(method='ffill').diff()).astype(pd.Int64Dtype())
+        v_df[rate_cols] = v_df.groupby(['ssf'], sort=False)[rate_cols].fillna(
+            method='ffill').diff().astype(pd.Int64Dtype())
         for col in rate_cols:
             v_df.loc[v_df[col] <= ratemin, col] = pd.NA
-        v_df[rate_cols] = v_df.groupby(['ssf'], sort=False)[rate_cols].transform('min')
+        v_df[rate_cols] = v_df.groupby(['ssf'], sort=False)[rate_cols].min()
         v_df['rate'] = v_df[rate_cols].min(axis=1).astype(pd.Int64Dtype())
         v_df = v_df.drop(rate_cols, axis=1)
+
+        # remove empty SSFs
+        logging.debug('removing empty SSFs for voice %u', v)
+        for col in ('vol', 'gate1', 'freq1'):
+            v_df = v_df[v_df[col].notna() & (v_df.groupby('ssf', sort=False)[col].max() > 0)]
+        v_df = v_df[v_df['test1'].notna() & (v_df.groupby('ssf', sort=False)['test1'].min() == 0)]
+
+        # extract only changes
+        logging.debug('extracting only state changes for voice %u (rows before %u)', v, len(v_df))
+        v_df = v_df.reset_index().set_index('clock')
+        v_df = squeeze_diffs(v_df, v_df.columns)
+        logging.debug('extracted only state changes for voice %u (rows after %u)', v, len(v_df))
+
+        v_df.reset_index(level=0, inplace=True)
+
+        v_df['vbi_frame'] = v_df['clock'].floordiv(int(sid.clockq)) - v_df['clock_start'].floordiv(int(sid.clockq))
+        v_df['clock'] = v_df['clock'] - v_df['clock_start']
+
         v_df['v'] = v
         v_df['ssf'] += ssfs
         ssfs = v_df['ssf'].max()
@@ -494,7 +498,7 @@ def normalize_ssf(sid, hashid_clock, hashid_noclock, ssf_df, remap_ssf_dfs, ssf_
                 normalized_ssf_df = ssf_df.drop(['ssf', 'clock_start', 'next_clock_start', 'hashid_clock'], axis=1)
                 last_row_df = normalized_ssf_df[-1:].copy()
                 last_row_df['clock'] = clock_duration
-                last_row_df['vbi_frame'] = int(clock_duration / sid.clockq)
+                last_row_df['vbi_frame'] = int((clock_start + clock_duration) / sid.clockq) - int(clock_start / sid.clockq)
                 last_row_df = last_row_df.astype(normalized_ssf_df.dtypes.to_dict())
                 normalized_ssf_df = pd.concat([normalized_ssf_df, last_row_df], ignore_index=True)
                 normalized_ssf_df = normalized_ssf_df.reset_index(drop=True)
