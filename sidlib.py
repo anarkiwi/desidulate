@@ -398,6 +398,9 @@ def split_vdf(sid, df, near=16, guard=96, ratemin=1024):
         v_df = v_df[(v_df['clock'] <= v_df['waveform_last'])].drop(['waveform_last'], axis=1)
 
         v_df['clock_start'] = v_df.groupby(['ssf'], sort=False)['clock'].min()
+        v_df['next_clock_start'] = v_df['clock_start'].shift(-1).astype(pd.Int64Dtype())
+        v_df['next_clock_start'] = v_df.groupby(['ssf'], sort=False)['next_clock_start'].max()
+        v_df['next_clock_start'] = v_df['next_clock_start'].fillna(v_df['clock'].max())
 
         # remove empty SSFs
         logging.debug('removing empty SSFs for voice %u', v)
@@ -414,9 +417,6 @@ def split_vdf(sid, df, near=16, guard=96, ratemin=1024):
         logging.debug('calculating clock for voice %u', v)
         v_df.reset_index(level=0, inplace=True)
         v_df['vbi_frame'] = (v_df['clock'] - v_df['clock_start'].floordiv(int(sid.clockq))).floordiv(int(sid.clockq))
-        v_df['next_clock_start'] = v_df['clock_start'].shift(-1).astype(pd.Int64Dtype())
-        v_df['next_clock_start'] = v_df.groupby(['ssf'], sort=False)['next_clock_start'].transform('max')
-        v_df['next_clock_start'] = v_df['next_clock_start'].fillna(v_df['clock'].max())
         # discard state changes within N cycles of next SSF.
         guard_start = v_df['next_clock_start'] - v_df['clock'].astype(pd.Int64Dtype())
         v_df = v_df[~((guard_start > 0) & (guard_start < guard))]
