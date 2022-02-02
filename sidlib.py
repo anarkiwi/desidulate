@@ -369,6 +369,8 @@ def split_vdf(sid, df, near=16, guard=96, ratemin=1024):
             mod_col = '%s_mod' % col
             v_df[mod_col] = v_df.groupby(['ssf'], sort=False)[col].transform(lambda x: (x.diff() != 0).sum())
 
+        v_df.set_index('ssf', inplace=True)
+
         logging.debug('removing redundant state for voice %u', v)
         # If test1 is set only at the start of the SSF, remove inaudible state.
         v_df.loc[v_df['test1_initial'] == 1, ['freq1', 'tri1', 'saw1', 'pulse1', 'noise1', 'flt1'] + mod_cols] = pd.NA
@@ -386,30 +388,31 @@ def split_vdf(sid, df, near=16, guard=96, ratemin=1024):
         # remove trailing rows when test1 set.
         v_df['test1_last'] = v_df['clock']
         v_df.loc[v_df['test1'] == 1, ['test1_last']] = pd.NA
-        v_df['test1_last'] = v_df.groupby(['ssf'], sort=False)['test1_last'].transform(max)
+        v_df['test1_last'] = v_df.groupby(['ssf'], sort=False)['test1_last'].max()
         v_df = v_df[(v_df['clock'] <= v_df['test1_last'])].drop(['test1_last'], axis=1)
 
         # remove trailing rows when no waveform set.
         v_df['waveform_last'] = v_df['clock']
         v_df.loc[(v_df['pulse1'] == 0) & (v_df['tri1'] == 0) & (v_df['noise1'] == 0) & (v_df['saw1'] == 0), ['waveform_last']] = pd.NA
-        v_df['waveform_last'] = v_df.groupby(['ssf'], sort=False)['waveform_last'].transform(max)
+        v_df['waveform_last'] = v_df.groupby(['ssf'], sort=False)['waveform_last'].max()
         v_df = v_df[(v_df['clock'] <= v_df['waveform_last'])].drop(['waveform_last'], axis=1)
 
-        # extract only changes
-        logging.debug('extracting only state changes for voice %u (rows before %u)', v, len(v_df))
-        v_df = v_df.set_index('clock')
-        v_df = squeeze_diffs(v_df, v_df.columns)
-        logging.debug('extracted only state changes for voice %u (rows after %u)', v, len(v_df))
+        v_df['clock_start'] = v_df.groupby(['ssf'], sort=False)['clock'].min()
 
         # remove empty SSFs
         logging.debug('removing empty SSFs for voice %u', v)
         for col in ('vol', 'gate1', 'freq1'):
-            v_df = v_df[v_df.groupby('ssf', sort=False)[col].transform('max') > 0]
-        v_df = v_df[v_df.groupby('ssf', sort=False)['test1'].transform('min') == 0]
+            v_df = v_df[v_df[col].notna() & (v_df.groupby('ssf', sort=False)[col].max() > 0)]
+        v_df = v_df[v_df['test1'].notna() & (v_df.groupby('ssf', sort=False)['test1'].min() == 0)]
+
+        # extract only changes
+        logging.debug('extracting only state changes for voice %u (rows before %u)', v, len(v_df))
+        v_df = v_df.reset_index().set_index('clock')
+        v_df = squeeze_diffs(v_df, v_df.columns)
+        logging.debug('extracted only state changes for voice %u (rows after %u)', v, len(v_df))
 
         logging.debug('calculating clock for voice %u', v)
         v_df.reset_index(level=0, inplace=True)
-        v_df['clock_start'] = v_df.groupby(['ssf'], sort=False)['clock'].transform('min')
         v_df['vbi_frame'] = (v_df['clock'] - v_df['clock_start'].floordiv(int(sid.clockq))).floordiv(int(sid.clockq))
         v_df['next_clock_start'] = v_df['clock_start'].shift(-1).astype(pd.Int64Dtype())
         v_df['next_clock_start'] = v_df.groupby(['ssf'], sort=False)['next_clock_start'].transform('max')
