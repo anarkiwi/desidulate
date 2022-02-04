@@ -409,10 +409,10 @@ def split_vdf(sid, df, near=16, guard=96, ratemin=1024):
         v_df = v_df[~((guard_start > 0) & (guard_start < guard))]
 
         # remove empty SSFs
-        for col in ('freq1', 'vol', 'gate1'):
-            logging.debug('removing empty SSFs with no %s for voice %u (%u rows before)', col, v, len(v_df))
-            v_df = v_df[v_df[col].notna() & (v_df.groupby('ssf', sort=False)[col].max() > 0)]
-        v_df = v_df[v_df['test1'].notna() & (v_df.groupby('ssf', sort=False)['test1'].min() == 0)]
+        #for col in ('freq1', 'vol', 'gate1'):
+        #    logging.debug('removing empty SSFs with no %s for voice %u (%u rows before)', col, v, len(v_df))
+        #    v_df = v_df[(v_df.groupby('ssf', sort=False)[col].max() > 0)]
+        #v_df = v_df[v_df['test1'].notna() & (v_df.groupby('ssf', sort=False)['test1'].min() == 0)]
 
         rate_cols = []
         rate_col_pairs = []
@@ -445,11 +445,11 @@ def split_vdf(sid, df, near=16, guard=96, ratemin=1024):
 
         v_df.reset_index(level=0, inplace=True)
 
-        v_df['vbi_frame'] = v_df['clock'].floordiv(int(sid.clockq)) - v_df['clock_start'].floordiv(int(sid.clockq))
         v_df['pr_speed'] = v_df['rate'].rfloordiv(sid.clockq).astype(pd.UInt8Dtype())
         v_df.loc[v_df['pr_speed'] == 0, 'pr_speed'] = int(1)
         v_df['pr_frame_clock'] = v_df['pr_speed'].rfloordiv(sid.clockq)
         v_df['pr_frame'] = v_df['clock'].floordiv(v_df['pr_frame_clock']).astype(pd.Int64Dtype()) - v_df['clock_start'].floordiv(v_df['pr_frame_clock']).astype(pd.Int64Dtype())
+        v_df['vbi_frame'] = v_df['clock'].floordiv(int(sid.clockq)) - v_df['clock_start'].floordiv(int(sid.clockq))
         v_df['clock'] = v_df['clock'] - v_df['clock_start']
         v_df = v_df.drop(['pr_frame_clock'], axis=1)
 
