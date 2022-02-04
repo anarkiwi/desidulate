@@ -446,7 +446,12 @@ def split_vdf(sid, df, near=16, guard=96, ratemin=1024):
         v_df.reset_index(level=0, inplace=True)
 
         v_df['vbi_frame'] = v_df['clock'].floordiv(int(sid.clockq)) - v_df['clock_start'].floordiv(int(sid.clockq))
+        v_df['pr_speed'] = v_df['rate'].rfloordiv(sid.clockq).astype(pd.UInt8Dtype())
+        v_df.loc[v_df['pr_speed'] == 0, 'pr_speed'] = int(1)
+        v_df['pr_frame_clock'] = v_df['pr_speed'].rfloordiv(sid.clockq)
+        v_df['pr_frame'] = v_df['clock'].floordiv(v_df['pr_frame_clock']).astype(pd.Int64Dtype()) - v_df['clock_start'].floordiv(v_df['pr_frame_clock']).astype(pd.Int64Dtype())
         v_df['clock'] = v_df['clock'] - v_df['clock_start']
+        v_df = v_df.drop(['pr_frame_clock'], axis=1)
 
         v_df['v'] = v
         v_df['ssf'] += ssfs
@@ -460,8 +465,9 @@ def split_vdf(sid, df, near=16, guard=96, ratemin=1024):
         v_dfs = hash_vdf(v_dfs, non_meta_cols)
         logging.debug('calculating clock hashes')
         v_dfs['hashid_clock'] = v_dfs.groupby(['ssf'], sort=False)['clock'].transform(hash_tuple).astype(np.int64)
-        meta_cols = [col for col in v_dfs.columns if col not in CANON_REG_ORDER and col != 'vbi_frame']
-        v_dfs = v_dfs[['vbi_frame'] + [col for col in CANON_REG_ORDER if col in v_dfs.columns] + meta_cols]
+        prefix_cols = ['clock', 'vbi_frame', 'pr_frame']
+        meta_cols = [col for col in v_dfs.columns if col not in CANON_REG_ORDER and col not in prefix_cols]
+        v_dfs = v_dfs[prefix_cols + [col for col in CANON_REG_ORDER if col in v_dfs.columns] + meta_cols]
 
         for v, v_df in v_dfs.groupby('v'):
             yield (v, v_df.drop(['v'], axis=1))
@@ -501,7 +507,15 @@ def normalize_ssf(sid, hashid_clock, hashid_noclock, ssf_df, remap_ssf_dfs, ssf_
                 normalized_ssf_df = ssf_df.drop(['ssf', 'clock_start', 'next_clock_start', 'hashid_clock'], axis=1)
                 last_row_df = normalized_ssf_df[-1:].copy()
                 last_row_df['clock'] = clock_duration
-                last_row_df['vbi_frame'] = int((clock_start + clock_duration) / sid.clockq) - int(clock_start / sid.clockq)
+                pr_div = ssf_df['pr_speed'].iat[-1]
+                if pd.notna(pr_div):
+                    pr_div = int(sid.clockq / pr_div)
+                for frame_col, frame_div in (
+                        ('vbi_frame', sid.clockq),
+                        ('pr_frame', pr_div)):
+                    last_row_df[frame_col] = pd.NA
+                    if pd.notna(frame_div):
+                        last_row_df[frame_col] = int((clock_start + clock_duration) / frame_div) - int(clock_start / frame_div)
                 last_row_df = last_row_df.astype(normalized_ssf_df.dtypes.to_dict())
                 normalized_ssf_df = pd.concat([normalized_ssf_df, last_row_df], ignore_index=True)
                 normalized_ssf_df = normalized_ssf_df.reset_index(drop=True)
