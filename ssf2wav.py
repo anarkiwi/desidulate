@@ -14,7 +14,7 @@ import numpy as np
 import pandas as pd
 
 from fileio import wav_path, out_path, read_csv
-from sidlib import get_sid, timer_args
+from sidlib import get_sid, timer_args, resampledf_to_pr
 from sidwav import df2wav
 from sidmidi import SidMidiFile, midi_args
 from ssf import add_freq_notes_df, SidSoundFragment
@@ -23,7 +23,7 @@ from ssf import add_freq_notes_df, SidSoundFragment
 parser = argparse.ArgumentParser(description='Convert .ssf into a WAV file')
 parser.add_argument('ssffile', default='', help='ssf to read')
 parser.add_argument('--hashid', default=0, help='hashid to reproduce, or 0 if all')
-parser.add_argument('--workers', default=4, help='number of worker processes to use')
+parser.add_argument('--workers', default=4, type=int, help='number of worker processes to use')
 parser.add_argument('--wavfile', default='', help='WAV file to write')
 parser.add_argument('--maxclock', default=0, type=int, help='max clock value to render, 0 for no limit')
 play_parser = parser.add_mutually_exclusive_group(required=False)
@@ -38,6 +38,9 @@ single_waveform_parser.add_argument('--no-skip-single-waveform', dest='skip_sing
 ssf_parser = parser.add_mutually_exclusive_group(required=False)
 ssf_parser.add_argument('--skip-ssf-parser', dest='skip_ssf_parser', action='store_true', help='skip parsing of SSF')
 ssf_parser.add_argument('--no-skip-ssf-parser', dest='skip_ssf_parser', action='store_false', help='do not skip parsing of SSF')
+pr_resample = parser.add_mutually_exclusive_group(required=False)
+pr_resample.add_argument('--pr_resample', dest='pr_resample', default=True, action='store_true', help='skip parsing of SSF')
+pr_resample.add_argument('--no-pr_resample', dest='pr_resample', action='store_false', help='do not skip parsing of SSF')
 timer_args(parser)
 midi_args(parser)
 args = parser.parse_args()
@@ -61,7 +64,12 @@ hashid = np.int64(args.hashid)
 
 
 def render_wav(ssf_df, wavfile, verbose):
-    ssf_df = ssf_df.fillna(method='ffill').set_index('clock')
+    if args.pr_resample:
+        if pd.isna(ssf_df['pr_speed'].iat[0]):
+            return
+        ssf_df = resampledf_to_pr(sid, ssf_df)
+    else:
+        ssf_df = ssf_df.fillna(method='ffill').set_index('clock')
     df2wav(ssf_df, sid, wavfile, skiptest=args.skiptest)
     if verbose:
         print(ssf_df.to_string())

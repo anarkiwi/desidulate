@@ -27,6 +27,12 @@ CANON_REG_ORDER = (
     'atk1', 'dec1', 'sus1', 'rel1', 'vol')
 
 
+def resampledf_to_pr(sid, ssf_df):
+    resample_df = ssf_df.copy().fillna(method='ffill').drop_duplicates('pr_frame', keep='last')
+    resample_df['clock'] = resample_df['pr_frame'] * int(sid.clockq / resample_df['pr_speed'].iat[0])
+    return resample_df.set_index('clock')
+
+
 def remove_end_repeats(waveforms):
     repeat_len = int(len(waveforms) / 2)
     if repeat_len > 1:
