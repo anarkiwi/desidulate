@@ -409,10 +409,12 @@ def split_vdf(sid, df, near=16, guard=96, ratemin=1024):
         v_df = v_df[~((guard_start > 0) & (guard_start < guard))]
 
         # remove empty SSFs
-        #for col in ('freq1', 'vol', 'gate1'):
-        #    logging.debug('removing empty SSFs with no %s for voice %u (%u rows before)', col, v, len(v_df))
-        #    v_df = v_df[(v_df.groupby('ssf', sort=False)[col].max() > 0)]
-        #v_df = v_df[v_df['test1'].notna() & (v_df.groupby('ssf', sort=False)['test1'].min() == 0)]
+        for col in ('freq1', 'vol', 'gate1'):
+            logging.debug('removing empty SSFs with no %s for voice %u (%u rows before)', col, v, len(v_df))
+            v_df['max_col'] = v_df.groupby('ssf', sort=False)[col].max()
+            v_df = v_df[v_df['max_col'] > 0].drop(['max_col'], axis=1)
+        v_df['test1_min'] = v_df.groupby('ssf', sort=False)['test1'].min()
+        v_df = v_df[v_df['test1_min'] == 0].drop(['test1_min'], axis=1)
 
         rate_cols = []
         rate_col_pairs = []
