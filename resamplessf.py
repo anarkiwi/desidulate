@@ -34,6 +34,7 @@ def resample():
     if len(df) < 1:
         return df_raws
     df = df[df['clock'] <= args.max_clock]
+    df = df[df['pr_frame'].notna()]
     df = df.drop(['clock', 'vol', 'vbi_frame', 'rate'], axis=1)
     for col, bits in big_regs.items():
         df[col] = np.left_shift(np.right_shift(df[col], bits), bits)

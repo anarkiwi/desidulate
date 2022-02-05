@@ -18,6 +18,7 @@ from fileio import read_csv
 SID_SAMPLE_FREQ = 11025
 # use of external filter will be non deterministic.
 FLTEXT = False
+CONTROL_BITS = ['gate', 'sync', 'ring', 'test', 'tri', 'saw', 'pulse', 'noise']
 WAVEFORM_COLS = tuple(sorted((('S', 'sync1'), ('R', 'ring1'), ('t', 'tri1'), ('s', 'saw1'), ('p', 'pulse1'), ('n', 'noise1'))))
 WAVEFORM_COLS_ORIG = [col[1] for col in WAVEFORM_COLS]
 CANON_REG_ORDER = (
@@ -217,8 +218,7 @@ def reg2state(snd_log_name, nrows=(10 * 1e6)):
         pwduty_hi = np.left_shift(reg_df[vb + 3].astype(np.uint16) & 15, 8)
         reg_df['pwduty%u' % v] = np.uint16(pwduty_hi + pwduty_lo)
         control = reg_df[vb + 4]
-        for b, name in enumerate(
-                ['gate', 'sync', 'ring', 'test', 'tri', 'saw', 'pulse', 'noise']):
+        for b, name in enumerate(CONTROL_BITS):
             set_bit(reg_df, control, b, '%s%u' % (name, v))
         set_hi_lo_nib(reg_df, reg_df[vb + 5], 'atk%u' % v, 'dec%u' % v)
         set_hi_lo_nib(reg_df, reg_df[vb + 6], 'sus%u' % v, 'rel%u' % v)
