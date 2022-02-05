@@ -1,6 +1,8 @@
 #!/usr/bin/python3
 
 import argparse
+import struct
+from itertools import groupby
 import pandas as pd
 from sidlib import resampledf_to_pr, get_sid, CONTROL_BITS, timer_args, timer_args, timer_args, timer_args
 from ssf import add_freq_notes_df
@@ -9,12 +11,37 @@ from ssf import add_freq_notes_df
 # -8369400230369463243, C64Music/MUSICIANS/H/Hubbard_Rob/Commando.ssf.xz
 # -6332327843409751282, C64Music/MUSICIANS/L/Linus/Ride_the_High_Country.ssf.xz
 parser = argparse.ArgumentParser(description='Transcribe SSF to Sid Wizard instrument')
-parser.add_argument('--ssffile', help='SSF file', default='C64Music/MUSICIANS/L/Linus/Ride_the_High_Country.ssf.xz')
-parser.add_argument('--hashid', type=int, help='hashid to transcribe', default=-6332327843409751282)
+parser.add_argument('--ssffile', help='SSF file', default='C64Music/MUSICIANS/H/Hubbard_Rob/Commando.ssf.xz')
+parser.add_argument('--hashid', type=int, help='hashid to transcribe', default=-8369400230369463243)
 timer_args(parser)
 
 args = parser.parse_args()
 sid = get_sid(args.pal)
+
+
+def sw_rle_diff(col):
+    pairs = [(int(pair[:2], 16), int(pair[2:], 16)) for pair in col]
+    compressed_pairs = []
+    while pairs and pairs[0][0] == 0:
+        compressed_pairs.append((0, 0))
+        pairs = pairs[1:]
+    for prefix, pairs in groupby(pairs, key=lambda x: x[0]):
+        suffixes = [pair[1] for pair in pairs]
+        diffs = [0]
+        for i, x in enumerate(suffixes[1:]):
+            diffs.append(x - suffixes[i])
+        for diff, vals in groupby(zip(suffixes, diffs), key=lambda x: x[1]):
+            vals = list(vals)
+            len_vals = len(vals)
+            if len_vals == 1:
+                compressed_pairs.append(((prefix, vals[0][0])))
+            else:
+                if diff < 0:
+                    diff = ord(struct.pack('b', diff))
+                compressed_pairs.append((len_vals, diff))
+    compressed_pairs = ['%2.2X%2.2X' % i for i in compressed_pairs]
+    compressed_pairs.extend(['0000'] * (len(col) - len(compressed_pairs)))
+    return compressed_pairs
 
 
 def dot0(hexval):
@@ -90,6 +117,8 @@ ssf_df['WF'] = ssf_df.apply(wf_from_row, axis=1)
 ssf_df['ARP'] = ssf_df.apply(arp_from_row, axis=1)
 ssf_df['PULSE'] = ssf_df.apply(pulse_from_row, axis=1)
 ssf_df['FILT'] = ssf_df.apply(filter_from_row, axis=1)
+ssf_df['FILT'] = sw_rle_diff(ssf_df['FILT'])
+ssf_df['PULSE'] = sw_rle_diff(ssf_df['PULSE'])
 ssf_df[['ARP', 'PULSE', 'FILT']] = ssf_df[['ARP', 'PULSE', 'FILT']].apply(
     lambda row: [dot0(c) for c in row])
 
