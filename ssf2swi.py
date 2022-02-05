@@ -6,10 +6,11 @@ from sidlib import resampledf_to_pr, get_sid, CONTROL_BITS, timer_args, timer_ar
 from ssf import add_freq_notes_df
 
 
+# -8369400230369463243, C64Music/MUSICIANS/H/Hubbard_Rob/Commando.ssf.xz
 # -6332327843409751282, C64Music/MUSICIANS/L/Linus/Ride_the_High_Country.ssf.xz
 parser = argparse.ArgumentParser(description='Transcribe SSF to Sid Wizard instrument')
-parser.add_argument('--ssffile', help='SSF file', default='C64Music/MUSICIANS/H/Hubbard_Rob/Commando.ssf.xz')
-parser.add_argument('--hashid', type=int, help='hashid to transcribe', default=-8369400230369463243)
+parser.add_argument('--ssffile', help='SSF file', default='C64Music/MUSICIANS/L/Linus/Ride_the_High_Country.ssf.xz')
+parser.add_argument('--hashid', type=int, help='hashid to transcribe', default=-6332327843409751282)
 timer_args(parser)
 
 args = parser.parse_args()
@@ -36,7 +37,7 @@ def arp_from_row(row):
     val = 0
     if pd.notna(arp):
         val = row.closest_note - 12 + 0x81
-    return dot0('%2.2X' % val)
+    return '%2.2X' % val
 
 
 def pulse_from_row(row):
@@ -44,7 +45,7 @@ def pulse_from_row(row):
     val = 0
     if pd.notna(pwduty):
         val = pwduty | 0x8000
-    return dot0('%4.4X' % val)
+    return '%4.4X' % val
 
 
 def filter_from_row(row):
@@ -65,7 +66,7 @@ def filter_from_row(row):
         route = route_map.get((row.fltlo, row.fltband, row.flthi)) << 4
         val = ((route + res) << 8) + (coff & 0xff)
 
-    return dot0('%4.4X' % val)
+    return '%4.4X' % val
 
 
 df = pd.read_csv(args.ssffile, dtype=pd.Int64Dtype())
@@ -89,6 +90,8 @@ ssf_df['WF'] = ssf_df.apply(wf_from_row, axis=1)
 ssf_df['ARP'] = ssf_df.apply(arp_from_row, axis=1)
 ssf_df['PULSE'] = ssf_df.apply(pulse_from_row, axis=1)
 ssf_df['FILT'] = ssf_df.apply(filter_from_row, axis=1)
+ssf_df[['ARP', 'PULSE', 'FILT']] = ssf_df[['ARP', 'PULSE', 'FILT']].apply(
+    lambda row: [dot0(c) for c in row])
 
 print('multispeed: %u' % pr_speed)
 
