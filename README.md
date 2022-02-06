@@ -71,6 +71,12 @@ desidulate can generate a WAV file from a ReSID based SID simulation directly fr
 
 desidulate can, with some limitations, transcribe an SSF to a Sid Wizard instrument.
 
+Extract the SID register dump from the song using VICE:
+
+```
+vsid -sounddev dump -soundarg C64Music/MUSICIANS/L/Linus/Cauldron_II_Remix.sid.dump -warp -limit 300000000 C64Music/MUSICIANS/L/Linus/Cauldron_II_Remix.sid
+```
+
 Process the desired song into an SSF log:
 
 ```
