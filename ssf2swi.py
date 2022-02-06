@@ -20,7 +20,7 @@ args = parser.parse_args()
 sid = get_sid(args.pal)
 
 
-def sw_rle_diff(col):
+def sw_rle_diff(col, diffmult):
     pairs = [(int(pair[:2], 16), int(pair[2:], 16)) for pair in col]
     compressed_pairs = []
     while pairs and pairs[0][0] == 0:
@@ -37,6 +37,7 @@ def sw_rle_diff(col):
             if len_vals == 1:
                 compressed_pairs.append(((prefix, vals[0][0])))
             else:
+                diff *= diffmult
                 if diff < 0:
                     diff = ord(struct.pack('b', diff))
                 compressed_pairs.append((len_vals, diff))
@@ -108,6 +109,8 @@ if atk1 == 0:
     first_freq = ssf_df.index[ssf_df['freq1'].notna()][0]
     ssf_df = ssf_df[first_freq:]
     ssf_df['pr_frame'] = ssf_df['pr_frame'] - ssf_df['pr_frame'].min()
+if rel1 == 0:
+    ssf_df = ssf_df[ssf_df['gate1'] == 1]
 
 ssf_df = ssf_df.set_index('pr_frame')
 ssf_df = add_freq_notes_df(sid, ssf_df)
@@ -118,12 +121,13 @@ ssf_df['WF'] = ssf_df.apply(wf_from_row, axis=1)
 ssf_df['ARP'] = ssf_df.apply(arp_from_row, axis=1)
 ssf_df['PULSE'] = ssf_df.apply(pulse_from_row, axis=1)
 ssf_df['FILT'] = ssf_df.apply(filter_from_row, axis=1)
-ssf_df['FILT'] = sw_rle_diff(ssf_df['FILT'])
-ssf_df['PULSE'] = sw_rle_diff(ssf_df['PULSE'])
+ssf_df['FILT'] = sw_rle_diff(ssf_df['FILT'], diffmult=2**3)
+ssf_df['PULSE'] = sw_rle_diff(ssf_df['PULSE'], diffmult=1)
 ssf_df[['ARP', 'PULSE', 'FILT']] = ssf_df[['ARP', 'PULSE', 'FILT']].apply(
     lambda row: [dot0(c) for c in row])
 
 print('multispeed: %u' % pr_speed)
+print('FRM1: %2.2X' % ssf_df.index.max())
 
 adsr = '%X%X%X%X' % (atk1, dec1, sus1, rel1)
 print('ADSR: %s' % adsr)
