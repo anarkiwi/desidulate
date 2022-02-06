@@ -140,6 +140,10 @@ lastindex += 1
 ssf_df.loc[ssf_df.index > lastindex, ['WFARP']] = '....'
 ssf_df = ssf_df.drop(['WF', 'ARP'], axis=1)
 
+sw_cols = ['F', 'WFARP', 'PULSE', 'FILT']
+sw_sf = ssf_df[sw_cols]
+ssf_df = ssf_df.drop(sw_cols, axis=1)
+
 print('multispeed: %u' % pr_speed)
 
 adsr = '%X%X%X%X' % (atk1, dec1, sus1, rel1)
@@ -147,4 +151,6 @@ print('ADSR: %s' % adsr)
 
 print()
 pd.set_option('display.max_rows', None)
+print(sw_sf)
+print()
 print(ssf_df)
