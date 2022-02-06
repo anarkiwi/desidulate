@@ -71,6 +71,12 @@ desidulate can generate a WAV file from a ReSID based SID simulation directly fr
 
 desidulate can, with some limitations, transcribe an SSF to a Sid Wizard instrument.
 
+Extract the SID register dump from the song using VICE:
+
+```
+vsid -sounddev dump -soundarg C64Music/MUSICIANS/L/Linus/Cauldron_II_Remix.sid.dump -warp -limit 300000000 C64Music/MUSICIANS/L/Linus/Cauldron_II_Remix.sid
+```
+
 Process the desired song into an SSF log:
 
 ```
@@ -85,33 +91,48 @@ Render all the SSFs as WAVs:
 
 Listen to the WAVs, to find the instrument you wish to transcribe, which will be indentified with a hashid in the filename.
 
-Now, transcribe the SSF into an instrument (in this case, a kick sound):
+Now, transcribe the SSF into an instrument (in this case, a kick sound): desidulate attempts to optimize the instruments by detecting and automating filter and PWM curves.
 
 ```
 ./ssf2swi.py C64Music/MUSICIANS/L/Linus/Cauldron_II_Remix.ssf.xz -1975247557004053752
 multispeed: 1
 ADSR: 05F0
 
-    gate1  freq1  pwduty1  pulse1  noise1  tri1  saw1  test1  sync1  ring1  freq3  test3  flt1  fltcoff  fltres  fltlo  fltband  flthi  real_freq  closest_note   F PULSE  FILT WFARP
-0       1   7940     <NA>       0       1     0     0      0   <NA>   <NA>   <NA>   <NA>     1      768      15      1        1      0     466.28            70  00  ....  BF60  81BB
-1       1   2501     2048       1       0     0     0      0   <NA>   <NA>   <NA>   <NA>     1       24      15      1        1      0     146.87            50  01  88..  BF03  41A7
-2       1   1250     1024       1       0     0     0      0   <NA>   <NA>   <NA>   <NA>     1       16      15      1        1      0      73.41            38  02  84..  02F8  419B
-3       1   1250     1088       1       0     0     0      0   <NA>   <NA>   <NA>   <NA>     1        8      15      1        1      0      73.41            38  03  0340  BF12  ....
-4       1   1250     1152       1       0     0     0      0   <NA>   <NA>   <NA>   <NA>     1      144      15      1        1      0      73.41            38  04  85..  BF06  ....
-5       1   1250     1216       1       0     0     0      0   <NA>   <NA>   <NA>   <NA>     1       48      15      1        1      0      73.41            38  05  0340  BF02  ....
-6       1   1250     1280       1       0     0     0      0   <NA>   <NA>   <NA>   <NA>     1       16      15      1        1      0      73.41            38  06  86..  BF03  ....
-7       1   1250     1344       1       0     0     0      0   <NA>   <NA>   <NA>   <NA>     1       24      15      1        1      0      73.41            38  07  0240  ....  ....
-8       1   1252     1408       1       0     0     0      0   <NA>   <NA>   <NA>   <NA>     1       24      15      1        1      0      73.52            38  08  ....  ....  ....
-9       1   1254     1472       1       0     0     0      0   <NA>   <NA>   <NA>   <NA>     1       24      15      1        1      0      73.64            38  09  ....  ....  ....
-10      1   1256     1536       1       0     0     0      0   <NA>   <NA>   <NA>   <NA>     1       24      15      1        1      0      73.76            38  0A  ....  ....  ....
-11      1   1254     1600       1       0     0     0      0   <NA>   <NA>   <NA>   <NA>     1       24      15      1        1      0      73.64            38  0B  ....  ....  ....
-12      1   1252     1664       1       0     0     0      0   <NA>   <NA>   <NA>   <NA>     1       24      15      1        1      0      73.52            38  0C  ....  ....  ....
+     F WFARP PULSE  FILT
+0   00  81BB  ....  BF60
+1   01  41A7  88..  BF03
+2   02  419B  84..  02F8
+3   03  ....  0340  BF12
+4   04  ....  85..  BF06
+5   05  ....  0340  BF02
+6   06  ....  86..  BF03
+7   07  ....  0240  ....
+8   08  ....  ....  ....
+9   09  ....  ....  ....
+10  0A  ....  ....  ....
+11  0B  ....  ....  ....
+12  0C  ....  ....  ....
+
+    gate1  freq1  pwduty1  pulse1  noise1  tri1  saw1  test1  sync1  ring1  freq3  test3  flt1  fltcoff  fltres  fltlo  fltband  flthi  real_freq  closest_note
+0       1   7940     <NA>       0       1     0     0      0   <NA>   <NA>   <NA>   <NA>     1      768      15      1        1      0     466.28            70
+1       1   2501     2048       1       0     0     0      0   <NA>   <NA>   <NA>   <NA>     1       24      15      1        1      0     146.87            50
+2       1   1250     1024       1       0     0     0      0   <NA>   <NA>   <NA>   <NA>     1       16      15      1        1      0      73.41            38
+3       1   1250     1088       1       0     0     0      0   <NA>   <NA>   <NA>   <NA>     1        8      15      1        1      0      73.41            38
+4       1   1250     1152       1       0     0     0      0   <NA>   <NA>   <NA>   <NA>     1      144      15      1        1      0      73.41            38
+5       1   1250     1216       1       0     0     0      0   <NA>   <NA>   <NA>   <NA>     1       48      15      1        1      0      73.41            38
+6       1   1250     1280       1       0     0     0      0   <NA>   <NA>   <NA>   <NA>     1       16      15      1        1      0      73.41            38
+7       1   1250     1344       1       0     0     0      0   <NA>   <NA>   <NA>   <NA>     1       24      15      1        1      0      73.41            38
+8       1   1252     1408       1       0     0     0      0   <NA>   <NA>   <NA>   <NA>     1       24      15      1        1      0      73.52            38
+9       1   1254     1472       1       0     0     0      0   <NA>   <NA>   <NA>   <NA>     1       24      15      1        1      0      73.64            38
+10      1   1256     1536       1       0     0     0      0   <NA>   <NA>   <NA>   <NA>     1       24      15      1        1      0      73.76            38
+11      1   1254     1600       1       0     0     0      0   <NA>   <NA>   <NA>   <NA>     1       24      15      1        1      0      73.64            38
+12      1   1252     1664       1       0     0     0      0   <NA>   <NA>   <NA>   <NA>     1       24      15      1        1      0      73.52            38
 
 ```
 
 Now enter the values into SID Wizard (a direct SWI exporter is planned), and play the sound with "z!"
 
-![Alt text](swisnop.png?raw=true "swi screenshot")
+![Alt text](swishot.png?raw=true "swi screenshot")
 
 
 ## Ongoing work
