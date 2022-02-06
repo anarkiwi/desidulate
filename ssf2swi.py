@@ -12,8 +12,8 @@ from ssf import add_freq_notes_df
 # -6332327843409751282, C64Music/MUSICIANS/L/Linus/Ride_the_High_Country.ssf.xz
 # -1975247557004053752, C64Music/MUSICIANS/L/Linus/Cauldron_II_Remix.ssf.xz
 parser = argparse.ArgumentParser(description='Transcribe SSF to Sid Wizard instrument')
-parser.add_argument('--ssffile', help='SSF file', default='C64Music/MUSICIANS/L/Linus/Cauldron_II_Remix.ssf.xz')
-parser.add_argument('--hashid', type=int, help='hashid to transcribe', default=-1975247557004053752)
+parser.add_argument('ssffile', help='SSF file')
+parser.add_argument('hashid', type=int, help='hashid to transcribe')
 timer_args(parser)
 
 args = parser.parse_args()
