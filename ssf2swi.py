@@ -41,6 +41,9 @@ def sw_rle_diff(col, diffmult):
                 if diff < 0:
                     diff = ord(struct.pack('b', diff))
                 compressed_pairs.append((len_vals, diff))
+    lastpair = compressed_pairs[-1]
+    if lastpair[0] <= 0x7f and lastpair[1] == 0:
+        compressed_pairs = compressed_pairs[:-1]
     compressed_pairs = ['%2.2X%2.2X' % i for i in compressed_pairs]
     compressed_pairs.extend(['0000'] * (len(col) - len(compressed_pairs)))
     return compressed_pairs
