@@ -12,8 +12,8 @@ from ssf import add_freq_notes_df
 # -6332327843409751282, C64Music/MUSICIANS/L/Linus/Ride_the_High_Country.ssf.xz
 # -1975247557004053752.wav, C64Music/MUSICIANS/L/Linus/Cauldron_II_Remix.ssf.xz
 parser = argparse.ArgumentParser(description='Transcribe SSF to Sid Wizard instrument')
-parser.add_argument('--ssffile', help='SSF file', default='C64Music/MUSICIANS/L/Linus/Cauldron_II_Remix.ssf.xz')
-parser.add_argument('--hashid', type=int, help='hashid to transcribe', default=-1975247557004053752)
+parser.add_argument('--ssffile', help='SSF file', default='C64Music/MUSICIANS/L/Linus/Ride_the_High_Country.ssf.xz')
+parser.add_argument('--hashid', type=int, help='hashid to transcribe', default=-6332327843409751282)
 timer_args(parser)
 
 args = parser.parse_args()
@@ -130,12 +130,9 @@ ssf_df[['ARP', 'PULSE', 'FILT']] = ssf_df[['ARP', 'PULSE', 'FILT']].apply(
     lambda row: [dot0(c) for c in row])
 
 print('multispeed: %u' % pr_speed)
-print('FRM1: %2.2X' % ssf_df.index.max())
 
 adsr = '%X%X%X%X' % (atk1, dec1, sus1, rel1)
 print('ADSR: %s' % adsr)
-if test1_initial:
-    print('ADHR: %s' % adsr)
 
 print()
 pd.set_option('display.max_rows', None)
