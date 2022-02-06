@@ -92,7 +92,7 @@ def filter_from_row(row):
         coff = row.fltcoff
         res = row.fltres
         route = route_map.get((row.fltlo, row.fltband, row.flthi)) << 4
-        val = ((route + res) << 8) + (coff >> 4)
+        val = ((route | res) << 8) | (coff >> 3)
 
     return '%4.4X' % val
 
