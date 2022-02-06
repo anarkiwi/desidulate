@@ -10,9 +10,10 @@ from ssf import add_freq_notes_df
 
 # -8369400230369463243, C64Music/MUSICIANS/H/Hubbard_Rob/Commando.ssf.xz
 # -6332327843409751282, C64Music/MUSICIANS/L/Linus/Ride_the_High_Country.ssf.xz
+# -1975247557004053752.wav, C64Music/MUSICIANS/L/Linus/Cauldron_II_Remix.ssf.xz
 parser = argparse.ArgumentParser(description='Transcribe SSF to Sid Wizard instrument')
-parser.add_argument('--ssffile', help='SSF file', default='C64Music/MUSICIANS/H/Hubbard_Rob/Commando.ssf.xz')
-parser.add_argument('--hashid', type=int, help='hashid to transcribe', default=-8369400230369463243)
+parser.add_argument('--ssffile', help='SSF file', default='C64Music/MUSICIANS/L/Linus/Cauldron_II_Remix.ssf.xz')
+parser.add_argument('--hashid', type=int, help='hashid to transcribe', default=-1975247557004053752)
 timer_args(parser)
 
 args = parser.parse_args()
@@ -91,7 +92,7 @@ def filter_from_row(row):
         coff = row.fltcoff
         res = row.fltres
         route = route_map.get((row.fltlo, row.fltband, row.flthi)) << 4
-        val = ((route + res) << 8) + (coff & 0xff)
+        val = ((route + res) << 8) + (coff >> 4)
 
     return '%4.4X' % val
 
