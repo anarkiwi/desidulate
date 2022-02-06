@@ -85,7 +85,7 @@ Render all the SSFs as WAVs:
 
 Listen to the WAVs, to find the instrument you wish to transcribe, which will be indentified with a hashid in the filename.
 
-Now, transcribe the SSF into an instrument (in this case, a kick sound):
+Now, transcribe the SSF into an instrument (in this case, a kick sound): desidulate attempts to optimize the instruments by detecting and automating filter and PWM curves.
 
 ```
 ./ssf2swi.py C64Music/MUSICIANS/L/Linus/Cauldron_II_Remix.ssf.xz -1975247557004053752
