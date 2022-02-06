@@ -10,10 +10,10 @@ from ssf import add_freq_notes_df
 
 # -8369400230369463243, C64Music/MUSICIANS/H/Hubbard_Rob/Commando.ssf.xz
 # -6332327843409751282, C64Music/MUSICIANS/L/Linus/Ride_the_High_Country.ssf.xz
-# -1975247557004053752.wav, C64Music/MUSICIANS/L/Linus/Cauldron_II_Remix.ssf.xz
+# -1975247557004053752, C64Music/MUSICIANS/L/Linus/Cauldron_II_Remix.ssf.xz
 parser = argparse.ArgumentParser(description='Transcribe SSF to Sid Wizard instrument')
-parser.add_argument('--ssffile', help='SSF file', default='C64Music/MUSICIANS/L/Linus/Ride_the_High_Country.ssf.xz')
-parser.add_argument('--hashid', type=int, help='hashid to transcribe', default=-6332327843409751282)
+parser.add_argument('--ssffile', help='SSF file', default='C64Music/MUSICIANS/L/Linus/Cauldron_II_Remix.ssf.xz')
+parser.add_argument('--hashid', type=int, help='hashid to transcribe', default=-1975247557004053752)
 timer_args(parser)
 
 args = parser.parse_args()
@@ -41,8 +41,10 @@ def sw_rle_diff(col, diffmult):
                 if diff < 0:
                     diff = ord(struct.pack('b', diff))
                 compressed_pairs.append((len_vals, diff))
-    lastpair = compressed_pairs[-1]
-    if lastpair[0] <= 0x7f and lastpair[1] == 0:
+    while len(compressed_pairs) > 1:
+        lastpair = compressed_pairs[-1]
+        if lastpair[0] > 0x7f or lastpair[1] > 0:
+            break
         compressed_pairs = compressed_pairs[:-1]
     compressed_pairs = ['%2.2X%2.2X' % i for i in compressed_pairs]
     compressed_pairs.extend(['0000'] * (len(col) - len(compressed_pairs)))
@@ -128,6 +130,15 @@ ssf_df['FILT'] = sw_rle_diff(ssf_df['FILT'], diffmult=2**3)
 ssf_df['PULSE'] = sw_rle_diff(ssf_df['PULSE'], diffmult=1)
 ssf_df[['ARP', 'PULSE', 'FILT']] = ssf_df[['ARP', 'PULSE', 'FILT']].apply(
     lambda row: [dot0(c) for c in row])
+
+ssf_df['WFARP'] = ssf_df.apply(lambda row: row.WF + row.ARP, axis=1)
+lastindex = ssf_df.index.max()
+lastwfarp = ssf_df['WFARP'].iloc[-1]
+while ssf_df['WFARP'].iloc[lastindex] == lastwfarp:
+    lastindex -= 1
+lastindex += 1
+ssf_df.loc[ssf_df.index > lastindex, ['WFARP']] = '....'
+ssf_df = ssf_df.drop(['WF', 'ARP'], axis=1)
 
 print('multispeed: %u' % pr_speed)
 
