@@ -37,6 +37,8 @@ def sw_rle_diff(col, diffmult):
             if len_vals == 1:
                 compressed_pairs.append(((prefix, vals[0][0])))
             else:
+                if not compressed_pairs:
+                    compressed_pairs.append(((prefix, vals[0][0])))
                 diff *= diffmult
                 if diff < 0:
                     diff = ord(struct.pack('b', diff))
