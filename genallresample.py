@@ -18,7 +18,7 @@ import pandas as pd
 from fileio import read_csv
 
 SSF_GLOB = r'*.resample_ssf.*xz'
-MAXES_RE = re.compile(r'.+\.([^\.]+)\.xz$')
+MAXES_RE = re.compile(r'.+\.(\d+)\.([^\.]+)\.xz$')
 MAX_WORKERS = multiprocessing.cpu_count()
 
 
@@ -60,13 +60,13 @@ def scrape_resample_dir(resample_df_files):
     return (None, None)
 
 
-def scrape_paths(maxes_filter, fromssfs):
+def scrape_paths(orders_filter, fromssfs):
     current = pathlib.Path(r'./')
-    resample_maxes_files = defaultdict(list)
+    resample_orders_files = defaultdict(list)
     globs = [SSF_GLOB]
-    if maxes_filter:
-        maxes_filter = set(maxes_filter)
-        globs = [r'*.resample_ssf.0-%s.*' % i for i in maxes_filter] + [r'*.resample_ssf.%s.*' % i for i in maxes_filter]
+    if orders_filter:
+        orders_filter = set(orders_filter)
+        globs = [r'*.resample_ssf.0-%s.*' % i for i in orders_filter] + [r'*.resample_ssf.%s.*' % i for i in orders_filter]
     fromssfs_files = None
     if fromssfs:
         if fromssfs.endswith('.gz'):
@@ -82,14 +82,15 @@ def scrape_paths(maxes_filter, fromssfs):
             globber = current.rglob(glob)
         for resample_df_file in globber:
             resample_df_file = os.path.normpath(str(resample_df_file))
-            match = MAXES_RE.match(resample_df_file).group(1)
-            if match.startswith('0-'):
-                match = match[2:]
-            if maxes_filter and match not in maxes_filter:
+            match = MAXES_RE.match(resample_df_file)
+            pr_speed, order = int(match.group(1)), match.group(2)
+            if order.startswith('0-'):
+                order = order[2:]
+            if orders_filter and order not in orders_filter:
                 continue
-            resample_maxes_files[match].append(resample_df_file)
+            resample_orders_files[(pr_speed, order)].append(resample_df_file)
 
-    return resample_maxes_files
+    return resample_orders_files
 
 
 def scrape_resample_dfs(resample_dir_dfs):
@@ -112,18 +113,19 @@ def write_df(df, name):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--maxes', nargs='+', default=None)
+    parser.add_argument('--orders', nargs='+', default=None)
     parser.add_argument('--fromssfs', type=str, default=None)
     args = parser.parse_args()
-    resample_maxes_files = scrape_paths(args.maxes, args.fromssfs)
-    for dir_max, resample_df_files in sorted(resample_maxes_files.items()):
-        print(dir_max)
+    resample_orders_files = scrape_paths(args.orders, args.fromssfs)
+    for order_pr_speed, resample_df_files in sorted(resample_orders_files.items()):
+        order, pr_speed = order_pr_speed
+        print(order, pr_speed)
         resample_dir_dfs = defaultdict(list)
         for resample_df_file in resample_df_files:
             resample_dir_dfs[os.path.dirname(resample_df_file)].append(resample_df_file)
         resample_df, hashids_df = scrape_resample_dfs(resample_dir_dfs)
-        write_df(resample_df, 'resample_ssf.%s.xz' % dir_max)
-        write_df(hashids_df, 'resample_ssf.hashid.%s.xz' % dir_max)
+        write_df(resample_df, 'resample_ssf.%u.%s.xz' % (order, pr_speed))
+        write_df(hashids_df, 'resample_ssf.hashid.%u.%s.xz' % (order, pr_speed))
 
 
 if __name__ == '__main__':
