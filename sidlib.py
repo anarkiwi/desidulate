@@ -270,7 +270,7 @@ def coalesce_near_writes(vdf, cols, near=16):
     return vdf
 
 
-def split_vdf(sid, df, near=16, guard=96, ratemin=1024):
+def split_vdf(sid, df, near=16, guard=96, maxprspeed=20):
     fltcols = [col for col in df.columns if col.startswith('flt') and not col[-1].isdigit()]
     mod_cols = ['freq3', 'test3', 'sync1', 'ring1']
 
@@ -318,6 +318,7 @@ def split_vdf(sid, df, near=16, guard=96, ratemin=1024):
         return vdf
 
     def calc_rates(vdf, non_meta_cols):
+        ratemin = int(sid.clockq / maxprspeed)
         rate_cols = []
         rate_col_pairs = []
         for col in sorted(non_meta_cols - {'atk1', 'dec1', 'sus1', 'rel1', 'gate1', 'fltext'}):
