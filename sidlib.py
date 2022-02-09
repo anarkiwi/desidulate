@@ -439,6 +439,13 @@ def split_vdf(sid, df, near=16, guard=96, maxprspeed=20):
         guard_start = v_df['next_clock_start'] - v_df['clock'].astype(pd.Int64Dtype())
         v_df = v_df[~((guard_start > 0) & (guard_start < guard))]
 
+        # extract only changes
+        logging.debug('extracting only state changes for voice %u (rows before %u)', v, len(v_df))
+        v_df = v_df.reset_index().set_index('clock')
+        v_df = squeeze_diffs(v_df, v_df.columns)
+        logging.debug('extracted only state changes for voice %u (rows after %u)', v, len(v_df))
+        v_df = v_df.reset_index().set_index('ssf')
+
         # remove empty SSFs
         for col in ('freq1', 'vol', 'gate1'):
             logging.debug('removing empty SSFs with no %s for voice %u (%u rows before)', col, v, len(v_df))
@@ -448,12 +455,6 @@ def split_vdf(sid, df, near=16, guard=96, maxprspeed=20):
         v_df = v_df[v_df['test1_min'] == 0].drop(['test1_min'], axis=1)
 
         v_df = calc_rates(v_df, non_meta_cols)
-
-        # extract only changes
-        logging.debug('extracting only state changes for voice %u (rows before %u)', v, len(v_df))
-        v_df = v_df.reset_index().set_index('clock')
-        v_df = squeeze_diffs(v_df, v_df.columns)
-        logging.debug('extracted only state changes for voice %u (rows after %u)', v, len(v_df))
 
         v_df.reset_index(level=0, inplace=True)
 
