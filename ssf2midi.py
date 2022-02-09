@@ -77,7 +77,7 @@ for row in ssf_log_df.itertuples():
             wav_file = None
         duration = row.duration
         if pd.notna(duration):
-            ssf_df.loc[ssf_df.index[-1], ['clock']] = duration
+            ssf_df.rename(index={ssf_df.index[-1]: duration}, inplace=True)
         ssf = SidSoundFragment(args.percussion, sid, ssf_df, smf, wav_file=wav_file)
         ssf_cache[row.hashid] = ssf
         ssf_instruments.append(ssf.instrument({'hashid': row.hashid}))
