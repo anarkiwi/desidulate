@@ -194,7 +194,6 @@ def reg2state(snd_log_name, nrows=(10 * 1e6)):
             reg_df = squeeze_diffs(reg_df, reg_cols)
             reg_dfs.append(reg_df)
         df = pd.concat(reg_dfs)
-        df['clock'] -= df['clock'].min()
         df = df.set_index('clock').sort_index()
         return df
 
@@ -470,15 +469,20 @@ def split_vdf(sid, df, near=16, guard=96, maxprspeed=20):
 
         v_df['rate'], v_df['rate_max'] = calc_rates(v_df, non_meta_cols)
 
-        v_df.reset_index(level=0, inplace=True)
-
         v_df['pr_speed'] = v_df['rate'].rfloordiv(sid.clockq).astype(pd.UInt8Dtype())
         v_df.loc[(v_df['pr_speed'] == 0) | (v_df['rate_max'] == 0), 'pr_speed'] = int(1)
         v_df.drop(['rate_max'], axis=1, inplace=True)
-        pr_frame_clock = v_df['pr_speed'].rfloordiv(sid.clockq)
-        v_df['pr_frame'] = v_df['clock'].floordiv(pr_frame_clock).astype(pd.Int64Dtype()) - v_df['clock_start'].floordiv(pr_frame_clock).astype(pd.Int64Dtype())
-        v_df['vbi_frame'] = v_df['clock'].floordiv(int(sid.clockq)) - v_df['clock_start'].floordiv(int(sid.clockq))
+        v_df['vbi_frame'] = v_df['clock'] * (1e6 / sid.clock_freq)
+        v_df['vbi_frame'] = v_df['vbi_frame'].floordiv(sid.clockq).astype(pd.Int64Dtype())
+        v_df['pr_frame'] = v_df['vbi_frame'] * v_df['pr_speed']
         v_df['clock'] -= v_df['clock_start']
+
+        pr_frame_min = v_df.groupby('ssf', sort=False)['pr_frame'].min()
+        v_df['pr_frame'] -= pr_frame_min
+        vbi_frame_min = v_df.groupby('ssf', sort=False)['vbi_frame'].min()
+        v_df['vbi_frame'] -= vbi_frame_min
+
+        v_df.reset_index(level=0, inplace=True)
 
         v_df['v'] = v
         v_df['ssf'] += ssfs

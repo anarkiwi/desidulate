@@ -65,11 +65,11 @@ class SSFTestCase(unittest.TestCase):
             for row in ssf_log_df.itertuples():
                 ssf_df = ssf_dfs[ssf_dfs['hashid'] == row.hashid].set_index('clock')
                 ssf = SidSoundFragment(True, sid, ssf_df, smf)
-                if ssf and row.clock == 103:
+                if ssf and row.clock == 104:
                     break
             self.assertTrue(row is not None)
             if row:
-                self.assertEqual(row.clock, 103)
+                self.assertEqual(row.clock, 104)
                 self.assertEqual(row.voice, 2)
             self.assertTrue(ssf is not None)
             if ssf:
