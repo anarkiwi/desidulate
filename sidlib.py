@@ -247,11 +247,13 @@ def reg2state(snd_log_name, nrows=(10 * 1e6)):
         for v in (1, 2, 3):
             set_voice(reg_df, v)
         set_common(reg_df)
-        return reg_df.drop(all_regs, axis=1)
+        reg_df.drop(all_regs, axis=1, inplace=True)
+        return reg_df
 
     df = compress_writes()
     reg_df = decode_regs(df)
-    df = df.drop(['reg', 'val'], axis=1).join(reg_df, on='clock')
+    df.drop(['reg', 'val'], axis=1, inplace=True)
+    df = df.join(reg_df, on='clock')
     logging.debug('%u rows from %s after compression', len(df), snd_log_name)
     return df
 
@@ -376,14 +378,16 @@ def split_vdf(sid, df, near=16, guard=96, maxprspeed=20):
             logging.debug('removing redundant AD for voice %u', v)
             # select AD from when gate on
             ad_df = v_df[v_df['diff_gate1'] == 1][['ssf', 'atk1', 'dec1']]
-            v_df = v_df.drop(['atk1', 'dec1'], axis=1).merge(ad_df, on='ssf', right_index=False)
+            v_df.drop(['atk1', 'dec1'], axis=1, inplace=True)
+            v_df = v_df.merge(ad_df, on='ssf', right_index=False)
 
         if v_df['rel1'].max():
             logging.debug('removing redundant R for voice %u', v)
             # select R from when gate off
             r_df = v_df[v_df['diff_gate1'] == -1][['ssf', 'rel1']]
             if not r_df.empty:
-                v_df = v_df.drop(['rel1'], axis=1).merge(r_df, on='ssf', right_index=False)
+                v_df.drop(['rel1'], axis=1, inplace=True)
+                v_df = v_df.merge(r_df, on='ssf', right_index=False)
 
         # use first non-zero S while gate on.
         logging.debug('removing redundant S for voice %u', v)
@@ -393,7 +397,7 @@ def split_vdf(sid, df, near=16, guard=96, maxprspeed=20):
 
         v_df.loc[v_df['diff_gate1'] != 1, ['atk1', 'dec1', 'sus1', 'rel1']] = pd.NA
         v_df.loc[(v_df['diff_gate1'] == 1) & (v_df['test1'] == 1), ['test1_initial']] = 1
-        v_df = v_df.drop(['diff_gate1'], axis=1)
+        v_df.drop(['diff_gate1'], axis=1, inplace=True)
 
         # TODO: Skip SSFs with sample playback.
         # http://www.ffd2.com/fridge/chacking/c=hacking20.txt
@@ -406,7 +410,7 @@ def split_vdf(sid, df, near=16, guard=96, maxprspeed=20):
         logging.debug('removing redundant state for voice %u', v)
         # If test1 is set only at the start of the SSF, remove inaudible state.
         v_df.loc[v_df['test1_initial'] == 1, ['freq1', 'tri1', 'saw1', 'pulse1', 'noise1', 'flt1'] + mod_cols] = pd.NA
-        v_df = v_df.drop(['test1_initial'], axis=1)
+        v_df.drop(['test1_initial'], axis=1, inplace=True)
 
         # remove modulator voice state while sync1/ring1 not set
         v_df.loc[~((v_df['sync1'] == 1) | ((v_df['ring1'] == 1) & (v_df['tri1'] == 1))), mod_cols] = pd.NA
@@ -421,14 +425,16 @@ def split_vdf(sid, df, near=16, guard=96, maxprspeed=20):
         v_df['test1_last'] = v_df['clock']
         v_df.loc[v_df['test1'] == 1, ['test1_last']] = pd.NA
         v_df['test1_last'] = v_df.groupby(['ssf'], sort=False)['test1_last'].max()
-        v_df = v_df[(v_df['clock'] <= v_df['test1_last'])].drop(['test1_last'], axis=1)
+        v_df = v_df[(v_df['clock'] <= v_df['test1_last'])]
+        v_df.drop(['test1_last'], axis=1, inplace=True)
 
         # remove trailing rows when no waveform set.
         v_df['waveform_last'] = v_df['clock']
         v_df.loc[(v_df['pulse1'] == 0) & (v_df['tri1'] == 0) & (v_df['noise1'] == 0) & (v_df['saw1'] == 0), ['waveform_last']] = pd.NA
         v_df['waveform_last'] = v_df.groupby(['ssf'], sort=False)['waveform_last'].max()
         # also removes SSFs with no waveform.
-        v_df = v_df[(v_df['clock'] <= v_df['waveform_last'])].drop(['waveform_last'], axis=1)
+        v_df = v_df[(v_df['clock'] <= v_df['waveform_last'])]
+        v_df.drop(['waveform_last'], axis=1, inplace=True)
 
         logging.debug('calculating clock for voice %u', v)
         v_df['clock_start'] = v_df.groupby(['ssf'], sort=False)['clock'].min()
@@ -451,9 +457,11 @@ def split_vdf(sid, df, near=16, guard=96, maxprspeed=20):
         for col in ('freq1', 'vol', 'gate1'):
             logging.debug('removing empty SSFs with no %s for voice %u (%u rows before)', col, v, len(v_df))
             v_df['max_col'] = v_df.groupby('ssf', sort=False)[col].max()
-            v_df = v_df[v_df['max_col'] > 0].drop(['max_col'], axis=1)
+            v_df = v_df[v_df['max_col'] > 0]
+            v_df.drop(['max_col'], axis=1, inplace=True)
         v_df['test1_min'] = v_df.groupby('ssf', sort=False)['test1'].min()
-        v_df = v_df[v_df['test1_min'] == 0].drop(['test1_min'], axis=1)
+        v_df = v_df[v_df['test1_min'] == 0]
+        v_df = v_df.drop(['test1_min'], axis=1, inplace=True)
 
         if v_df.empty:
             continue
