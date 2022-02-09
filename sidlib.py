@@ -456,23 +456,24 @@ def split_vdf(sid, df, near=16, guard=96, maxprspeed=20):
         v_df['test1_min'] = v_df.groupby('ssf', sort=False)['test1'].min()
         v_df = v_df[v_df['test1_min'] == 0].drop(['test1_min'], axis=1)
 
+        if v_df.empty:
+            continue
+
         v_df['rate'] = calc_rates(v_df, non_meta_cols)
 
         v_df.reset_index(level=0, inplace=True)
 
         v_df['pr_speed'] = v_df['rate'].rfloordiv(sid.clockq).astype(pd.UInt8Dtype())
         v_df.loc[v_df['pr_speed'] == 0, 'pr_speed'] = int(1)
-        v_df['pr_frame_clock'] = v_df['pr_speed'].rfloordiv(sid.clockq)
-        v_df['pr_frame'] = v_df['clock'].floordiv(v_df['pr_frame_clock']).astype(pd.Int64Dtype()) - v_df['clock_start'].floordiv(v_df['pr_frame_clock']).astype(pd.Int64Dtype())
+        pr_frame_clock = v_df['pr_speed'].rfloordiv(sid.clockq)
+        v_df['pr_frame'] = v_df['clock'].floordiv(pr_frame_clock).astype(pd.Int64Dtype()) - v_df['clock_start'].floordiv(pr_frame_clock).astype(pd.Int64Dtype())
         v_df['vbi_frame'] = v_df['clock'].floordiv(int(sid.clockq)) - v_df['clock_start'].floordiv(int(sid.clockq))
-        v_df['clock'] = v_df['clock'] - v_df['clock_start']
-        v_df = v_df.drop(['pr_frame_clock'], axis=1)
+        v_df['clock'] -= v_df['clock_start']
 
         v_df['v'] = v
         v_df['ssf'] += ssfs
-        if not v_df.empty:
-            ssfs = v + v_df['ssf'].max()
-            v_dfs.append(v_df)
+        ssfs = v + v_df['ssf'].max()
+        v_dfs.append(v_df)
 
     if v_dfs:
         v_dfs = pd.concat(v_dfs)
