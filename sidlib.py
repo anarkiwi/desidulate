@@ -340,8 +340,7 @@ def split_vdf(sid, df, near=16, guard=96, maxprspeed=20):
             method='ffill').diff().astype(pd.Int64Dtype())
         for col in rate_cols:
             rate_col_df.loc[rate_col_df[col] <= ratemin, col] = pd.NA
-        rate_col_df[rate_cols] = rate_col_df.groupby(['ssf'], sort=False)[rate_cols].min()
-        rate = rate_col_df[rate_cols].min(axis=1).astype(pd.Int64Dtype())
+        rate = rate_col_df.groupby(['ssf'], sort=False)[rate_cols].min().min(axis=1).astype(pd.Int64Dtype())
         return rate
 
     df = set_sid_dtype(df)
