@@ -30,7 +30,8 @@ CANON_REG_ORDER = (
 
 def resampledf_to_pr(sid, ssf_df):
     resample_df = ssf_df.copy().fillna(method='ffill').drop_duplicates('pr_frame', keep='last')
-    resample_df['clock'] = resample_df['pr_frame'] * int(sid.clockq / resample_df['pr_speed'].iat[0])
+    pr_speed = resample_df['pr_speed'].iat[0]
+    resample_df['clock'] = resample_df['pr_frame'] * int(sid.clockq / pr_speed)
     return resample_df.set_index('clock')
 
 
@@ -340,7 +341,7 @@ def split_vdf(sid, df, near=16, guard=96, maxprspeed=20):
 
         rate_col_df[rate_cols] = rate_col_df.groupby(['ssf'], sort=False)[rate_cols].fillna(
             method='ffill').diff().astype(pd.Int64Dtype())
-        rate_max = rate_col_df.groupby(['ssf'], sort=False)[rate_cols].max().max(axis=1).astype(pd.Int64Dtype())
+        rate_max = rate_col_df.groupby(['ssf'], sort=False)[rate_cols].max().max(axis=1).fillna(0).astype(pd.Int64Dtype())
         for col in rate_cols:
             rate_col_df.loc[rate_col_df[col] <= ratemin, col] = pd.NA
         rate = rate_col_df.groupby(['ssf'], sort=False)[rate_cols].min().min(axis=1).astype(pd.Int64Dtype())
