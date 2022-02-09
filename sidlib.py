@@ -483,12 +483,11 @@ def split_vdf(sid, df, near=16, guard=96, maxprspeed=20):
         v_df.drop(['rate_max'], axis=1, inplace=True)
         v_df['vbi_frame'] = calc_vbi_frame(sid, v_df['clock'])
         v_df['pr_frame'] = v_df['vbi_frame'] * v_df['pr_speed']
-        v_df['clock'] -= v_df['clock_start']
 
-        pr_frame_min = v_df.groupby('ssf', sort=False)['pr_frame'].min()
-        v_df['pr_frame'] -= pr_frame_min
-        vbi_frame_min = v_df.groupby('ssf', sort=False)['vbi_frame'].min()
-        v_df['vbi_frame'] -= vbi_frame_min
+        for col in ('vbi_frame', 'pr_frame'):
+            col_min = v_df.groupby('ssf', sort=False)[col].min()
+            v_df[col] -= col_min
+        v_df['clock'] -= v_df['clock_start']
 
         v_df.reset_index(level=0, inplace=True)
 
