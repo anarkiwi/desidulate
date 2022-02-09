@@ -317,6 +317,30 @@ def split_vdf(sid, df, near=16, guard=96, ratemin=1024):
         vdf.drop(['row_hash'], inplace=True, axis=1)
         return vdf
 
+    def calc_rates(vdf, non_meta_cols):
+        rate_cols = []
+        rate_col_pairs = []
+        for col in sorted(non_meta_cols - {'atk1', 'dec1', 'sus1', 'rel1', 'gate1', 'fltext'}):
+            col_max = vdf[col].max()
+            if pd.notna(col_max) and col_max:
+                rate_col = '%s_rate' % col
+                rate_cols.append(rate_col)
+                rate_col_pairs.append((col, rate_col))
+
+        for col, rate_col in rate_col_pairs:
+            logging.debug('calculating %s rates for voice %u', col, v)
+            diff = vdf.groupby(['ssf'], sort=False)[col].diff()
+            vdf[rate_col] = vdf['clock']
+            vdf.loc[((diff == 0) | (diff.isna()) & (vdf.clock != 0)), [rate_col]] = pd.NA
+
+        vdf[rate_cols] = vdf.groupby(['ssf'], sort=False)[rate_cols].fillna(
+            method='ffill').diff().astype(pd.Int64Dtype())
+        for col in rate_cols:
+            vdf.loc[vdf[col] <= ratemin, col] = pd.NA
+        vdf[rate_cols] = vdf.groupby(['ssf'], sort=False)[rate_cols].min()
+        vdf['rate'] = vdf[rate_cols].min(axis=1).astype(pd.Int64Dtype())
+        return vdf.drop(rate_cols, axis=1)
+
     df = set_sid_dtype(df)
     df = coalesce_near_writes(df, ('fltcoff',), near=near)
     # when filter is not routed, cutoff and resonance do not matter.
@@ -422,28 +446,7 @@ def split_vdf(sid, df, near=16, guard=96, ratemin=1024):
         v_df['test1_min'] = v_df.groupby('ssf', sort=False)['test1'].min()
         v_df = v_df[v_df['test1_min'] == 0].drop(['test1_min'], axis=1)
 
-        rate_cols = []
-        rate_col_pairs = []
-        for col in sorted(non_meta_cols - {'atk1', 'dec1', 'sus1', 'rel1', 'gate1', 'fltext'}):
-            col_max = v_df[col].max()
-            if pd.notna(col_max) and col_max:
-                rate_col = '%s_rate' % col
-                rate_cols.append(rate_col)
-                rate_col_pairs.append((col, rate_col))
-
-        for col, rate_col in rate_col_pairs:
-            logging.debug('calculating %s rates for voice %u', col, v)
-            diff = v_df.groupby(['ssf'], sort=False)[col].diff()
-            v_df[rate_col] = v_df['clock']
-            v_df.loc[((diff == 0) | (diff.isna()) & (v_df.clock != 0)), [rate_col]] = pd.NA
-
-        v_df[rate_cols] = v_df.groupby(['ssf'], sort=False)[rate_cols].fillna(
-            method='ffill').diff().astype(pd.Int64Dtype())
-        for col in rate_cols:
-            v_df.loc[v_df[col] <= ratemin, col] = pd.NA
-        v_df[rate_cols] = v_df.groupby(['ssf'], sort=False)[rate_cols].min()
-        v_df['rate'] = v_df[rate_cols].min(axis=1).astype(pd.Int64Dtype())
-        v_df = v_df.drop(rate_cols, axis=1)
+        v_df = calc_rates(v_df, non_meta_cols)
 
         # extract only changes
         logging.debug('extracting only state changes for voice %u (rows before %u)', v, len(v_df))
