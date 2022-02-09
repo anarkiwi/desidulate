@@ -13,7 +13,7 @@ from collections import Counter
 from itertools import groupby
 import pandas as pd
 from fileio import out_path, read_csv
-from sidlib import set_sid_dtype
+from sidlib import set_sid_dtype, resampledf_to_pr
 from sidmidi import ELECTRIC_SNARE, BASS_DRUM, LOW_TOM, HIGH_TOM, PEDAL_HIHAT, CLOSED_HIHAT, OPEN_HIHAT, ACCOUSTIC_SNARE, closest_midi
 from sidwav import state2samples, samples_loudestf, readwav
 
@@ -45,7 +45,7 @@ class SidSoundFragment:
                 for row in ssf.itertuples()]
 
     def __init__(self, percussion, sid, df, smf, wav_file=None):
-        self.df = df
+        self.df = resampledf_to_pr(sid, df)
         self.percussion = percussion
         waveform_states = self._waveform_state(self.df)
         self.waveform_order = tuple([frozenset(i[0]) for i in groupby(waveform_states)])

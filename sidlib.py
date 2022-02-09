@@ -28,11 +28,20 @@ CANON_REG_ORDER = (
     'atk1', 'dec1', 'sus1', 'rel1', 'vol')
 
 
+def calc_vbi_frame(sid, clock):
+    vbi_frame = clock * (1e6 / sid.clock_freq)
+    vbi_frame = vbi_frame.floordiv(sid.clockq).astype(pd.Int64Dtype())
+    return vbi_frame
+
+
 def resampledf_to_pr(sid, ssf_df):
-    resample_df = ssf_df.copy().fillna(method='ffill').drop_duplicates('pr_frame', keep='last')
-    pr_speed = resample_df['pr_speed'].iat[0]
-    resample_df['clock'] = resample_df['pr_frame'] * int(sid.clockq / pr_speed)
-    return resample_df.set_index('clock')
+    pr_speed = ssf_df['pr_speed'].iat[0]
+    if pr_speed == 1:
+        return ssf_df
+    resample_df = ssf_df.fillna(method='ffill').drop_duplicates('pr_frame', keep='last').reset_index(drop=True).drop('vbi_frame', axis=1).copy()
+    resample_df_clock = ssf_df[['pr_frame', 'vbi_frame']].fillna(method='ffill').reset_index().drop_duplicates('pr_frame', keep='first').copy()
+    resample_df = resample_df.merge(resample_df_clock, on='pr_frame').set_index('clock').sort_index()
+    return resample_df
 
 
 def remove_end_repeats(waveforms):
@@ -472,8 +481,7 @@ def split_vdf(sid, df, near=16, guard=96, maxprspeed=20):
         v_df['pr_speed'] = v_df['rate'].rfloordiv(sid.clockq).astype(pd.UInt8Dtype())
         v_df.loc[(v_df['pr_speed'] == 0) | (v_df['rate_max'] == 0), 'pr_speed'] = int(1)
         v_df.drop(['rate_max'], axis=1, inplace=True)
-        v_df['vbi_frame'] = v_df['clock'] * (1e6 / sid.clock_freq)
-        v_df['vbi_frame'] = v_df['vbi_frame'].floordiv(sid.clockq).astype(pd.Int64Dtype())
+        v_df['vbi_frame'] = calc_vbi_frame(sid, v_df['clock'])
         v_df['pr_frame'] = v_df['vbi_frame'] * v_df['pr_speed']
         v_df['clock'] -= v_df['clock_start']
 

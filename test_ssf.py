@@ -4,7 +4,7 @@ import os
 import tempfile
 import unittest
 import pandas as pd
-from sidlib import get_sid, reg2state, state2ssfs
+from sidlib import get_sid, reg2state, state2ssfs, calc_vbi_frame
 from sidmidi import SidMidiFile, DEFAULT_BPM
 from ssf import SidSoundFragment, add_freq_notes_df
 
@@ -17,7 +17,9 @@ class SSFTestCase(unittest.TestCase):
         sid = get_sid(pal=True)
         smf = SidMidiFile(sid, DEFAULT_BPM)
         df = add_freq_notes_df(sid, df)
-        df['vbi_frame'] = df['clock'].floordiv(int(sid.clockq))
+        df['pr_speed'] = 1
+        df['vbi_frame'] = calc_vbi_frame(sid, df['clock'])
+        df['pr_frame'] = df['vbi_frame'].floordiv(df['pr_speed'])
         df = df.fillna(method='ffill').set_index('clock')
         return SidSoundFragment(percussion=percussion, sid=sid, smf=smf, df=df)
 
