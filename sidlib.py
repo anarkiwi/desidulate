@@ -340,10 +340,11 @@ def split_vdf(sid, df, near=16, guard=96, maxprspeed=20):
 
         rate_col_df[rate_cols] = rate_col_df.groupby(['ssf'], sort=False)[rate_cols].fillna(
             method='ffill').diff().astype(pd.Int64Dtype())
+        rate_max = rate_col_df.groupby(['ssf'], sort=False)[rate_cols].max().max(axis=1).astype(pd.Int64Dtype())
         for col in rate_cols:
             rate_col_df.loc[rate_col_df[col] <= ratemin, col] = pd.NA
         rate = rate_col_df.groupby(['ssf'], sort=False)[rate_cols].min().min(axis=1).astype(pd.Int64Dtype())
-        return rate
+        return (rate, rate_max)
 
     df = set_sid_dtype(df)
     df = coalesce_near_writes(df, ('fltcoff',), near=near)
@@ -466,12 +467,13 @@ def split_vdf(sid, df, near=16, guard=96, maxprspeed=20):
         if v_df.empty:
             continue
 
-        v_df['rate'] = calc_rates(v_df, non_meta_cols)
+        v_df['rate'], v_df['rate_max'] = calc_rates(v_df, non_meta_cols)
 
         v_df.reset_index(level=0, inplace=True)
 
         v_df['pr_speed'] = v_df['rate'].rfloordiv(sid.clockq).astype(pd.UInt8Dtype())
-        v_df.loc[v_df['pr_speed'] == 0, 'pr_speed'] = int(1)
+        v_df.loc[(v_df['pr_speed'] == 0) | (v_df['rate_max'] == 0), 'pr_speed'] = int(1)
+        v_df.drop(['rate_max'], axis=1, inplace=True)
         pr_frame_clock = v_df['pr_speed'].rfloordiv(sid.clockq)
         v_df['pr_frame'] = v_df['clock'].floordiv(pr_frame_clock).astype(pd.Int64Dtype()) - v_df['clock_start'].floordiv(pr_frame_clock).astype(pd.Int64Dtype())
         v_df['vbi_frame'] = v_df['clock'].floordiv(int(sid.clockq)) - v_df['clock_start'].floordiv(int(sid.clockq))
@@ -558,8 +560,6 @@ def state2ssfs(sid, df):
 
     for v, v_df in split_vdf(sid, df):
         ssfs = v_df['ssf'].nunique()
-        if pd.isna(ssfs):
-            continue
         logging.debug('splitting %u SSFs for voice %u', ssfs, v)
         for hashid_noclock, hashid_noclock_df in v_df.groupby(['hashid_noclock'], sort=False):
             for _, ssf_df in hashid_noclock_df.groupby(['ssf'], sort=False):
