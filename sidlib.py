@@ -461,7 +461,7 @@ def split_vdf(sid, df, near=16, guard=96, maxprspeed=20):
             v_df.drop(['max_col'], axis=1, inplace=True)
         v_df['test1_min'] = v_df.groupby('ssf', sort=False)['test1'].min()
         v_df = v_df[v_df['test1_min'] == 0]
-        v_df = v_df.drop(['test1_min'], axis=1, inplace=True)
+        v_df.drop(['test1_min'], axis=1, inplace=True)
 
         if v_df.empty:
             continue
