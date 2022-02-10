@@ -50,7 +50,17 @@ def resample():
         cols = (set(resample_df.columns) - meta_cols)
         df_raw = {col: resample_df[col].iat[-1] for col in meta_cols - {'pr_frame'}}
         waveforms = df_waveform_order(resample_df)
-        assert pre_waveforms == waveforms, (ssf_df, resample_df)
+        a = pre_waveforms
+        b = waveforms
+        if a[0] == '0':
+            a = a[1:]
+        if b[0] == '0':
+            b = b[1:]
+        if a != b:
+            print(a)
+            print(b)
+            print(ssf_df.drop(['hashid', 'hashid_noclock', 'vbi_frame'], axis=1).reset_index(drop=True).set_index('clock'))
+            print(resample_df.drop(['hashid', 'hashid_noclock', 'vbi_frame'], axis=1))
 
         for row in resample_df.itertuples():
             time_cols = {(col, '%s_%u' % (col, row.pr_frame)) for col in cols if not (col in adsr_cols and row.pr_frame)}
