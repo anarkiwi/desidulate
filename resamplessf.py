@@ -46,7 +46,7 @@ def resample():
     for _, ssf_df in df.groupby(['hashid']):  # pylint: disable=no-member
         pre_waveforms = df_waveform_order(ssf_df)
         resample_df = ssf_df.reset_index(drop=True).set_index('clock')
-        resample_df = resampledf_to_pr(sid, resample_df)
+        resample_df = resampledf_to_pr(resample_df)
         cols = (set(resample_df.columns) - meta_cols)
         df_raw = {col: resample_df[col].iat[-1] for col in meta_cols - {'pr_frame'}}
         waveforms = df_waveform_order(resample_df)

@@ -34,7 +34,7 @@ def calc_vbi_frame(sid, clock, pr_speed=1):
     return vbi_frame
 
 
-def resampledf_to_pr(sid, ssf_df):
+def resampledf_to_pr(ssf_df):
     pr_speed = ssf_df['pr_speed'].iat[0]
     resample_df = ssf_df.drop_duplicates('pr_frame', keep='last').reset_index(drop=True).drop('vbi_frame', axis=1).copy()
     resample_df_clock = ssf_df[['pr_frame', 'vbi_frame']].reset_index().drop_duplicates('pr_frame', keep='first').copy()

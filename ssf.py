@@ -45,7 +45,7 @@ class SidSoundFragment:
                 for row in ssf.itertuples()]
 
     def __init__(self, percussion, sid, df, smf, wav_file=None):
-        self.df = resampledf_to_pr(sid, df)
+        self.df = resampledf_to_pr(df)
         self.percussion = percussion
         waveform_states = self._waveform_state(self.df)
         self.waveform_order = tuple([frozenset(i[0]) for i in groupby(waveform_states)])

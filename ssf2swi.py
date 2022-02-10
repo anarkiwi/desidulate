@@ -67,7 +67,7 @@ def filter_from_row(row):
 
 df = pd.read_csv(args.ssffile, dtype=pd.Int64Dtype())
 ssf_df = df[df.hashid == args.hashid].drop(['hashid_noclock', 'count', 'rate', 'vol', 'hashid', 'fltext'], axis=1)
-ssf_df = resampledf_to_pr(sid, ssf_df).reset_index(drop=True)
+ssf_df = resampledf_to_pr(ssf_df).reset_index(drop=True)
 
 atk1, dec1, sus1, rel1, pr_speed, test1_initial = ssf_df[['atk1', 'dec1', 'sus1', 'rel1', 'pr_speed', 'test1']].iloc[0]
 ssf_df = ssf_df.drop(['atk1', 'dec1', 'sus1', 'rel1', 'pr_speed'], axis=1)

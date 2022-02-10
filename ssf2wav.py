@@ -64,12 +64,13 @@ hashid = np.int64(args.hashid)
 
 
 def render_wav(ssf_df, wavfile, verbose):
+    ssf_df = ssf_df.set_index('clock')
     if args.pr_resample:
         if pd.isna(ssf_df['pr_speed'].iat[0]):
             return
-        ssf_df = resampledf_to_pr(sid, ssf_df)
+        ssf_df = resampledf_to_pr(ssf_df)
     else:
-        ssf_df = ssf_df.fillna(method='ffill').set_index('clock')
+        ssf_df = ssf_df.fillna(method='ffill')
     df2wav(ssf_df, sid, wavfile, skiptest=args.skiptest)
     if verbose:
         print(ssf_df.to_string())
