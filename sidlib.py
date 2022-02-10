@@ -30,14 +30,13 @@ CANON_REG_ORDER = (
 
 def calc_vbi_frame(sid, clock, pr_speed=1):
     vbi_frame = clock * (1e6 / sid.clock_freq)
-    vbi_frame = vbi_frame.floordiv(sid.clockqf / pr_speed).astype(pd.Int64Dtype())
+    vbi_frame = vbi_frame.floordiv(round(sid.clockqf / pr_speed)).astype(pd.Int64Dtype())
     return vbi_frame
 
 
 def resampledf_to_pr(sid, ssf_df):
     pr_speed = ssf_df['pr_speed'].iat[0]
-    resample_df = ssf_df.fillna(method='ffill')
-    resample_df = resample_df.drop_duplicates('pr_frame', keep='last').reset_index(drop=True).drop('vbi_frame', axis=1).copy()
+    resample_df = ssf_df.drop_duplicates('pr_frame', keep='last').reset_index(drop=True).drop('vbi_frame', axis=1).copy()
     resample_df_clock = ssf_df[['pr_frame', 'vbi_frame']].reset_index().drop_duplicates('pr_frame', keep='first').copy()
     resample_df = resample_df.merge(resample_df_clock, on='pr_frame').set_index('clock').sort_index()
     return resample_df

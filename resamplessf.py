@@ -44,11 +44,14 @@ def resample():
     meta_cols -= {'clock'}
 
     for _, ssf_df in df.groupby(['hashid']):  # pylint: disable=no-member
+        pre_waveforms = df_waveform_order(ssf_df)
         resample_df = ssf_df.reset_index(drop=True).set_index('clock')
         resample_df = resampledf_to_pr(sid, resample_df)
         cols = (set(resample_df.columns) - meta_cols)
         df_raw = {col: resample_df[col].iat[-1] for col in meta_cols - {'pr_frame'}}
         waveforms = df_waveform_order(resample_df)
+        assert pre_waveforms == waveforms, (ssf_df, resample_sf)
+
         for row in resample_df.itertuples():
             time_cols = {(col, '%s_%u' % (col, row.pr_frame)) for col in cols if not (col in adsr_cols and row.pr_frame)}
             df_raw.update({time_col: getattr(row, col) for col, time_col in time_cols})
