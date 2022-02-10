@@ -28,9 +28,9 @@ CANON_REG_ORDER = (
     'atk1', 'dec1', 'sus1', 'rel1', 'vol')
 
 
-def calc_vbi_frame(sid, clock):
+def calc_vbi_frame(sid, clock, pr_speed=1):
     vbi_frame = clock * (1e6 / sid.clock_freq)
-    vbi_frame = vbi_frame.floordiv(sid.clockq).astype(pd.Int64Dtype())
+    vbi_frame = vbi_frame.floordiv(sid.clockq / pr_speed).astype(pd.Int64Dtype())
     return vbi_frame
 
 
@@ -482,7 +482,8 @@ def split_vdf(sid, df, near=16, guard=96, maxprspeed=20):
         v_df.loc[(v_df['pr_speed'] == 0) | (v_df['rate_max'] == 0), 'pr_speed'] = int(1)
         v_df.drop(['rate_max'], axis=1, inplace=True)
         v_df['vbi_frame'] = calc_vbi_frame(sid, v_df['clock'])
-        v_df['pr_frame'] = v_df['vbi_frame'] * v_df['pr_speed']
+        pr_frame = calc_vbi_frame(sid, v_df['clock'], pr_speed=maxprspeed)
+        v_df['pr_frame'] = pr_frame.floordiv(v_df['pr_speed'].rfloordiv(maxprspeed))
 
         for col in ('vbi_frame', 'pr_frame'):
             col_min = v_df.groupby('ssf', sort=False)[col].min()
