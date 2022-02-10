@@ -42,7 +42,7 @@ class SSFTestCase(unittest.TestCase):
         self.assertEqual(s.waveforms, {'tri'})
         self.assertEqual(s.midi_pitches, (35,))
         self.assertEqual(s.total_duration, 78820)
-        self.assertEqual(s.midi_notes, ((20000, 1, 35, 78820, 127, 60.134765625),))
+        self.assertEqual(s.midi_notes, ((20000, 405, 35, 78820, 127, 60.134765625),))
 
     def test_ssf_parser(self):
         with tempfile.TemporaryDirectory() as tmpdir:

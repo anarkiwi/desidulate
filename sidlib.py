@@ -29,8 +29,9 @@ CANON_REG_ORDER = (
 
 
 def calc_vbi_frame(sid, clock, pr_speed=1):
-    vbi_frame = clock * (1e6 / sid.clock_freq)
-    vbi_frame = vbi_frame.floordiv(round(sid.clockqf / pr_speed)).astype(pd.Int64Dtype())
+    t_scaler = (1e6 / sid.clock_freq)
+    vbi_frame = clock * t_scaler
+    vbi_frame = vbi_frame.floordiv(sid.int_freq / pr_speed).astype(pd.Int64Dtype())
     return vbi_frame
 
 
