@@ -149,7 +149,7 @@ class SidWrap:
             model=model, clock_frequency=self.clock_freq,
             sampling_frequency=sampling_frequency)
         self.clockqf = self.clock_freq / self.int_freq
-        self.clockq = int(round(self.clockq))
+        self.clockq = int(round(self.clockqf))
         self.attack_clock = {
             k: int(v / 1e3 * self.clock_freq) for k, v in self.ATTACK_MS.items()}
         self.decay_release_clock = {
