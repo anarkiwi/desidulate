@@ -50,7 +50,7 @@ def resample():
         cols = (set(resample_df.columns) - meta_cols)
         df_raw = {col: resample_df[col].iat[-1] for col in meta_cols - {'pr_frame'}}
         waveforms = df_waveform_order(resample_df)
-        assert pre_waveforms == waveforms, (ssf_df, resample_sf)
+        assert pre_waveforms == waveforms, (ssf_df, resample_df)
 
         for row in resample_df.itertuples():
             time_cols = {(col, '%s_%u' % (col, row.pr_frame)) for col in cols if not (col in adsr_cols and row.pr_frame)}
