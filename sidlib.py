@@ -407,7 +407,6 @@ def split_vdf(sid, df, near=16, guard=96, maxprspeed=20):
         v_df.loc[(v_df['diff_gate1'] == 1) & (v_df['sus1'] == 0) & (v_df['atk1'] == 0), ['sus1']] = 15
 
         v_df.loc[v_df['diff_gate1'] != 1, ['atk1', 'dec1', 'sus1', 'rel1']] = pd.NA
-        v_df.loc[(v_df['diff_gate1'] == 1) & (v_df['test1'] == 1), ['test1_initial']] = 1
         v_df.drop(['diff_gate1'], axis=1, inplace=True)
 
         # TODO: Skip SSFs with sample playback.
@@ -420,8 +419,13 @@ def split_vdf(sid, df, near=16, guard=96, maxprspeed=20):
 
         logging.debug('removing redundant state for voice %u', v)
         # If test1 is set only at the start of the SSF, remove inaudible state.
-        v_df.loc[v_df['test1_initial'] == 1, ['freq1', 'tri1', 'saw1', 'pulse1', 'noise1', 'flt1'] + mod_cols] = pd.NA
-        v_df.drop(['test1_initial'], axis=1, inplace=True)
+        v_df['test1_first'] = v_df['clock']
+        v_df.loc[v_df['test1'] == 1, ['test1_first']] = pd.NA
+        v_df['test1_first'] = v_df.groupby(['ssf'], sort=False)['test1_first'].min()
+        v_df.loc[
+            (v_df['test1'] == 1) & (v_df['clock'] <= v_df['test1_first']),
+            ['freq1', 'tri1', 'saw1', 'pulse1', 'noise1', 'flt1'] + mod_cols] = pd.NA
+        v_df.drop(['test1_first'], axis=1, inplace=True)
 
         # remove modulator voice state while sync1/ring1 not set
         v_df.loc[~((v_df['sync1'] == 1) | ((v_df['ring1'] == 1) & (v_df['tri1'] == 1))), mod_cols] = pd.NA
