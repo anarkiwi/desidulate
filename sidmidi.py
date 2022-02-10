@@ -212,19 +212,20 @@ class SidMidiFile:
     def get_note_starts(self, row_states):
         last_note = None
         last_clock = None
-        last_rel = 0
         last_gate_clock = None
         notes_starts = []
+        first_row = None
         for row, row_waveforms in row_states:
+            if first_row is None:
+                first_row = row
             clock = row.Index
             if row.gate1:
                 last_gate_clock = clock
-                last_rel = row.rel1
             if row_waveforms and not row.test1:
                 # TODO: add pitch bend if significantly different to canonical note.
                 # https://github.com/magenta/magenta/issues/1902
                 if row.closest_note != last_note:
-                    velocity = self.sid_adsr_to_velocity(row, last_rel, last_gate_clock)
+                    velocity = self.sid_adsr_to_velocity(first_row, first_row.rel1, last_gate_clock)
                     assert velocity >= 0 and velocity <= 127, (velocity, row)
                     if velocity:
                         notes_starts.append((clock, row.vbi_frame, int(row.closest_note), velocity, row.real_freq))

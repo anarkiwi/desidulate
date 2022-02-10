@@ -39,6 +39,8 @@ def resampledf_to_pr(sid, ssf_df):
     resample_df = ssf_df.drop_duplicates('pr_frame', keep='last').reset_index(drop=True).drop('vbi_frame', axis=1).copy()
     resample_df_clock = ssf_df[['pr_frame', 'vbi_frame']].reset_index().drop_duplicates('pr_frame', keep='first').copy()
     resample_df = resample_df.merge(resample_df_clock, on='pr_frame').set_index('clock').sort_index()
+    adsr_cols = ['atk1', 'dec1', 'sus1', 'rel1']
+    resample_df[adsr_cols] = resample_df[adsr_cols].fillna(method='ffill')
     return resample_df
 
 
