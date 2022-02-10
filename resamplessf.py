@@ -12,11 +12,12 @@ import numpy as np
 import pandas as pd
 
 from fileio import out_path, read_csv
-from sidlib import df_waveform_order
+from sidlib import df_waveform_order, resampledf_to_pr, timer_args, get_sid
 
 parser = argparse.ArgumentParser(description='Downsample SSFs to frames')
 parser.add_argument('ssffile', help='SSF file')
 parser.add_argument('--max_clock', default=500000, type=int, help='include number of cycles')
+timer_args(parser)
 
 args = parser.parse_args()
 waveform_cols = {'sync1', 'ring1', 'tri1', 'saw1', 'pulse1', 'noise1'}
@@ -26,6 +27,7 @@ sid_cols = { # exclude vol, fltext
     'fltlo', 'fltband', 'flthi', 'flt1', 'fltres', 'fltcoff',
     'freq3', 'test3'}.union(waveform_cols).union(adsr_cols)
 big_regs = {'freq1': 8, 'freq3': 8, 'pwduty1': 4, 'fltcoff': 3}
+sid = get_sid(pal=args.pal)
 
 
 def resample():
@@ -35,13 +37,15 @@ def resample():
         return df_raws
     df = df[df['clock'] <= args.max_clock]
     df = df[df['pr_frame'].notna()]
-    df = df.drop(['clock', 'vol', 'vbi_frame', 'rate'], axis=1)
+    df.drop(['vol', 'rate'], axis=1, inplace=True)
     for col, bits in big_regs.items():
         df[col] = np.left_shift(np.right_shift(df[col], bits), bits)
     meta_cols = set(df.columns) - sid_cols
+    meta_cols -= {'clock'}
 
     for _, ssf_df in df.groupby(['hashid']):  # pylint: disable=no-member
-        resample_df = ssf_df.drop_duplicates('pr_frame', keep='last')
+        resample_df = ssf_df.reset_index(drop=True).set_index('clock')
+        resample_df = resampledf_to_pr(sid, resample_df)
         cols = (set(resample_df.columns) - meta_cols)
         df_raw = {col: resample_df[col].iat[-1] for col in meta_cols - {'pr_frame'}}
         waveforms = df_waveform_order(resample_df)
@@ -71,7 +75,8 @@ def main():
         pr_speed, waveforms = pr_speed_waveforms
         df = pd.DataFrame(dfs, dtype=pd.Int64Dtype()).set_index('hashid')
         nacols = [col for col in df.columns if df[col].isnull().all() or df[col].max() == 0]
-        df = df.drop(nacols, axis=1).drop_duplicates()
+        df.drop(nacols, axis=1, inplace=True)
+        df.drop_duplicates(inplace=True)
         outfile = out_path(args.ssffile, 'resample_ssf.%u.%s.xz' % (pr_speed, waveforms))
         df.to_csv(outfile)
 
