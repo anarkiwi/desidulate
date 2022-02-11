@@ -32,7 +32,7 @@ def calc_vbi_frame(sid, clock, pr_speed=1):
     if pd.isna(pr_speed):
         return pd.NA
     vbi_frame = clock * sid.clock_scaler
-    vbi_frame = vbi_frame.floordiv(sid.vbi_time / pr_speed).astype(pd.Int64Dtype())
+    vbi_frame = vbi_frame.floordiv(sid.int_freq / pr_speed).astype(pd.Int64Dtype())
     return vbi_frame
 
 
@@ -154,7 +154,6 @@ class SidWrap:
         self.clockqf = self.clock_freq / self.int_freq
         self.clockq = int(round(self.clockqf))
         self.clock_scaler = 1e6 / self.clock_freq
-        self.vbi_time = 1e6 / self.clock_scaler / self.int_freq
         self.attack_clock = {
             k: int(v / 1e3 * self.clock_freq) for k, v in self.ATTACK_MS.items()}
         self.decay_release_clock = {
