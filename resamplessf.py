@@ -17,6 +17,7 @@ from sidlib import df_waveform_order, resampledf_to_pr, timer_args, get_sid
 parser = argparse.ArgumentParser(description='Downsample SSFs to frames')
 parser.add_argument('ssffile', help='SSF file')
 parser.add_argument('--max_clock', default=500000, type=int, help='include number of cycles')
+parser.add_argument('--max_pr_speed', default=8, type=int, help='max pr_speed')
 timer_args(parser)
 
 args = parser.parse_args()
@@ -35,8 +36,7 @@ def resample():
     df_raws = defaultdict(list)
     if len(df) < 1:
         return df_raws
-    df = df[df['clock'] <= args.max_clock]
-    df = df[df['pr_frame'].notna()]
+    df = df[(df['clock'] <= args.max_clock) & (df['pr_speed'] <= args.max_pr_speed)]
     df.drop(['vol', 'rate'], axis=1, inplace=True)
     for col, bits in big_regs.items():
         df[col] = np.left_shift(np.right_shift(df[col], bits), bits)
@@ -50,17 +50,12 @@ def resample():
         cols = (set(resample_df.columns) - meta_cols)
         df_raw = {col: resample_df[col].iat[-1] for col in meta_cols - {'pr_frame'}}
         waveforms = df_waveform_order(resample_df)
-        a = pre_waveforms
-        b = waveforms
-        if a[0] == '0':
-            a = a[1:]
-        if b[0] == '0':
-            b = b[1:]
-        if a != b:
-            print(a)
-            print(b)
-            print(ssf_df.drop(['hashid', 'hashid_noclock', 'vbi_frame'], axis=1).reset_index(drop=True).set_index('clock'))
+        if pre_waveforms != waveforms:
+            print(pre_waveforms)
+            print(waveforms)
+            print(ssf_df.reset_index(drop=True).set_index('clock').drop(['hashid', 'hashid_noclock', 'vbi_frame'], axis=1))
             print(resample_df.drop(['hashid', 'hashid_noclock', 'vbi_frame'], axis=1))
+            raise
 
         for row in resample_df.itertuples():
             time_cols = {(col, '%s_%u' % (col, row.pr_frame)) for col in cols if not (col in adsr_cols and row.pr_frame)}

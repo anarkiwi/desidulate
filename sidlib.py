@@ -32,7 +32,8 @@ def calc_vbi_frame(sid, clock, pr_speed=1):
     if pd.isna(pr_speed):
         return pd.NA
     vbi_frame = clock * sid.clock_scaler
-    vbi_frame = vbi_frame.floordiv(sid.int_freq / pr_speed).astype(pd.Int64Dtype())
+    vbi_time = 1e6 / (sid.int_freq * pr_speed)
+    vbi_frame = vbi_frame.floordiv(vbi_time).astype(pd.Int64Dtype())
     return vbi_frame
 
 
@@ -151,8 +152,7 @@ class SidWrap:
         self.resid = SoundInterfaceDevice(
             model=model, clock_frequency=self.clock_freq,
             sampling_frequency=sampling_frequency)
-        self.clockqf = self.clock_freq / self.int_freq
-        self.clockq = int(round(self.clockqf))
+        self.clockq = int(round(self.clock_freq / self.int_freq))
         self.clock_scaler = 1e6 / self.clock_freq
         self.attack_clock = {
             k: int(v / 1e3 * self.clock_freq) for k, v in self.ATTACK_MS.items()}
@@ -486,7 +486,7 @@ def split_vdf(sid, df, near=16, guard=96, maxprspeed=20):
 
         v_df['rate'], v_df['rate_max'] = calc_rates(v_df, non_meta_cols)
 
-        v_df['pr_speed'] = v_df['rate'].rfloordiv(sid.clockqf).astype(pd.UInt8Dtype())
+        v_df['pr_speed'] = v_df['rate'].rfloordiv(sid.clockq).astype(pd.UInt8Dtype())
         v_df.loc[(v_df['pr_speed'] == 0) | (v_df['rate_max'] == 0), 'pr_speed'] = int(1)
         v_df.drop(['rate_max'], axis=1, inplace=True)
         v_df['vbi_frame'] = calc_vbi_frame(sid, v_df['clock'])
@@ -552,9 +552,14 @@ def normalize_ssf(sid, hashid_clock, hashid_noclock, ssf_df, remap_ssf_dfs, ssf_
                         clock_duration = next_clock_start - clock_start - 1
                 normalized_ssf_df = ssf_df.drop(['ssf', 'clock_start', 'next_clock_start', 'hashid_clock'], axis=1)
                 last_row_df = normalized_ssf_df[-1:].copy()
+                last_row_df['clock'] = clock_start
+                pr_speed = last_row_df['pr_speed'].iat[-1]
+                vbi_frame_start = calc_vbi_frame(sid, last_row_df['clock'])
+                pr_frame_start = calc_vbi_frame(sid, last_row_df['clock'], pr_speed=pr_speed)
+                last_row_df['clock'] += clock_duration
+                last_row_df['vbi_frame'] = calc_vbi_frame(sid, last_row_df['clock']) - vbi_frame_start
+                last_row_df['pr_frame'] = calc_vbi_frame(sid, last_row_df['clock'], pr_speed=pr_speed) - pr_frame_start
                 last_row_df['clock'] = clock_duration
-                last_row_df['vbi_frame'] = calc_vbi_frame(sid, last_row_df['clock'])
-                last_row_df['pr_frame'] = calc_vbi_frame(sid, last_row_df['clock'], pr_speed=last_row_df['pr_speed'].iat[-1])
                 last_row_df = last_row_df.astype(normalized_ssf_df.dtypes.to_dict())
                 normalized_ssf_df = pd.concat([normalized_ssf_df, last_row_df], ignore_index=True)
                 normalized_ssf_df = normalized_ssf_df.reset_index(drop=True)
