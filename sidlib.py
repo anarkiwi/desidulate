@@ -29,9 +29,10 @@ CANON_REG_ORDER = (
 
 
 def calc_vbi_frame(sid, clock, pr_speed=1):
-    t_scaler = (1e6 / sid.clock_freq)
-    vbi_frame = clock * t_scaler
-    vbi_frame = vbi_frame.floordiv(sid.int_freq / pr_speed).astype(pd.Int64Dtype())
+    if pd.isna(pr_speed):
+        return pd.NA
+    vbi_frame = clock * sid.clock_scaler
+    vbi_frame = vbi_frame.floordiv(sid.vbi_time / pr_speed).astype(pd.Int64Dtype())
     return vbi_frame
 
 
@@ -152,6 +153,8 @@ class SidWrap:
             sampling_frequency=sampling_frequency)
         self.clockqf = self.clock_freq / self.int_freq
         self.clockq = int(round(self.clockqf))
+        self.clock_scaler = 1e6 / self.clock_freq
+        self.vbi_time = 1e6 / self.clock_scaler / self.int_freq
         self.attack_clock = {
             k: int(v / 1e3 * self.clock_freq) for k, v in self.ATTACK_MS.items()}
         self.decay_release_clock = {
@@ -551,15 +554,8 @@ def normalize_ssf(sid, hashid_clock, hashid_noclock, ssf_df, remap_ssf_dfs, ssf_
                 normalized_ssf_df = ssf_df.drop(['ssf', 'clock_start', 'next_clock_start', 'hashid_clock'], axis=1)
                 last_row_df = normalized_ssf_df[-1:].copy()
                 last_row_df['clock'] = clock_duration
-                pr_div = ssf_df['pr_speed'].iat[-1]
-                if pd.notna(pr_div):
-                    pr_div = int(sid.clockq / pr_div)
-                for frame_col, frame_div in (
-                        ('vbi_frame', sid.clockq),
-                        ('pr_frame', pr_div)):
-                    last_row_df[frame_col] = pd.NA
-                    if pd.notna(frame_div):
-                        last_row_df[frame_col] = int((clock_start + clock_duration) / frame_div) - int(clock_start / frame_div)
+                last_row_df['vbi_frame'] = calc_vbi_frame(sid, last_row_df['clock'])
+                last_row_df['pr_frame'] = calc_vbi_frame(sid, last_row_df['clock'], pr_speed=last_row_df['pr_speed'].iat[-1])
                 last_row_df = last_row_df.astype(normalized_ssf_df.dtypes.to_dict())
                 normalized_ssf_df = pd.concat([normalized_ssf_df, last_row_df], ignore_index=True)
                 normalized_ssf_df = normalized_ssf_df.reset_index(drop=True)
