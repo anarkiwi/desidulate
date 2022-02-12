@@ -485,10 +485,12 @@ def split_vdf(sid, df, near=16, guard=96, maxprspeed=20):
 
         v_df['pr_speed'] = v_df['rate'].floordiv(sid.clockq).astype(pd.UInt8Dtype())
         v_df.loc[(v_df['pr_speed'] == 0) | (v_df['rate_max'] == 0), 'pr_speed'] = int(1)
+        v_df.drop(['rate_max'], axis=1, inplace=True)
+
         v_df['vbi_frame'] = calc_vbi_frame(sid, v_df['clock'])
         v_df['pr_frame'] = v_df['clock'].floordiv(v_df['rate']).astype(pd.Int64Dtype())
+        # not playroutine? default to vbi.
         v_df['pr_frame'].where(v_df['pr_frame'].notna(), v_df['vbi_frame'], inplace=True)
-        v_df.drop(['rate_max'], axis=1, inplace=True)
 
         for col in ('vbi_frame', 'pr_frame'):
             col_min = v_df.groupby('ssf', sort=False)[col].min()
