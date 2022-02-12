@@ -74,6 +74,7 @@ class SSFTestCase(unittest.TestCase):
                 self.assertEqual(row.clock, 104)
                 self.assertEqual(row.voice, 2)
             self.assertTrue(ssf is not None)
+            self.assertTrue(ssf.df[ssf.df.pr_frame.isna()].empty)
             if ssf:
                 ssf.smf_transcribe(smf, 0, 1)
                 smf.write(os.devnull)
