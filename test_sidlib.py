@@ -4,13 +4,28 @@ import unittest
 from io import StringIO
 import pandas as pd
 from fileio import read_csv
-from sidlib import jittermatch_df, squeeze_diffs, coalesce_near_writes, remove_end_repeats, df_waveform_order
+from sidlib import jittermatch_df, squeeze_diffs, coalesce_near_writes, remove_end_repeats, df_waveform_order, get_sid, calc_vbi_frame
 
 
 class SIDLibTestCase(unittest.TestCase):
 
     def str2df(self, df_str):
         return read_csv(StringIO(df_str), dtype=pd.UInt64Dtype()).set_index('clock')
+
+    def test_frames(self):
+        df = pd.DataFrame([
+            {'clock': 5000, 'pal_vbi_frame': 0, 'ntsc_vbi_frame': 0},
+            {'clock': 10000, 'pal_vbi_frame': 0, 'ntsc_vbi_frame': 0},
+            {'clock': 15000, 'pal_vbi_frame': 0, 'ntsc_vbi_frame': 0},
+            {'clock': 18000, 'pal_vbi_frame': 0, 'ntsc_vbi_frame': 1},
+            {'clock': 20000, 'pal_vbi_frame': 1, 'ntsc_vbi_frame': 1},
+            {'clock': 25000, 'pal_vbi_frame': 1, 'ntsc_vbi_frame': 1}])
+        self.assertEqual(
+            df['pal_vbi_frame'].to_list(),
+            calc_vbi_frame(get_sid(pal=True), df['clock']).to_list())
+        self.assertEqual(
+            df['ntsc_vbi_frame'].to_list(),
+            calc_vbi_frame(get_sid(pal=False), df['clock']).to_list())
 
     def test_remove_end_repeats(self):
         self.assertEqual([1, 2], remove_end_repeats([1, 2]))
