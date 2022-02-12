@@ -528,6 +528,27 @@ def jittermatch_df(df1, df2, jitter_col, jitter_max):
     return False
 
 
+def pad_ssf_duration(sid, ssf_df):
+    clock_duration = ssf_df['clock'].max() + sid.clockq
+    next_clock_start = ssf_df['next_clock_start'].iat[-1]
+    clock_start = ssf_df['clock_start'].iat[-1]
+    if pd.notna(next_clock_start):
+        if next_clock_start > clock_start:
+            clock_duration = next_clock_start - clock_start - 1
+    normalized_ssf_df = ssf_df.drop(['ssf', 'clock_start', 'next_clock_start', 'hashid_clock'], axis=1)
+    last_row_df = normalized_ssf_df[-1:].copy()
+    last_row_df['clock'] = clock_start
+    vbi_frame_start = calc_vbi_frame(sid, last_row_df['clock'])
+    pr_frame_start = last_row_df['clock'].floordiv(last_row_df['rate']).astype(pd.Int64Dtype())
+    last_row_df['clock'] += clock_duration
+    last_row_df['vbi_frame'] = calc_vbi_frame(sid, last_row_df['clock']) - vbi_frame_start
+    last_row_df['pr_frame'] = last_row_df['clock'].floordiv(last_row_df['rate']).astype(pd.Int64Dtype()) - pr_frame_start
+    last_row_df['pr_frame'] = last_row_df['pr_frame'].where(last_row_df['pr_frame'].notna(), last_row_df['vbi_frame'])
+    last_row_df['clock'] = clock_duration
+    last_row_df = last_row_df.astype(normalized_ssf_df.dtypes.to_dict())
+    return pd.concat([normalized_ssf_df, last_row_df], ignore_index=True).reset_index(drop=True)
+
+
 def normalize_ssf(sid, hashid_clock, hashid_noclock, ssf_df, remap_ssf_dfs, ssf_noclock_dfs, ssf_dfs, ssf_count):
     hashid = hash((hashid_clock, hashid_noclock))
 
@@ -543,26 +564,7 @@ def normalize_ssf(sid, hashid_clock, hashid_noclock, ssf_df, remap_ssf_dfs, ssf_
                 remap_ssf_dfs[hashid] = remapped_hashid
                 hashid = remapped_hashid
             else:
-                clock_duration = ssf_df['clock'].max() + sid.clockq
-                next_clock_start = ssf_df['next_clock_start'].iat[-1]
-                clock_start = ssf_df['clock_start'].iat[-1]
-                if pd.notna(next_clock_start):
-                    if next_clock_start > clock_start:
-                        clock_duration = next_clock_start - clock_start - 1
-                normalized_ssf_df = ssf_df.drop(['ssf', 'clock_start', 'next_clock_start', 'hashid_clock'], axis=1)
-                last_row_df = normalized_ssf_df[-1:].copy()
-                last_row_df['clock'] = clock_start
-                vbi_frame_start = calc_vbi_frame(sid, last_row_df['clock'])
-                pr_frame_start = last_row_df['clock'].floordiv(last_row_df['rate']).astype(pd.Int64Dtype())
-                last_row_df['clock'] += clock_duration
-                last_row_df['vbi_frame'] = calc_vbi_frame(sid, last_row_df['clock']) - vbi_frame_start
-                last_row_df['pr_frame'] = last_row_df['clock'].floordiv(last_row_df['rate']).astype(pd.Int64Dtype()) - pr_frame_start
-                last_row_df['pr_frame'] = last_row_df['pr_frame'].where(last_row_df['pr_frame'].notna(), last_row_df['vbi_frame'])
-                last_row_df['clock'] = clock_duration
-                last_row_df = last_row_df.astype(normalized_ssf_df.dtypes.to_dict())
-                normalized_ssf_df = pd.concat([normalized_ssf_df, last_row_df], ignore_index=True)
-                normalized_ssf_df = normalized_ssf_df.reset_index(drop=True)
-                ssf_dfs[hashid] = normalized_ssf_df
+                ssf_dfs[hashid] = pad_ssf_duration(sid, ssf_df)
                 ssf_noclock_dfs[remap_hashid_noclock] = hashid
 
     ssf_count[hashid] += 1

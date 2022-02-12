@@ -55,7 +55,7 @@ def resample():
             print(waveforms)
             print(ssf_df.reset_index(drop=True).set_index('clock').drop(['hashid', 'hashid_noclock', 'vbi_frame'], axis=1))
             print(resample_df.drop(['hashid', 'hashid_noclock', 'vbi_frame'], axis=1))
-            raise
+            assert False
 
         for row in resample_df.itertuples():
             time_cols = {(col, '%s_%u' % (col, row.pr_frame)) for col in cols if not (col in adsr_cols and row.pr_frame)}
