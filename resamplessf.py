@@ -37,13 +37,13 @@ def resample():
     if len(df) < 1:
         return df_raws
     df = df[(df['clock'] <= args.max_clock) & (df['pr_speed'] <= args.max_pr_speed)]
-    df.drop(['vol', 'rate'], axis=1, inplace=True)
+    df.drop(['rate'], axis=1, inplace=True)
     for col, bits in big_regs.items():
         df[col] = np.left_shift(np.right_shift(df[col], bits), bits)
     meta_cols = set(df.columns) - sid_cols
     meta_cols -= {'clock'}
 
-    for _, ssf_df in df.groupby(['hashid']):  # pylint: disable=no-member
+    for hashid, ssf_df in df.groupby(['hashid']):  # pylint: disable=no-member
         pre_waveforms = df_waveform_order(ssf_df)
         resample_df = ssf_df.reset_index(drop=True).set_index('clock')
         resample_df = resampledf_to_pr(resample_df)
@@ -51,11 +51,12 @@ def resample():
         df_raw = {col: resample_df[col].iat[-1] for col in meta_cols - {'pr_frame'}}
         waveforms = df_waveform_order(resample_df)
         if pre_waveforms != waveforms:
+            print(hashid)
             print(pre_waveforms)
             print(waveforms)
             print(ssf_df.reset_index(drop=True).set_index('clock').drop(['hashid', 'hashid_noclock', 'vbi_frame'], axis=1))
             print(resample_df.drop(['hashid', 'hashid_noclock', 'vbi_frame'], axis=1))
-            assert False
+            # assert False
 
         for row in resample_df.itertuples():
             time_cols = {(col, '%s_%u' % (col, row.pr_frame)) for col in cols if not (col in adsr_cols and row.pr_frame)}
