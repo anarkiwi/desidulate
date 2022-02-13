@@ -28,6 +28,36 @@ CANON_REG_ORDER = (
     'atk1', 'dec1', 'sus1', 'rel1', 'vol')
 
 
+def calc_rates(sid, maxprspeed, vdf, non_meta_cols):
+    ratemin = int(sid.clockq / maxprspeed)
+    rate_cols = []
+    rate_col_pairs = []
+    for col in sorted(non_meta_cols - {'atk1', 'dec1', 'sus1', 'rel1', 'gate1', 'fltext'}):
+        col_max = vdf[col].max()
+        if pd.notna(col_max) and col_max:
+            rate_col = '%s_rate' % col
+            rate_cols.append(rate_col)
+            rate_col_pairs.append((col, rate_col))
+
+    rate_col_df = pd.DataFrame(vdf['clock'])
+
+    for col, rate_col in rate_col_pairs:
+        diff = vdf.groupby(['ssf'], sort=False)[col].diff()
+        rate_col_df[rate_col] = rate_col_df['clock']
+        rate_col_df.loc[diff == 0, [rate_col]] = pd.NA
+
+    rate_col_df[rate_cols] = rate_col_df.groupby(['ssf'], sort=False)[rate_cols].fillna(
+        method='ffill').diff().astype(pd.Int64Dtype())
+    rate_max = rate_col_df.groupby(['ssf'], sort=False)[rate_cols].max().max(axis=1).fillna(0).astype(pd.Int64Dtype())
+    for col in rate_cols:
+        rate_col_df.loc[rate_col_df[col] <= ratemin, col] = pd.NA
+    rate = rate_col_df.groupby(['ssf'], sort=False)[rate_cols].min().min(axis=1).astype(pd.Int64Dtype())
+    pr_speed = rate.floordiv(sid.clockq).astype(pd.UInt8Dtype())
+    pr_speed.loc[(pr_speed == 0) | (rate_max == 0)] = int(1)
+
+    return (rate, pr_speed)
+
+
 def calc_vbi_frame(sid, clock):
     vbi_frame = clock.astype(pd.Float32Dtype())
     vbi_frame = vbi_frame.floordiv(sid.clockq).astype(pd.Int64Dtype())
@@ -328,33 +358,6 @@ def split_vdf(sid, df, near=16, guard=96, maxprspeed=20):
         vdf.drop(['row_hash'], inplace=True, axis=1)
         return vdf
 
-    def calc_rates(vdf, non_meta_cols):
-        ratemin = int(sid.clockq / maxprspeed)
-        rate_cols = []
-        rate_col_pairs = []
-        for col in sorted(non_meta_cols - {'atk1', 'dec1', 'sus1', 'rel1', 'gate1', 'fltext'}):
-            col_max = vdf[col].max()
-            if pd.notna(col_max) and col_max:
-                rate_col = '%s_rate' % col
-                rate_cols.append(rate_col)
-                rate_col_pairs.append((col, rate_col))
-
-        rate_col_df = pd.DataFrame(v_df['clock'])
-
-        for col, rate_col in rate_col_pairs:
-            logging.debug('calculating %s rates for voice %u', col, v)
-            diff = vdf.groupby(['ssf'], sort=False)[col].diff()
-            rate_col_df[rate_col] = rate_col_df['clock']
-            rate_col_df.loc[diff == 0, [rate_col]] = pd.NA
-
-        rate_col_df[rate_cols] = rate_col_df.groupby(['ssf'], sort=False)[rate_cols].fillna(
-            method='ffill').diff().astype(pd.Int64Dtype())
-        rate_max = rate_col_df.groupby(['ssf'], sort=False)[rate_cols].max().max(axis=1).fillna(0).astype(pd.Int64Dtype())
-        for col in rate_cols:
-            rate_col_df.loc[rate_col_df[col] <= ratemin, col] = pd.NA
-        rate = rate_col_df.groupby(['ssf'], sort=False)[rate_cols].min().min(axis=1).astype(pd.Int64Dtype())
-        return (rate, rate_max)
-
     df = set_sid_dtype(df)
     df = coalesce_near_writes(df, ('fltcoff',), near=near)
     # when filter is not routed, cutoff and resonance do not matter.
@@ -480,11 +483,8 @@ def split_vdf(sid, df, near=16, guard=96, maxprspeed=20):
         if v_df.empty:
             continue
 
-        v_df['rate'], v_df['rate_max'] = calc_rates(v_df, non_meta_cols)
-
-        v_df['pr_speed'] = v_df['rate'].floordiv(sid.clockq).astype(pd.UInt8Dtype())
-        v_df.loc[(v_df['pr_speed'] == 0) | (v_df['rate_max'] == 0), 'pr_speed'] = int(1)
-        v_df.drop(['rate_max'], axis=1, inplace=True)
+        logging.debug('calculating rates for voice %u', v)
+        v_df['rate'], v_df['pr_speed'] = calc_rates(sid, maxprspeed, v_df, non_meta_cols)
 
         v_df['vbi_frame'] = calc_vbi_frame(sid, v_df['clock'])
         v_df['pr_frame'] = v_df['clock'].floordiv(v_df['rate']).astype(pd.Int64Dtype())
