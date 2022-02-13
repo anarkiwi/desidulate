@@ -56,7 +56,7 @@ clock,gate1,freq1,pwduty1,pulse1,noise1,tri1,saw1,test1,sync1,ring1,freq3,test3,
 
         df = self.ssfdf('''
 clock,gate1,freq1,pwduty1,pulse1,noise1,tri1,saw1,test1,sync1,ring1,freq3,test3,flt1,fltcoff,fltres,fltlo,fltband,flthi,fltext,atk1,dec1,sus1,rel1,vol
-0,1,32768,,0,0,1,0,0,,,,,0,,,,,,,0,0,15,0
+0,1,32768,,0,0,1,0,0,,,,,0,,,,,,,0,0,15,0,0
 6,1,,,0,0,0,0,1,,,,,,,,,,,,,,,,
 20,1,,,0,0,0,0,0,,,,,,,,,,,,,,,,
 126,1,32768,,0,0,1,0,0,,,,,0,,,,,,,,,,,
@@ -68,8 +68,8 @@ clock,gate1,freq1,pwduty1,pulse1,noise1,tri1,saw1,test1,sync1,ring1,freq3,test3,
 378,1,32768,,0,0,1,0,0,,,,,0,,,,,,,,,,,
 ''')
         rate, pr_speed = calc_rates(sid, 20, df)
-        self.assertEqual(sid.clockq, rate.iat[-1])
-        self.assertEqual(1, pr_speed.iat[-1])
+        self.assertTrue(pd.isna(rate.iat[-1]))
+        self.assertTrue(pd.isna(pr_speed.iat[-1]))
 
     def test_frames(self):
         df = pd.DataFrame([
