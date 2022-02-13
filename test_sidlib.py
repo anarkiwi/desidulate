@@ -4,13 +4,36 @@ import unittest
 from io import StringIO
 import pandas as pd
 from fileio import read_csv
-from sidlib import jittermatch_df, squeeze_diffs, coalesce_near_writes, remove_end_repeats, df_waveform_order, get_sid, calc_vbi_frame
+from sidlib import jittermatch_df, squeeze_diffs, coalesce_near_writes, remove_end_repeats, df_waveform_order, get_sid, calc_vbi_frame, calc_rates
 
 
 class SIDLibTestCase(unittest.TestCase):
 
     def str2df(self, df_str):
         return read_csv(StringIO(df_str), dtype=pd.UInt64Dtype()).set_index('clock')
+
+    def ssfdf(self, df_str):
+        df = self.str2df(df_str)
+        non_meta_cols = set(df.columns)
+        df['ssf'] = 1
+        df = df.reset_index().set_index('ssf')
+        return (df, non_meta_cols)
+
+    def test_calc_rates(self):
+        sid = get_sid(pal=True)
+        df, non_meta_cols = self.ssfdf('''
+clock,gate1,freq1,pwduty1,pulse1,noise1,tri1,saw1,test1,sync1,ring1,freq3,test3,flt1,fltcoff,fltres,fltlo,fltband,flthi,fltext,atk1,dec1,sus1,rel1,vol
+0,1,,,,,,,1,,,,,,,,,,,,9,0,10,0,15
+4946,1,65535,,0,1,0,0,0,,,,,0,,,,,,,,,,,15
+39393,1,1669,,0,1,0,0,0,,,,,0,,,,,,,,,,,15
+39415,0,1669,,0,0,1,0,0,,,,,0,,,,,,,,,,,15
+44191,0,65535,,0,0,1,0,0,,,,,0,,,,,,,,,,,15
+44213,0,65535,,0,1,0,0,0,,,,,0,,,,,,,,,,,15
+786407,0,65535,,0,1,0,0,0,,,,,0,,,,,,,,,,,15
+''')
+        rate, pr_speed = calc_rates(sid, 20, df, non_meta_cols)
+        self.assertEqual(4798, rate.iat[0])
+        self.assertEqual(4, pr_speed.iat[0])
 
     def test_frames(self):
         df = pd.DataFrame([
