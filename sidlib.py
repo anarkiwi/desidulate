@@ -35,11 +35,11 @@ def bits2byte(df, cols):
     return byte_col
 
 
-def calc_rates(sid, maxprspeed, vdf, non_meta_cols):
+def calc_rates(sid, maxprspeed, vdf):
     ratemin = int(sid.clockq / maxprspeed)
     rate_cols = []
     rate_col_pairs = []
-    for col in sorted(non_meta_cols - {'atk1', 'dec1', 'sus1', 'rel1', 'gate1', 'fltext'}):
+    for col in {'freq1', 'pwduty1', 'freq3', 'test3', 'fltcoff', 'fltres'}:
         col_max = vdf[col].max()
         if pd.notna(col_max) and col_max:
             rate_col = '%s_rate' % col
@@ -50,6 +50,13 @@ def calc_rates(sid, maxprspeed, vdf, non_meta_cols):
 
     for col, rate_col in rate_col_pairs:
         diff = vdf.groupby(['ssf'], sort=False)[col].diff()
+        rate_col_df[rate_col] = rate_col_df['clock']
+        rate_col_df.loc[diff == 0, [rate_col]] = pd.NA
+
+    control_col = bits2byte(vdf, WAVEFORM_COLS_ORIG)
+    filter_col = bits2byte(vdf, ['flt1', 'fltlo', 'fltband', 'flthi'])
+    for rate_col, col in (('control', control_col), ('filter', filter_col)):
+        diff = col.groupby(['ssf'], sort=False).diff()
         rate_col_df[rate_col] = rate_col_df['clock']
         rate_col_df.loc[diff == 0, [rate_col]] = pd.NA
     rate_col_df['clock'] = rate_col_df['clock'].diff()
@@ -491,7 +498,7 @@ def split_vdf(sid, df, near=16, guard=96, maxprspeed=20):
             continue
 
         logging.debug('calculating rates for voice %u', v)
-        v_df['rate'], v_df['pr_speed'] = calc_rates(sid, maxprspeed, v_df, non_meta_cols)
+        v_df['rate'], v_df['pr_speed'] = calc_rates(sid, maxprspeed, v_df)
 
         v_df['vbi_frame'] = calc_vbi_frame(sid, v_df['clock'])
         v_df['pr_frame'] = v_df['clock'].floordiv(v_df['rate']).astype(pd.Int64Dtype())

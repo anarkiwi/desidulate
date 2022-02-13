@@ -22,16 +22,15 @@ class SIDLibTestCase(unittest.TestCase):
 
     def ssfdf(self, df_str, ssf=1):
         df = self.str2df(df_str)
-        non_meta_cols = set(df.columns) - {'ssf'}
         if ssf is not None:
             df['ssf'] = ssf
         df = df.reset_index().set_index('ssf')
         df['clock'] += 1024
-        return (df, non_meta_cols)
+        return df
 
     def test_calc_rates(self):
         sid = get_sid(pal=True)
-        df, non_meta_cols = self.ssfdf('''
+        df = self.ssfdf('''
 clock,gate1,freq1,pwduty1,pulse1,noise1,tri1,saw1,test1,sync1,ring1,freq3,test3,flt1,fltcoff,fltres,fltlo,fltband,flthi,fltext,atk1,dec1,sus1,rel1,vol
 0,1,,,,,,,1,,,,,,,,,,,,9,0,10,0,15
 4946,1,65535,,0,1,0,0,0,,,,,0,,,,,,,,,,,15
@@ -41,17 +40,17 @@ clock,gate1,freq1,pwduty1,pulse1,noise1,tri1,saw1,test1,sync1,ring1,freq3,test3,
 44213,0,65535,,0,1,0,0,0,,,,,0,,,,,,,,,,,15
 786407,0,65535,,0,1,0,0,0,,,,,0,,,,,,,,,,,15
 ''')
-        rate, pr_speed = calc_rates(sid, 20, df, non_meta_cols)
+        rate, pr_speed = calc_rates(sid, 20, df)
         self.assertEqual(4798, rate.iat[-1])
         self.assertEqual(4, pr_speed.iat[-1])
 
-        df, non_meta_cols = self.ssfdf('''
+        df = self.ssfdf('''
 clock,gate1,freq1,pwduty1,pulse1,noise1,tri1,saw1,test1,sync1,ring1,freq3,test3,flt1,fltcoff,fltres,fltlo,fltband,flthi,fltext,atk1,dec1,sus1,rel1,vol
 20000,1,,,,,,,1,,,,,,,,,,,,2,9,10,15,10
 200036,1,2145,,0,0,0,1,0,,,,,0,,,,,,,,,,,10
 264219,1,2145,,0,0,0,1,0,,,,,0,,,,,,,,,,,10
 ''')
-        rate, pr_speed = calc_rates(sid, 20, df, non_meta_cols)
+        rate, pr_speed = calc_rates(sid, 20, df)
         self.assertEqual(sid.clockq, rate.iat[-1])
         self.assertEqual(1, pr_speed.iat[-1])
 
