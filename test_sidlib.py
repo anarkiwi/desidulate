@@ -38,12 +38,11 @@ clock,gate1,freq1,pwduty1,pulse1,noise1,tri1,saw1,test1,sync1,ring1,freq3,test3,
         self.assertEqual(4, pr_speed.iat[-1])
 
         df, non_meta_cols = self.ssfdf('''
-ssf,clock,gate1,freq1,pwduty1,pulse1,noise1,tri1,saw1,test1,sync1,ring1,freq3,test3,flt1,fltcoff,fltres,fltlo,fltband,flthi,fltext,atk1,dec1,sus1,rel1,vol
-0,1,0,2048,,0,0,0,1,0,,,,,0,,,,,,,,,,,10
-1,20000,1,,,,,,,1,,,,,,,,,,,,2,9,10,15,10
-1,200036,1,2145,,0,0,0,1,0,,,,,0,,,,,,,,,,,10
-1,264219,1,2145,,0,0,0,1,0,,,,,0,,,,,,,,,,,10
-''', ssf=None)
+clock,gate1,freq1,pwduty1,pulse1,noise1,tri1,saw1,test1,sync1,ring1,freq3,test3,flt1,fltcoff,fltres,fltlo,fltband,flthi,fltext,atk1,dec1,sus1,rel1,vol
+20000,1,,,,,,,1,,,,,,,,,,,,2,9,10,15,10
+200036,1,2145,,0,0,0,1,0,,,,,0,,,,,,,,,,,10
+264219,1,2145,,0,0,0,1,0,,,,,0,,,,,,,,,,,10
+''')
         rate, pr_speed = calc_rates(sid, 20, df, non_meta_cols)
         self.assertEqual(sid.clockq, rate.iat[-1])
         self.assertEqual(1, pr_speed.iat[-1])
