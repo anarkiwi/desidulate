@@ -28,6 +28,13 @@ CANON_REG_ORDER = (
     'atk1', 'dec1', 'sus1', 'rel1', 'vol')
 
 
+def bits2byte(df, cols):
+    byte_col = df[cols[0]]
+    for i, col in enumerate(cols[1:], start=1):
+        byte_col += df[col] * 2**i
+    return byte_col
+
+
 def calc_rates(sid, maxprspeed, vdf, non_meta_cols):
     ratemin = int(sid.clockq / maxprspeed)
     rate_cols = []

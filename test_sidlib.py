@@ -4,10 +4,18 @@ import unittest
 from io import StringIO
 import pandas as pd
 from fileio import read_csv
-from sidlib import jittermatch_df, squeeze_diffs, coalesce_near_writes, remove_end_repeats, df_waveform_order, get_sid, calc_vbi_frame, calc_rates
+from sidlib import jittermatch_df, squeeze_diffs, coalesce_near_writes, remove_end_repeats, df_waveform_order, get_sid, calc_vbi_frame, calc_rates, bits2byte
 
 
 class SIDLibTestCase(unittest.TestCase):
+
+    def test_bits2byte(self):
+        df = pd.DataFrame([{'col1': 0, 'col2': 1, 'col3': 0, 'col4': 1}])
+        self.assertEqual(10, bits2byte(df, df.columns).iat[0])
+        df = pd.DataFrame([{'col1': 1, 'col2': 0, 'col3': 1, 'col4': 0}])
+        self.assertEqual(5, bits2byte(df, df.columns).iat[0])
+        df = pd.DataFrame([{'col1': 1}])
+        self.assertEqual(1, bits2byte(df, df.columns).iat[0])
 
     def str2df(self, df_str):
         return read_csv(StringIO(df_str), dtype=pd.UInt64Dtype()).set_index('clock')
