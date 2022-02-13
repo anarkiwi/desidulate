@@ -31,6 +31,12 @@ big_regs = {'freq1': 8, 'freq3': 8, 'pwduty1': 4, 'fltcoff': 3}
 sid = get_sid(pal=args.pal)
 
 
+
+def col_diffs(col):
+    diff = col.diff()
+    return diff[diff != 0].count()
+
+
 def resample():
     df = read_csv(args.ssffile, dtype=pd.Int64Dtype())
     df_raws = defaultdict(list)
@@ -44,6 +50,10 @@ def resample():
     meta_cols -= {'clock'}
 
     for hashid, ssf_df in df.groupby(['hashid']):  # pylint: disable=no-member
+        vol_changes = col_diffs(ssf_df['vol'])
+        test_changes = col_diffs(ssf_df['test1'])
+        if vol_changes > 2 or test_changes > 2:
+            continue
         pre_waveforms = df_waveform_order(ssf_df)
         resample_df = ssf_df.reset_index(drop=True).set_index('clock')
         resample_df = resampledf_to_pr(resample_df)
