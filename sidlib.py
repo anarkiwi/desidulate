@@ -51,7 +51,7 @@ def calc_rates(sid, maxprspeed, vdf, non_meta_cols):
     rate_max = rate_col_df.groupby(['ssf'], sort=False)[rate_cols].max().max(axis=1).fillna(0).astype(pd.Int64Dtype())
     for col in rate_cols:
         rate_col_df.loc[rate_col_df[col] <= ratemin, col] = pd.NA
-    rate = rate_col_df.groupby(['ssf'], sort=False)[rate_cols].min().min(axis=1).astype(pd.Int64Dtype())
+    rate = rate_col_df.groupby(['ssf'], sort=False)[rate_cols].min().min(axis=1).astype(pd.Int64Dtype()).clip(upper=sid.clockq)
     pr_speed = rate.rfloordiv(sid.clockq).astype(pd.UInt8Dtype())
     pr_speed.loc[(pr_speed == 0) | (rate_max == 0)] = int(1)
 
