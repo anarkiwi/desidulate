@@ -61,6 +61,9 @@ def resample():
         df_raw = {col: resample_df[col].iat[-1] for col in meta_cols - {'pr_frame'}}
         waveforms = df_waveform_order(resample_df)
         if pre_waveforms != waveforms:
+            if pre_waveforms[0] == '0':
+                pre_waveforms = pre_waveforms[1:]
+        if pre_waveforms != waveforms:
             print(hashid)
             print(pre_waveforms)
             print(waveforms)
