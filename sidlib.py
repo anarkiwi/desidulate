@@ -29,14 +29,14 @@ CANON_REG_ORDER = (
 
 
 def bits2byte(df, cols):
-    byte_col = df[cols[0]]
+    byte_col = df[cols[0]].fillna(0)
     for i, col in enumerate(cols[1:], start=1):
-        byte_col += df[col] * 2**i
+        byte_col += df[col].fillna(0) * 2**i
     return byte_col
 
 
 def calc_rates(sid, maxprspeed, vdf):
-    ratemin = int(sid.clockq / maxprspeed)
+    ratemin = int(sid.clockq / maxprspeed) / 2
     rate_cols = []
     rate_col_pairs = []
     for col in {'freq1', 'pwduty1', 'freq3', 'test3', 'fltcoff', 'fltres'}:
@@ -53,9 +53,9 @@ def calc_rates(sid, maxprspeed, vdf):
         rate_col_df[rate_col] = rate_col_df['clock']
         rate_col_df.loc[diff == 0, [rate_col]] = pd.NA
 
-    control_col = bits2byte(vdf, WAVEFORM_COLS_ORIG)
+    control_col = bits2byte(vdf, [col + '1' for col in CONTROL_BITS])
     filter_col = bits2byte(vdf, ['flt1', 'fltlo', 'fltband', 'flthi'])
-    for rate_col, col in (('control', control_col), ('filter', filter_col)):
+    for rate_col, col in (('control_rate', control_col), ('filter_rate', filter_col)):
         diff = col.groupby(['ssf'], sort=False).diff()
         rate_col_df[rate_col] = rate_col_df['clock']
         rate_col_df.loc[diff == 0, [rate_col]] = pd.NA
@@ -63,7 +63,7 @@ def calc_rates(sid, maxprspeed, vdf):
 
     rate_col_df[rate_cols] = rate_col_df.groupby(['ssf'], sort=False)[rate_cols].fillna(
         method='ffill').diff().astype(pd.Int64Dtype())
-    for col in rate_cols:
+    for col in rate_cols + ['control_rate', 'filter_rate']:
         rate_col_df.loc[rate_col_df[col] <= ratemin, col] = pd.NA
     rate = rate_col_df.groupby(['ssf'], sort=False)[rate_cols].min().min(axis=1).astype(pd.Int64Dtype()).clip(upper=sid.clockq)
     pr_speed = rate.rfloordiv(sid.clockq).astype(pd.UInt8Dtype())
