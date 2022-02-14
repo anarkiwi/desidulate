@@ -36,7 +36,7 @@ def bits2byte(df, cols):
 
 
 def calc_rates(sid, maxprspeed, vdf):
-    ratemin = int(sid.clockq / maxprspeed) / 2
+    ratemin = int(sid.clockq / (maxprspeed + 1))
     rate_cols = []
     rate_col_pairs = []
     for col in {'freq1', 'pwduty1', 'freq3', 'test3', 'fltcoff', 'fltres'}:
@@ -328,7 +328,7 @@ def coalesce_near_writes(vdf, cols, near=16):
     return vdf
 
 
-def split_vdf(sid, df, near=16, guard=96, maxprspeed=20):
+def split_vdf(sid, df, near=16, guard=96, maxprspeed=8):
     fltcols = [col for col in df.columns if col.startswith('flt') and not col[-1].isdigit()]
     mod_cols = ['freq3', 'test3', 'sync1', 'ring1']
 
