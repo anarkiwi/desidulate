@@ -61,10 +61,13 @@ def calc_rates(sid, maxprspeed, vdf):
         rate_col_df.loc[diff == 0, [rate_col]] = pd.NA
     rate_col_df['clock'] = rate_col_df['clock'].diff()
 
+    rate_col_df.loc[vdf['clock'] == vdf['clock_start'],:] = pd.NA
+
     rate_col_df[rate_cols] = rate_col_df.groupby(['ssf'], sort=False)[rate_cols].fillna(
         method='ffill').diff().astype(pd.Int64Dtype())
-    for col in rate_cols + ['control_rate', 'filter_rate']:
+    for col in rate_col_df.columns:
         rate_col_df.loc[rate_col_df[col] <= ratemin, col] = pd.NA
+    rate_cols = [col for col in rate_col_df.columns if not rate_col_df[rate_col_df[col].notna()].empty]
     rate = rate_col_df.groupby(['ssf'], sort=False)[rate_cols].min().min(axis=1).astype(pd.Int64Dtype()).clip(upper=sid.clockq)
     pr_speed = rate.rfloordiv(sid.clockq).astype(pd.UInt8Dtype())
     pr_speed.loc[pr_speed == 0] = int(1)
@@ -519,7 +522,7 @@ def split_vdf(sid, df, near=16, guard=96, maxprspeed=20):
 
     if v_dfs:
         v_dfs = pd.concat(v_dfs)
-        logging.debug('calculating row hashes')
+        logging.debug('calculating row hashes on %s', sorted(non_meta_cols))
         v_dfs = hash_vdf(v_dfs, non_meta_cols)
         logging.debug('calculating clock hashes')
         v_dfs['hashid_clock'] = v_dfs.groupby(['ssf'], sort=False)['clock'].transform(hash_tuple).astype(np.int64)
