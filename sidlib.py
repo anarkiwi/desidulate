@@ -501,13 +501,18 @@ def split_vdf(sid, df, near=16, guard=96, maxprspeed=8):
 
         logging.debug('calculating rates for voice %u', v)
         v_df['rate'], v_df['pr_speed'] = calc_rates(sid, maxprspeed, v_df)
-        logging.debug('pr_speeds for voice %u: %s', v, sorted(v_df['pr_speed'].unique()))
-        pr_speeds = v_df.reset_index()[['ssf', 'pr_speed']].groupby('pr_speed')['ssf'].nunique().to_dict()
-        most_pr_speed = sorted(pr_speeds.items(), key=lambda x: x[1], reverse=True)[0][0]
-        mean_rate = v_df[v_df['pr_speed'] == most_pr_speed]['rate'].mean().round().astype(pd.Int64Dtype)
-        logging.debug('using pr_speed %u, min/mean/max rate %u/%u/%u for voice %u (counts %s)',
-            most_pr_speed, v_df['rate'].min(), mean_rate, v_df['rate'].max(), v, pr_speeds)
-        v_df.loc[v_df['pr_speed'] != most_pr_speed, 'rate'] = mean_rate
+        pr_speeds = v_df[v_df['pr_speed'].notna()]['pr_speed'].unique()
+        if len(pr_speeds) == 0:
+            logging.debug('no pr_speed detected for voice %u (min/max rate %u/%u/%u)',
+            v, v_df['rate'].min(), v_df['rate'].mean(), v_df['rate'].max())
+        else:
+            logging.debug('pr_speeds for voice %u: %s', v, sorted(pr_speeds))
+            pr_speeds = v_df[v_df['pr_speed'].notna()].reset_index()[['ssf', 'pr_speed']].groupby('pr_speed')['ssf'].nunique().to_dict()
+            most_pr_speed = sorted(pr_speeds.items(), key=lambda x: x[1], reverse=True)[0][0]
+            mean_rate = v_df[v_df['pr_speed'] == most_pr_speed]['rate'].mean().round().astype(pd.Int64Dtype)
+            logging.debug('using pr_speed %u, min/mean/max rate %u/%u/%u for voice %u (counts %s)',
+                most_pr_speed, v_df['rate'].min(), mean_rate, v_df['rate'].max(), v, pr_speeds)
+            v_df.loc[v_df['pr_speed'] != most_pr_speed, 'rate'] = mean_rate
 
         v_df['vbi_frame'] = calc_vbi_frame(sid, v_df['clock'])
         v_df['pr_frame'] = v_df['clock'].floordiv(v_df['rate']).astype(pd.Int64Dtype())
