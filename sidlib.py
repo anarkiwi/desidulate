@@ -503,8 +503,7 @@ def split_vdf(sid, df, near=16, guard=96, maxprspeed=8):
         v_df['rate'], v_df['pr_speed'] = calc_rates(sid, maxprspeed, v_df)
         pr_speeds = v_df[v_df['pr_speed'].notna()]['pr_speed'].unique()
         if len(pr_speeds) == 0:
-            logging.debug('no pr_speed detected for voice %u (min/max rate %u/%u/%u)',
-            v, v_df['rate'].min(), v_df['rate'].mean(), v_df['rate'].max())
+            logging.debug('no pr_speed detected for voice %u', v)
         else:
             logging.debug('pr_speeds for voice %u: %s', v, sorted(pr_speeds))
             pr_speeds = v_df[v_df['pr_speed'].notna()].reset_index()[['ssf', 'pr_speed']].groupby('pr_speed')['ssf'].nunique().to_dict()
