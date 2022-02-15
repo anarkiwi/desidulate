@@ -512,7 +512,6 @@ def split_vdf(sid, df, near=16, guard=96, maxprspeed=8):
             mean_rate = v_df[v_df['pr_speed'] == most_pr_speed]['rate'].mean().round().astype(pd.Int64Dtype)
             logging.debug('using pr_speed %u, min/mean/max rate %u/%u/%u for voice %u (counts %s)',
                 most_pr_speed, v_df['rate'].min(), mean_rate, v_df['rate'].max(), v, pr_speeds)
-            v_df.loc[v_df['pr_speed'] != most_pr_speed, 'rate'] = mean_rate
 
         v_df['vbi_frame'] = calc_vbi_frame(sid, v_df['clock'])
         v_df['pr_frame'] = v_df['clock'].floordiv(v_df['rate']).astype(pd.Int64Dtype())
