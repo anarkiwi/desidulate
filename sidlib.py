@@ -59,7 +59,6 @@ def calc_rates(sid, maxprspeed, vdf):
         diff = col.groupby(['ssf'], sort=False).diff()
         rate_col_df[rate_col] = rate_col_df['clock']
         rate_col_df.loc[diff == 0, [rate_col]] = pd.NA
-    rate_col_df['clock'] = rate_col_df['clock'].diff()
 
     rate_col_df.loc[vdf['clock'] == vdf['clock_start'],:] = pd.NA
 
@@ -502,6 +501,8 @@ def split_vdf(sid, df, near=16, guard=96, maxprspeed=8):
 
         logging.debug('calculating rates for voice %u', v)
         v_df['rate'], v_df['pr_speed'] = calc_rates(sid, maxprspeed, v_df)
+        logging.debug('pr_speeds for voice %u: %s', v, sorted(v_df['pr_speed'].unique()))
+        logging.debug('SSF rate min %u, max %u for voice %u', v_df['rate'].min(), v_df['rate'].max(), v)
 
         v_df['vbi_frame'] = calc_vbi_frame(sid, v_df['clock'])
         v_df['pr_frame'] = v_df['clock'].floordiv(v_df['rate']).astype(pd.Int64Dtype())
