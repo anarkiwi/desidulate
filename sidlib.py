@@ -49,7 +49,7 @@ def calc_rates(sid, maxprspeed, vdf):
     rate_col_df = pd.DataFrame(vdf['clock'])
 
     for col, rate_col in rate_col_pairs:
-        diff = vdf.groupby(['ssf'], sort=False)[col].diff()
+        diff = vdf.astype(pd.Int64Dtype()).groupby(['ssf'], sort=False)[col].diff()
         rate_col_df[rate_col] = rate_col_df['clock']
         rate_col_df.loc[diff == 0, [rate_col]] = pd.NA
 
@@ -59,11 +59,12 @@ def calc_rates(sid, maxprspeed, vdf):
         diff = col.groupby(['ssf'], sort=False).diff()
         rate_col_df[rate_col] = rate_col_df['clock']
         rate_col_df.loc[diff == 0, [rate_col]] = pd.NA
+        rate_cols.append(rate_col)
 
-    rate_col_df.loc[vdf['clock'] == vdf['clock_start'],:] = pd.NA
-
+    rate_col_df.drop(['clock'], axis=1, inplace=True)
     rate_col_df[rate_cols] = rate_col_df.groupby(['ssf'], sort=False)[rate_cols].fillna(
         method='ffill').diff().astype(pd.Int64Dtype())
+
     for col in rate_col_df.columns:
         rate_col_df.loc[rate_col_df[col] <= ratemin, col] = pd.NA
     rate_cols = [col for col in rate_col_df.columns if not rate_col_df[rate_col_df[col].notna()].empty]

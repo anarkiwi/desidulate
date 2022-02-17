@@ -38,16 +38,18 @@ def col_diffs(col):
 
 
 def resample():
+    clockrq = int(sid.clockq / args.max_pr_speed)
     df = read_csv(args.ssffile, dtype=pd.Int64Dtype())
     df_raws = defaultdict(list)
     if len(df) < 1:
         return df_raws
     df = df[(df['clock'] <= args.max_clock) & (df['pr_speed'] <= args.max_pr_speed)]
-    df.drop(['rate'], axis=1, inplace=True)
     for col, bits in big_regs.items():
         df[col] = np.left_shift(np.right_shift(df[col], bits), bits)
+    df['clockrq'] = df['clock'].floordiv(clockrq)
     meta_cols = set(df.columns) - sid_cols
     meta_cols -= {'clock'}
+    df = df.drop_duplicates(['hashid', 'clockrq'], keep='last')
 
     for hashid, ssf_df in df.groupby(['hashid']):  # pylint: disable=no-member
         vol_changes = col_diffs(ssf_df['vol'])
@@ -67,7 +69,8 @@ def resample():
             print(hashid)
             print(pre_waveforms)
             print(waveforms)
-            print(ssf_df.reset_index(drop=True).set_index('clock').drop(['hashid', 'hashid_noclock', 'vbi_frame'], axis=1))
+            orig = ssf_df.reset_index(drop=True).set_index('clock').drop(['hashid', 'hashid_noclock', 'vbi_frame'], axis=1)
+            print(orig)
             print(resample_df.drop(['hashid', 'hashid_noclock', 'vbi_frame'], axis=1))
             # assert False
 

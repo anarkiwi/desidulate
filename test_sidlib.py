@@ -69,8 +69,22 @@ clock,gate1,freq1,pwduty1,pulse1,noise1,tri1,saw1,test1,sync1,ring1,freq3,test3,
 378,1,32768,,0,0,1,0,0,,,,,0,,,,,,,,,,,
 ''')
         rate, pr_speed = calc_rates(sid, 20, df)
-        self.assertEqual(1030, rate.iat[-1])
-        self.assertTrue(20, pr_speed.iat[-1])
+        self.assertTrue(pd.isna(rate.iat[-1]))
+        self.assertTrue(pd.isna(pr_speed.iat[-1]))
+
+        df = self.ssfdf('''
+clock,gate1,freq1,pwduty1,pulse1,noise1,tri1,saw1,test1,sync1,ring1,freq3,test3,flt1,fltcoff,fltres,fltlo,fltband,flthi,fltext,atk1,dec1,sus1,rel1,vol
+0,1,1536,256,1,0,0,0,0,,,,,0,,,,,,,0,0,15,15,15
+19452,1,63744,,0,1,0,0,0,,,,,0,,,,,,,,,,,15
+39093,0,1536,320,1,0,0,0,0,,,,,0,,,,,,,,,,,15
+58688,0,1536,352,1,0,0,0,0,,,,,0,,,,,,,,,,,15
+78278,0,1536,400,1,0,0,0,0,,,,,0,,,,,,,,,,,15
+97974,0,1536,432,1,0,0,0,0,,,,,0,,,,,,,,,,,15
+117964,0,1536,432,1,0,0,0,0,,,,,0,,,,,,,,,,,15
+''')
+        rate, pr_speed = calc_rates(sid, 20, df)
+        self.assertEqual(19452, rate.iat[-1])
+        self.assertTrue(1, pr_speed.iat[-1])
 
         df = self.ssfdf('''
 clock,gate1,freq1,pwduty1,pulse1,noise1,tri1,saw1,test1,sync1,ring1,freq3,test3,flt1,fltcoff,fltres,fltlo,fltband,flthi,fltext,atk1,dec1,sus1,rel1,vol
@@ -204,8 +218,8 @@ clock,gate1,freq1,pwduty1,pulse1,noise1,tri1,saw1,test1,sync1,ring1,freq3,test3,
 170351,0,4455,,0,1,0,0,0,,,,,3,1554,5,1,0,0,0,,,,,15
 ''')
         rate, pr_speed = calc_rates(sid, 20, df)
-        self.assertEqual(1806, rate.iat[-1])
-        self.assertEqual(10, pr_speed.iat[-1])
+        self.assertEqual(1634, rate.iat[-1])
+        self.assertEqual(12, pr_speed.iat[-1])
 
     def test_frames(self):
         df = pd.DataFrame([
