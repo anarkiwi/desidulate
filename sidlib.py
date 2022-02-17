@@ -328,7 +328,7 @@ def coalesce_near_writes(vdf, cols, near=16):
     return vdf
 
 
-def split_vdf(sid, df, near=16, guard=96, maxprspeed=8):
+def split_vdf(sid, df, near=16, guard=96, maxprspeed=20):
     fltcols = [col for col in df.columns if col.startswith('flt') and not col[-1].isdigit()]
     mod_cols = ['freq3', 'test3', 'sync1', 'ring1']
 
