@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 
 from fileio import out_path, read_csv
-from sidlib import df_waveform_order, resampledf_to_pr, timer_args, get_sid
+from sidlib import df_waveform_order, resampledf_to_pr, timer_args, get_sid, ADSR_COLS
 
 parser = argparse.ArgumentParser(description='Downsample SSFs to frames')
 parser.add_argument('ssffile', help='SSF file')
@@ -29,7 +29,6 @@ sid_cols = { # exclude vol, fltext
     'freq3', 'test3'}.union(waveform_cols).union(adsr_cols)
 big_regs = {'freq1': 8, 'freq3': 8, 'pwduty1': 4, 'fltcoff': 3}
 sid = get_sid(pal=args.pal)
-
 
 
 def col_diffs(col):
@@ -49,13 +48,16 @@ def resample():
     df['clockrq'] = df['clock'].floordiv(clockrq)
     meta_cols = set(df.columns) - sid_cols
     meta_cols -= {'clock'}
-    df = df.drop_duplicates(['hashid', 'clockrq'], keep='last')
 
     for hashid, ssf_df in df.groupby(['hashid']):  # pylint: disable=no-member
         vol_changes = col_diffs(ssf_df['vol'])
         test_changes = col_diffs(ssf_df['test1'])
         if vol_changes > 2 or test_changes > 2:
             continue
+        first_row = ssf_df.iloc[0]
+        ssf_df.drop_duplicates(['hashid', 'clockrq'], keep='last', inplace=True)
+        for col in ADSR_COLS:
+            ssf_df[col] = getattr(first_row, col)
         pre_waveforms = df_waveform_order(ssf_df)
         resample_df = ssf_df.reset_index(drop=True).set_index('clock')
         resample_df = resampledf_to_pr(resample_df)
