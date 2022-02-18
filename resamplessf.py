@@ -38,7 +38,7 @@ def col_diffs(col):
 
 
 def resample():
-    clockrq = int(sid.clockq / args.max_pr_speed)
+    clockrq = int(sid.clockq / (args.max_pr_speed * 2))
     df = read_csv(args.ssffile, dtype=pd.Int64Dtype())
     df_raws = defaultdict(list)
     if len(df) < 1:
@@ -70,6 +70,7 @@ def resample():
             print(pre_waveforms)
             print(waveforms)
             orig = ssf_df.reset_index(drop=True).set_index('clock').drop(['hashid', 'hashid_noclock', 'vbi_frame'], axis=1)
+            # orig.drop(['rate', 'pr_speed', 'count', 'pr_frame'], axis=1)
             print(orig)
             print(resample_df.drop(['hashid', 'hashid_noclock', 'vbi_frame'], axis=1))
             # assert False
