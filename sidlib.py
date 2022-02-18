@@ -18,6 +18,7 @@ from fileio import read_csv
 SID_SAMPLE_FREQ = 11025
 # use of external filter will be non deterministic.
 FLTEXT = False
+ADSR_COLS = ['atk1', 'dec1', 'sus1', 'rel1']
 CONTROL_BITS = ['gate', 'sync', 'ring', 'test', 'tri', 'saw', 'pulse', 'noise']
 WAVEFORM_COLS = tuple(sorted((('S', 'sync1'), ('R', 'ring1'), ('t', 'tri1'), ('s', 'saw1'), ('p', 'pulse1'), ('n', 'noise1'))))
 WAVEFORM_COLS_ORIG = [col[1] for col in WAVEFORM_COLS]
@@ -86,8 +87,7 @@ def resampledf_to_pr(ssf_df):
     resample_df = ssf_df.drop_duplicates('pr_frame', keep='last').reset_index(drop=True).drop('vbi_frame', axis=1).copy()
     resample_df_clock = ssf_df[['pr_frame', 'vbi_frame']].reset_index().drop_duplicates('pr_frame', keep='first').copy()
     resample_df = resample_df.merge(resample_df_clock, on='pr_frame').set_index('clock').sort_index()
-    adsr_cols = ['atk1', 'dec1', 'sus1', 'rel1']
-    resample_df[adsr_cols] = resample_df[adsr_cols].fillna(method='ffill')
+    resample_df[ADSR_COLS] = resample_df[ADSR_COLS].fillna(method='ffill')
     return resample_df
 
 
