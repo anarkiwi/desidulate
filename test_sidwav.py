@@ -16,7 +16,7 @@ class SidWavTestCase(unittest.TestCase):
     def _make_wav_df(rows):
         return pd.DataFrame(rows, dtype=pd.UInt64Dtype()).set_index('clock').fillna(method='ffill').astype(pd.UInt64Dtype())
 
-    def _same_samples(self, df1, df2):
+    def _same_samples(self, df1, df2, same=True):
         sid = get_sid(pal=True)
         raw_samples = state2samples(df1, sid)
         sid = get_sid(pal=True)
@@ -24,7 +24,10 @@ class SidWavTestCase(unittest.TestCase):
         self.assertTrue(len(raw_samples))
         self.assertTrue(len(raw_samples2))
         self.assertNotEqual(df1.to_string(), df2.to_string())
-        self.assertTrue(np.array_equal(raw_samples, raw_samples2))
+        if same:
+            self.assertTrue(np.array_equal(raw_samples, raw_samples2))
+        else:
+            self.assertFalse(np.array_equal(raw_samples, raw_samples2))
 
     def test_skiptest(self):
         sid = get_sid(pal=True)
@@ -41,6 +44,23 @@ class SidWavTestCase(unittest.TestCase):
             write_wav(test_wav, sid, state2samples(df, sid, skiptest=True))
             freq_max = loudestf(test_wav)
             self.assertEqual(freq_max, 235)
+
+    def test_changes_in_no_rel(self):
+        gateon = {'hashid': 1, 'clock': 0, 'freq1': 1000, 'sus1': 15, 'rel': 0, 'gate1': 1, 'tri1': 1, 'vol': 15}
+        gateoff = {'hashid': 1, 'clock': 1e6 * 10, 'gate1': 0}
+        end = {'hashid': 1, 'clock': 1e6 * 20, 'freq1': 0}
+        df1 = self._make_wav_df([
+            gateon,
+            gateoff,
+            end,
+        ])
+        df2 = self._make_wav_df([
+            gateon,
+            gateoff,
+            {'hashid': 1, 'clock': gateoff['clock'] + 256, 'freq1': gateon['freq1'] * 2},
+            end,
+        ])
+        self._same_samples(df1, df2, same=False)
 
     def test_no_flt_route(self):
         gateoff = {'hashid': 1, 'clock': 1e6 * 10, 'gate1': 0}
