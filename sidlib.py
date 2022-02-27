@@ -448,6 +448,8 @@ def split_vdf(sid, df, near=16, guard=96, maxprspeed=20):
             ['freq1', 'tri1', 'saw1', 'pulse1', 'noise1', 'flt1'] + mod_cols] = pd.NA
         v_df.drop(['test1_first'], axis=1, inplace=True)
 
+        # fold noise1 + other waveforms, to waveform 0.
+        v_df.loc[(v_df['noise1'] == 1) & ((v_df['pulse1'] == 1) | (v_df['saw1'] == 1) | (v_df['tri1'] == 1)), ['noise1', 'pulse1', 'saw1', 'tri1']] = 0
         # remove modulator voice state while sync1/ring1 not set
         v_df.loc[(v_df['freq3'] == 0), ['ring1', 'sync1']] = 0
         v_df.loc[(v_df['ring1'] == 1) & (v_df['tri1'] == 0), ['ring1']] = 0
