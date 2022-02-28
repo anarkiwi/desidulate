@@ -45,6 +45,35 @@ class SidWavTestCase(unittest.TestCase):
             freq_max = loudestf(test_wav)
             self.assertEqual(freq_max, 235)
 
+    def test_ring_non_tri(self):
+        gateon = {'hashid': 1, 'clock': 0, 'freq1': 1024, 'sus1': 15, 'gate1': 1, 'pwduty1': 1024, 'pulse1': 1, 'saw1': 1, 'vol': 15, 'freq3': 512}
+        end = {'hashid': 1, 'clock': 1e6 * 20, 'freq1': 0}
+        df1 = self._make_wav_df([
+            gateon,
+            end,
+        ])
+        gateon['ring1'] = 1
+        df2 = self._make_wav_df([
+            gateon,
+            end,
+        ])
+        self._same_samples(df1, df2)
+
+    def test_sync_noise(self):
+        gateon = {'hashid': 1, 'clock': 0, 'freq1': 1024, 'sus1': 15, 'gate1': 1, 'noise1': 1, 'vol': 15, 'freq3': 512}
+        gateoff = {'hashid': 1, 'clock': 1e6 * 10, 'gate1': 0}
+        end = {'hashid': 1, 'clock': 1e6 * 20, 'freq1': 0}
+        df1 = self._make_wav_df([
+            gateon,
+            end,
+        ])
+        gateon['sync1'] = 1
+        df2 = self._make_wav_df([
+            gateon,
+            end,
+        ])
+        self._same_samples(df1, df2, same=False)
+
     def test_changes_in_no_rel(self):
         gateon = {'hashid': 1, 'clock': 0, 'freq1': 1000, 'sus1': 15, 'rel': 0, 'gate1': 1, 'tri1': 1, 'vol': 15}
         gateoff = {'hashid': 1, 'clock': 1e6 * 10, 'gate1': 0}
