@@ -11,8 +11,8 @@ from collections import defaultdict
 import numpy as np
 import pandas as pd
 
-from fileio import out_path, read_csv
-from sidlib import df_waveform_order, resampledf_to_pr, timer_args, get_sid, ADSR_COLS
+from desidulate.fileio import out_path, read_csv
+from desidulate.sidlib import df_waveform_order, resampledf_to_pr, timer_args, get_sid, ADSR_COLS
 
 parser = argparse.ArgumentParser(description='Downsample SSFs to frames')
 parser.add_argument('ssffile', help='SSF file')

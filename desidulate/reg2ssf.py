@@ -11,8 +11,8 @@
 
 import argparse
 import logging
-from fileio import out_path
-from sidlib import get_sid, reg2state, state2ssfs, timer_args
+from desidulate.fileio import out_path
+from desidulate.sidlib import get_sid, reg2state, state2ssfs, timer_args
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(message)s')
 

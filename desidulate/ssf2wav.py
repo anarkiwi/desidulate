@@ -13,11 +13,11 @@ import sys
 import numpy as np
 import pandas as pd
 
-from fileio import wav_path, out_path, read_csv
-from sidlib import get_sid, timer_args, resampledf_to_pr
-from sidwav import df2wav
-from sidmidi import SidMidiFile, midi_args
-from ssf import add_freq_notes_df, SidSoundFragment
+from desidulate.fileio import wav_path, out_path, read_csv
+from desidulate.sidlib import get_sid, timer_args, resampledf_to_pr
+from desidulate.sidwav import df2wav
+from desidulate.sidmidi import SidMidiFile, midi_args
+from desidulate.ssf import add_freq_notes_df, SidSoundFragment
 
 
 parser = argparse.ArgumentParser(description='Convert .ssf into a WAV file')

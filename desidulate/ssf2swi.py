@@ -2,9 +2,9 @@
 
 import argparse
 import pandas as pd
-from sidlib import resampledf_to_pr, get_sid, CONTROL_BITS, timer_args
-from ssf import add_freq_notes_df
-from swilib import sw_rle_diff, dot0
+from desidulate.sidlib import resampledf_to_pr, get_sid, CONTROL_BITS, timer_args
+from desidulate.ssf import add_freq_notes_df
+from desidulate.swilib import sw_rle_diff, dot0
 
 
 # -8369400230369463243, C64Music/MUSICIANS/H/Hubbard_Rob/Commando.ssf.xz
