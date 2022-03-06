@@ -216,26 +216,50 @@ class SidMidiFile:
         last_note = None
         last_clock = None
         last_gate_clock = None
+        atk1 = None
+        dec1 = None
+        sus1 = None
+        rel1 = None
+        missing_initial_note = None
         notes_starts = []
-        first_row = None
+
+        def add_new_note(vel_clock, row):
+            # TODO: add pitch bend if significantly different to canonical note.
+            # https://github.com/magenta/magenta/issues/1902
+            # TODO: use aftertouch to simulate envelopes.
+            velocity = self.sid_adsr_to_velocity(vel_clock, last_gate_clock, atk1, dec1, sus1, rel1, row.gate1)
+            assert velocity >= 0 and velocity <= 127, (velocity, row)
+            if velocity:
+                return (row.Index, row.vbi_frame, int(row.closest_note), velocity, row.real_freq)
+            return None
+
+        rows = []
         for row, row_waveforms in row_states:
             clock = row.Index
-            if first_row is None:
-                first_row = row
+            last_clock = clock
+            rows.append(row)
+            if atk1 is None:
+                atk1, dec1, sus1, rel1 = (row.atk1, row.dec1, row.sus1, row.rel1)
             if row.gate1:
                 last_gate_clock = clock
-            if row_waveforms and not row.test1:
-                # TODO: add pitch bend if significantly different to canonical note.
-                # https://github.com/magenta/magenta/issues/1902
-                if row.closest_note != last_note:
-                    atk1, dec1, sus1, rel1 = (first_row.atk1, first_row.dec1, first_row.sus1, first_row.rel1)
-                    velocity = self.sid_adsr_to_velocity(clock, last_gate_clock, atk1, dec1, sus1, rel1, row.gate1)
-                    assert velocity >= 0 and velocity <= 127, (velocity, row)
-                    if velocity:
-                        notes_starts.append((clock, row.vbi_frame, int(row.closest_note), velocity, row.real_freq))
-                        last_note = row.closest_note
-            last_clock = clock
+            if row.test1:
+                continue
+            if not row_waveforms:
+                continue
+            if row.closest_note == last_note:
+                continue
+            new_note = add_new_note(clock, row)
+            if new_note:
+                notes_starts.append(new_note)
+                last_note = row.closest_note
+            elif not notes_starts and not missing_initial_note and atk1 > 0:
+                missing_initial_note = row
         notes_starts.append((last_clock, None, None, None, None))
+        if missing_initial_note:
+            new_note = add_new_note(notes_starts[0][0], missing_initial_note)
+            if new_note:
+                notes_starts = [new_note] + notes_starts
+
         return notes_starts
 
     def get_notes(self, notes_starts):
