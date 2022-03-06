@@ -8,8 +8,9 @@ jobs:
     - name: test
       run: |
         sudo apt-get update && sudo apt-get install python3-dev && \
-        sudo pip3 install -U -r test-requirements.txt && \
+        sudo pip3 install -U -r test-requirements.txt -r requirements.txt && \
+        PYFILES=$(find . -type f -name \*py|sort) && \
+        PYTHONPATH=. pylint -E ${PYFILES} && pytype -k ${PYFILES} && \
         sudo pip3 install . && \
-        PYFILES=$(find . -type f -name \*py|sort)
-        PYTHONPATH=. pylint -E ${PYFILES} && \
-        coverage run --source=desidulate -m unittest discover tests && coverage report -m
+        coverage run --source=desidulate -m unittest discover tests && \
+        coverage report -m
