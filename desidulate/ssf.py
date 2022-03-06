@@ -12,10 +12,10 @@
 from collections import Counter
 from itertools import groupby
 import pandas as pd
-from fileio import out_path, read_csv
-from sidlib import set_sid_dtype, resampledf_to_pr
-from sidmidi import ELECTRIC_SNARE, BASS_DRUM, LOW_TOM, HIGH_TOM, PEDAL_HIHAT, CLOSED_HIHAT, OPEN_HIHAT, ACCOUSTIC_SNARE, closest_midi
-from sidwav import state2samples, samples_loudestf, readwav
+from desidulate.fileio import out_path, read_csv
+from desidulate.sidlib import set_sid_dtype, resampledf_to_pr
+from desidulate.sidmidi import ELECTRIC_SNARE, BASS_DRUM, LOW_TOM, HIGH_TOM, PEDAL_HIHAT, CLOSED_HIHAT, OPEN_HIHAT, ACCOUSTIC_SNARE, closest_midi
+from desidulate.sidwav import state2samples, samples_loudestf, readwav
 
 INITIAL_PERIOD_FRAMES = 4
 

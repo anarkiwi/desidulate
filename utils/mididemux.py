@@ -11,7 +11,7 @@ import os
 import sys
 from collections import defaultdict
 from music21 import midi
-from sidmidi import add_end_of_track, add_event, write_midi, read_midi
+from desidulate.sidmidi import add_end_of_track, add_event, write_midi, read_midi
 
 
 TSGRAN = 10

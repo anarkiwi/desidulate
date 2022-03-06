@@ -13,7 +13,7 @@ import pandas as pd
 import numpy as np
 from pyresidfp import SoundInterfaceDevice
 from pyresidfp.sound_interface_device import ChipModel
-from fileio import read_csv
+from desidulate.fileio import read_csv
 
 SID_SAMPLE_FREQ = 11025
 # use of external filter will be non deterministic.

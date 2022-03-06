@@ -4,9 +4,9 @@ import os
 import tempfile
 import unittest
 import pandas as pd
-from sidlib import get_sid, reg2state, state2ssfs, calc_vbi_frame
-from sidmidi import SidMidiFile, DEFAULT_BPM
-from ssf import SidSoundFragment, add_freq_notes_df
+from desidulate.sidlib import get_sid, reg2state, state2ssfs, calc_vbi_frame
+from desidulate.sidmidi import SidMidiFile, DEFAULT_BPM
+from desidulate.ssf import SidSoundFragment, add_freq_notes_df
 
 
 class SSFTestCase(unittest.TestCase):

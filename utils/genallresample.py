@@ -15,7 +15,7 @@ import pathlib
 import concurrent.futures
 from collections import defaultdict
 import pandas as pd
-from fileio import read_csv
+from desidulate.fileio import read_csv
 
 SSF_GLOB = r'*.resample_ssf.*xz'
 MAXES_RE = re.compile(r'.+\.(\d+)\.([^\.]+)\.xz$')

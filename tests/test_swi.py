@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 
 import unittest
-from swilib import sw_rle_diff, dot0
+from desidulate.swilib import sw_rle_diff, dot0
 
 
 class SWITestCase(unittest.TestCase):
