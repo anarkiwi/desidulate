@@ -10,7 +10,7 @@ jobs:
         sudo apt-get update && sudo apt-get install python3-dev && \
         sudo pip3 install -U -r test-requirements.txt -r requirements.txt && \
         PYFILES=$(find . -type f -name \*py|sort) && \
-        PYTHONPATH=. pylint -E ${PYFILES} && pytype -k desidulate/* && \
+        PYTHONPATH=. pylint -E ${PYFILES} && pytype -P. -k . && \
         sudo pip3 install . && \
         coverage run --source=desidulate -m unittest discover tests && \
         coverage report -m
