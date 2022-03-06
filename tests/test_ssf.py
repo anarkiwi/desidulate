@@ -5,7 +5,7 @@ import tempfile
 import unittest
 import pandas as pd
 from desidulate.sidlib import get_sid, reg2state, state2ssfs, calc_vbi_frame
-from desidulate.sidmidi import SidMidiFile, DEFAULT_BPM
+from desidulate.sidmidi import SidMidiFile
 from desidulate.ssf import SidSoundFragment, add_freq_notes_df
 
 
@@ -15,7 +15,7 @@ class SSFTestCase(unittest.TestCase):
     @staticmethod
     def _df2ssf(df, percussion=True):
         sid = get_sid(pal=True)
-        smf = SidMidiFile(sid, DEFAULT_BPM)
+        smf = SidMidiFile(sid, bpm=None)
         df = add_freq_notes_df(sid, df)
         df['pr_speed'] = 1
         df['vbi_frame'] = calc_vbi_frame(sid, df['clock'])
@@ -56,7 +56,7 @@ class SSFTestCase(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             test_log = os.path.join(tmpdir, 'vicesnd.log')
             sid = get_sid(pal=True)
-            smf = SidMidiFile(sid, DEFAULT_BPM)
+            smf = SidMidiFile(sid, bpm=None)
             with open(test_log, 'w', encoding='utf8') as log:
                 log.write('\n'.join((
                     '1 24 15',

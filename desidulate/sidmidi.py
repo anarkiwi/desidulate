@@ -99,7 +99,7 @@ def bpm_from_int(int_freq):
 
 class SidMidiFile:
 
-    def __init__(self, sid, bpm, program=81, drum_program=0):
+    def __init__(self, sid, bpm=None, program=81, drum_program=0):
         self.sid = sid
         if bpm is None:
             bpm = bpm_from_int(sid.int_freq)
