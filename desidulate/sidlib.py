@@ -89,7 +89,7 @@ def resampledf_to_pr(ssf_df):
     resample_df_clock = ssf_df[['pr_frame', 'vbi_frame']].reset_index().drop_duplicates('pr_frame', keep='first').copy()
     resample_df = resample_df.merge(resample_df_clock, on='pr_frame').set_index('clock').sort_index()
     for col in ADSR_COLS:
-        resample_df[col] = getattr(first_row, col)
+        resample_df[col] = int(getattr(first_row, col))
     return resample_df
 
 

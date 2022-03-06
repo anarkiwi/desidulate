@@ -23,6 +23,14 @@ class SSFTestCase(unittest.TestCase):
         df = df.fillna(method='ffill').set_index('clock')
         return SidSoundFragment(percussion=percussion, sid=sid, smf=smf, df=df)
 
+    def test_adsr(self):
+        sid = get_sid(pal=True)
+        smf = SidMidiFile(sid, DEFAULT_BPM)
+        self.assertEqual(127, smf.sid_adsr_to_velocity(0, None, atk1=0, dec1=0, sus1=15, rel1=0, gate1=1))
+        self.assertEqual(59, smf.sid_adsr_to_velocity(0, None, atk1=0, dec1=0, sus1=7, rel1=0, gate1=1))
+        self.assertEqual(32, smf.sid_adsr_to_velocity(20e3, None, atk1=7, dec1=0, sus1=0, rel1=0, gate1=1))
+        self.assertEqual(32, smf.sid_adsr_to_velocity(20e3, None, atk1=7, dec1=0, sus1=1, rel1=0, gate1=1))
+
     def test_notest_ssf(self):
         df = pd.DataFrame(
             [{'hashid': 1, 'count': 1, 'clock': 0, 'freq1': 1024, 'pwduty1': 0, 'atk1': 0, 'dec1': 0, 'sus1': 15, 'rel1': 0, 'gate1': 1, 'sync1': 0, 'ring1': 0, 'test1': 0, 'tri1': 1, 'saw1': 0, 'pulse1': 0, 'noise1': 0, 'flt1': 0, 'fltres': 0, 'fltcoff': 0, 'fltlo': 0, 'fltband': 0, 'flthi': 0, 'vol': 15},
