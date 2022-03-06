@@ -15,7 +15,7 @@ class SSFTestCase(unittest.TestCase):
     @staticmethod
     def _df2ssf(df, percussion=True):
         sid = get_sid(pal=True)
-        smf = SidMidiFile(sid, bpm=None)
+        smf = SidMidiFile(sid)
         df = add_freq_notes_df(sid, df)
         df['pr_speed'] = 1
         df['vbi_frame'] = calc_vbi_frame(sid, df['clock'])
@@ -25,7 +25,7 @@ class SSFTestCase(unittest.TestCase):
 
     def test_adsr(self):
         sid = get_sid(pal=True)
-        smf = SidMidiFile(sid, DEFAULT_BPM)
+        smf = SidMidiFile(sid)
         self.assertEqual(127, smf.sid_adsr_to_velocity(0, None, atk1=0, dec1=0, sus1=15, rel1=0, gate1=1))
         self.assertEqual(59, smf.sid_adsr_to_velocity(0, None, atk1=0, dec1=0, sus1=7, rel1=0, gate1=1))
         self.assertEqual(32, smf.sid_adsr_to_velocity(20e3, None, atk1=7, dec1=0, sus1=0, rel1=0, gate1=1))
@@ -56,7 +56,7 @@ class SSFTestCase(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             test_log = os.path.join(tmpdir, 'vicesnd.log')
             sid = get_sid(pal=True)
-            smf = SidMidiFile(sid, bpm=None)
+            smf = SidMidiFile(sid)
             with open(test_log, 'w', encoding='utf8') as log:
                 log.write('\n'.join((
                     '1 24 15',
