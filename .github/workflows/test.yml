@@ -9,7 +9,7 @@ jobs:
       run: |
         sudo apt-get update && sudo apt-get install python3-dev && \
         sudo pip3 install -U -r test-requirements.txt && \
-        sudp pip3 install . && \
+        sudo pip3 install . && \
         PYFILES=$(find . -type f -name \*py)
         PYTHONPATH=. pylint -E ${PYFILES} && PYTHONPATH=. pytype -k ${PYFILES} && \
         coverage run --source=. -m unittest discover && coverage report -m
