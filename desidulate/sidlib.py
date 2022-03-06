@@ -188,17 +188,21 @@ class SidWrap:
     }
 
     def __init__(self, pal, model, sampling_frequency):
+        # https://codebase64.org/doku.php?id=magazines:chacking17
         if pal:
             self.clock_freq = SoundInterfaceDevice.PAL_CLOCK_FREQUENCY
-            self.int_freq = 50.0
+            self.raster_lines = 312
+            self.cycles_per_line = 63
         else:
             self.clock_freq = SoundInterfaceDevice.NTSC_CLOCK_FREQUENCY
-            self.int_freq = 60.0
+            self.raster_lines = 263
+            self.cycles_per_line = 65
+        self.clockq = self.raster_lines * self.cycles_per_line
+        self.int_freq = self.clock_freq / self.clockq
         self.freq_scaler = self.clock_freq / 16777216
         self.resid = SoundInterfaceDevice(
             model=model, clock_frequency=self.clock_freq,
             sampling_frequency=sampling_frequency)
-        self.clockq = int(round(self.clock_freq / self.int_freq))
         self.attack_clock = {
             k: int(v / 1e3 * self.clock_freq) for k, v in self.ATTACK_MS.items()}
         self.decay_release_clock = {

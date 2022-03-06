@@ -38,8 +38,8 @@ class SSFTestCase(unittest.TestCase):
         s = self._df2ssf(df, percussion=True)
         self.assertEqual(s.waveforms, {'tri'})
         self.assertEqual(s.midi_pitches, (35,))
-        self.assertEqual(s.total_duration, 98525)
-        self.assertEqual(s.midi_notes, ((0, 0, 35, 98525, 127, 60.134765625),))
+        self.assertEqual(s.total_duration, 98280)
+        self.assertEqual(s.midi_notes, ((0, 0, 35, s.total_duration, 127, 60.134765625),))
 
     def test_test_ssf(self):
         df = pd.DataFrame(
@@ -49,8 +49,8 @@ class SSFTestCase(unittest.TestCase):
         s = self._df2ssf(df, percussion=True)
         self.assertEqual(s.waveforms, {'tri'})
         self.assertEqual(s.midi_pitches, (35,))
-        self.assertEqual(s.total_duration, 78820)
-        self.assertEqual(s.midi_notes, ((20000, 1, 35, 78820, 127, 60.134765625),))
+        self.assertEqual(s.total_duration, 78624)
+        self.assertEqual(s.midi_notes, ((20000, 1, 35, s.total_duration, 127, 60.134765625),))
 
     def test_ssf_parser(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -87,7 +87,7 @@ class SSFTestCase(unittest.TestCase):
                 ssf.smf_transcribe(smf, 0, 1)
                 smf.write(os.devnull)
                 self.assertEqual(ssf.midi_pitches, (95,))
-                self.assertEqual(ssf.total_duration, 118230)
+                self.assertEqual(ssf.total_duration, 117936)
 
 
 if __name__ == '__main__':
