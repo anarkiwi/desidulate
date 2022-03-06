@@ -11,5 +11,5 @@ jobs:
         sudo pip3 install -U -r test-requirements.txt && \
         sudo pip3 install . && \
         PYFILES=$(find . -type f -name \*py|sort)
-        PYTHONPATH=. pylint -E ${PYFILES} && PYTHONPATH=. pytype -k ${PYFILES} && \
+        PYTHONPATH=. pylint -E ${PYFILES} && \
         coverage run --source=. -m unittest discover && coverage report -m
