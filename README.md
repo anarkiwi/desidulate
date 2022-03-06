@@ -9,7 +9,7 @@ desidulate is intended to help new SID composers understand the SID more quickly
 ## Installing
 
 ```
-$ ./build.sh
+$ pip3 install .
 ```
 
 ## Transcribing to a MIDI file
@@ -31,7 +31,7 @@ $ mv vicesnd.sid mytune.dump
 2. Generate `ssf` and `log` files.
 
 ```
-$ ./reg2ssf.py mytune.dump
+$ reg2ssf mytune.dump
 ```
 
 This intermediate step, identifies all SSFs (see below) and writes them to `mytune.ssf.xz`, and also writes a log file `mytune.log.xz`, which logs when SSFs are played (in CPU clock cycles).
@@ -39,7 +39,7 @@ This intermediate step, identifies all SSFs (see below) and writes them to `mytu
 3. Generate SMF MIDI file.
 
 ```
-$ ./ssf2midi.py mytune.log.xz
+$ ssf2midi mytune.log.xz
 ```
 
 This re-renders the `ssf` and `log` files into a SMF `mid` file, `mytune.mid`
@@ -51,7 +51,7 @@ A SID register dump is parsed into partitions called SSFs - SID Sound Fragments,
 ## Transcibing an SSF to a WAV file
 
 ```
-$ ./ssf2wav.py mytune.ssf.xz <hashid>
+$ ssf2wav mytune.ssf.xz <hashid>
 ```
 
 Where `<hashid>` is the key of the SSF to render (view `mytune.ssf.xz` for the complete list of SSF's detected, sorted by most often used SSF first).
@@ -60,7 +60,7 @@ Where `<hashid>` is the key of the SSF to render (view `mytune.ssf.xz` for the c
 ## Transcribing to a WAV file
 
 ```
-$ ./reg2wav.py mytune.dump
+$ reg2wav mytune.dump
 ```
 
 The result will be rendered into `mytune.wav`.
@@ -80,13 +80,13 @@ vsid -sounddev dump -soundarg C64Music/MUSICIANS/L/Linus/Cauldron_II_Remix.sid.d
 Process the desired song into an SSF log:
 
 ```
-./reg2ssf.py C64Music/MUSICIANS/L/Linus/Cauldron_II_Remix.sid.dump
+reg2ssf C64Music/MUSICIANS/L/Linus/Cauldron_II_Remix.sid.dump
 ```
 
 Render all the SSFs as WAVs:
 
 ```
-./ssf2wav.py C64Music/MUSICIANS/L/Linus/Cauldron_II_Remix.ssf.xz
+ssf2wav C64Music/MUSICIANS/L/Linus/Cauldron_II_Remix.ssf.xz
 ```
 
 Listen to the WAVs, to find the instrument you wish to transcribe, which will be indentified with a hashid in the filename.
@@ -94,7 +94,7 @@ Listen to the WAVs, to find the instrument you wish to transcribe, which will be
 Now, transcribe the SSF into an instrument (in this case, a kick sound): desidulate attempts to optimize the instruments by detecting and automating filter and PWM curves.
 
 ```
-./ssf2swi.py C64Music/MUSICIANS/L/Linus/Cauldron_II_Remix.ssf.xz -1975247557004053752
+ssf2swi C64Music/MUSICIANS/L/Linus/Cauldron_II_Remix.ssf.xz -1975247557004053752
 multispeed: 1
 ADSR: 05F0
 
