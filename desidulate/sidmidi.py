@@ -109,6 +109,18 @@ class SidMidiFile:
         self.one_8n_clocks = self.one_4n_clocks / 2
         self.one_16n_clocks = self.one_4n_clocks / 4
 
+    @lru_cache
+    def vel_scale(self, x, x_max):
+        return int((x / x_max) * 127)
+
+    @lru_cache
+    def neg_vel_scale(self, x, x_max):
+        return int((1.0 - (x / x_max)) * 127)
+
+    @lru_cache
+    def get_duration(self, clocks):
+        return round(clocks / self.sid.clockq) * self.sid.clockq
+
     def clock_to_ticks(self, clock):
         return self.sid.clock_to_ticks(clock, self.bpm, self.tpqn)
 
@@ -182,29 +194,22 @@ class SidMidiFile:
         assert duration > 0, duration
         self.drum_pitches[voicenum].append((clock, duration, pitch, velocity))
 
-    @lru_cache
-    def vel_scale(self, x, x_max):
-        return int((x / x_max) * 127)
-
-    @lru_cache
-    def neg_vel_scale(self, x, x_max):
-        return int((1.0 - (x / x_max)) * 127)
-
-    def sid_adsr_to_velocity(self, row, last_rel, last_gate_clock):
+    def sid_adsr_to_velocity(self, first_row, row, last_gate_clock):
+        atk1, dec1, sus1, rel1 = (first_row.atk1, first_row.dec1, first_row.sus1, first_row.rel1)
         clock = row.Index
         if row.gate1:
-            attack_clock = self.sid.attack_clock[row.atk1]
+            attack_clock = self.sid.attack_clock[atk1]
             if clock < attack_clock:
-                if row.atk1 and not row.sus1:
+                if atk1 and not sus1:
                     return self.vel_scale(clock, attack_clock)
             else:
-                if row.dec1 and not row.sus1:
-                    decay_clock = self.sid.decay_release_clock[row.dec1]
+                if dec1 and not sus1:
+                    decay_clock = self.sid.decay_release_clock[dec1]
                     if clock < attack_clock + decay_clock:
                         return self.neg_vel_scale(clock - attack_clock, decay_clock)
-            return self.sid_velocity[row.sus1]
+            return self.sid_velocity[sus1]
         if last_gate_clock is not None:
-            rel_clock = self.sid.decay_release_clock[last_rel]
+            rel_clock = self.sid.decay_release_clock[rel1]
             if clock - last_gate_clock <= rel_clock:
                 return self.neg_vel_scale(clock - last_gate_clock, rel_clock)
         return 0
@@ -216,16 +221,16 @@ class SidMidiFile:
         notes_starts = []
         first_row = None
         for row, row_waveforms in row_states:
+            clock = row.Index
             if first_row is None:
                 first_row = row
-            clock = row.Index
             if row.gate1:
                 last_gate_clock = clock
             if row_waveforms and not row.test1:
                 # TODO: add pitch bend if significantly different to canonical note.
                 # https://github.com/magenta/magenta/issues/1902
                 if row.closest_note != last_note:
-                    velocity = self.sid_adsr_to_velocity(first_row, first_row.rel1, last_gate_clock)
+                    velocity = self.sid_adsr_to_velocity(first_row, row, last_gate_clock)
                     assert velocity >= 0 and velocity <= 127, (velocity, row)
                     if velocity:
                         notes_starts.append((clock, row.vbi_frame, int(row.closest_note), velocity, row.real_freq))
@@ -233,10 +238,6 @@ class SidMidiFile:
             last_clock = clock
         notes_starts.append((last_clock, None, None, None, None))
         return notes_starts
-
-    @lru_cache
-    def get_duration(self, clocks):
-        return round(clocks / self.sid.clockq) * self.sid.clockq
 
     def get_notes(self, notes_starts):
         notes = []
