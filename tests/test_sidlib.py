@@ -3,8 +3,8 @@
 import unittest
 from io import StringIO
 import pandas as pd
-from fileio import read_csv
-from sidlib import jittermatch_df, squeeze_diffs, coalesce_near_writes, remove_end_repeats, df_waveform_order, get_sid, calc_vbi_frame, calc_rates, bits2byte
+from desidulate.fileio import read_csv
+from desidulate.sidlib import jittermatch_df, squeeze_diffs, coalesce_near_writes, remove_end_repeats, df_waveform_order, get_sid, calc_vbi_frame, calc_rates, bits2byte
 
 
 class SIDLibTestCase(unittest.TestCase):

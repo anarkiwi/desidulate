@@ -13,10 +13,10 @@ import argparse
 import os
 import sys
 import pandas as pd
-from fileio import midi_path, out_path, read_csv
-from sidlib import get_sid, timer_args
-from sidmidi import SidMidiFile, midi_args
-from ssf import SidSoundFragment, SidSoundFragmentParser
+from desidulate.fileio import midi_path, out_path, read_csv
+from desidulate.sidlib import get_sid, timer_args
+from desidulate.sidmidi import SidMidiFile, midi_args
+from desidulate.ssf import SidSoundFragment, SidSoundFragmentParser
 
 ALL_VOICES = frozenset([1, 2, 3])
 

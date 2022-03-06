@@ -4,7 +4,12 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - name: build 
       run: |
-        ./build.sh && for s in ./*2*py ; do $s --help ; done && sudo pip3 install -U -r test-requirements.txt && pylint -E *py && pytype -k *py && coverage run --source=. -m unittest discover && coverage report -m
+        sudo apt-get update && apt-get install python3-dev && \
+        sudo pip3 install . && \
+        sudo pip3 install -U -r test-requirements.txt && \
+        PYFILES=$(find . -type f -name \*py)
+        pylint -E ${PYFILES} && pytype -k ${PYFILES} && \
+        coverage run --source=. -m unittest discover && coverage report -m

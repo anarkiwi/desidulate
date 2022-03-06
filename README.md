@@ -132,7 +132,7 @@ ADSR: 05F0
 
 Now enter the values into SID Wizard (a direct SWI exporter is planned), and play the sound with "z!"
 
-![Alt text](swishot.png?raw=true "swi screenshot")
+![Alt text](docs/swishot.png?raw=true "swi screenshot")
 
 
 ## Ongoing work
