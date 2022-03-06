@@ -7,8 +7,7 @@
 from collections import defaultdict
 from functools import lru_cache
 from music21 import midi
-
-DEFAULT_BPM=125
+from desidulate.sidlib import timer_args
 
 A = 440
 MIDI_N_TO_F = {n: (A / 32) * (2 ** ((n - 9) / 12)) for n in range(128)}
@@ -29,7 +28,8 @@ CRASH_CYMBAL1 = 49
 
 
 def midi_args(parser):
-    parser.add_argument('--bpm', default=DEFAULT_BPM, type=int, help='MIDI BPM')
+    timer_args(parser)
+    parser.add_argument('--bpm', default=None, type=int, help='MIDI BPM (default derive from int. frequency)')
     parser.add_argument('--percussion', dest='percussion', action='store_true')
     parser.add_argument('--no-percussion', dest='percussion', action='store_false')
     parser.set_defaults(pal=True, percussion=True)
@@ -93,10 +93,16 @@ def read_midi(file_name):
     return input_mf
 
 
+def bpm_from_int(int_freq):
+    return int_freq * 60 / 24
+
+
 class SidMidiFile:
 
     def __init__(self, sid, bpm, program=81, drum_program=0):
         self.sid = sid
+        if bpm is None:
+            bpm = bpm_from_int(sid.int_freq)
         self.bpm = bpm
         self.program = program
         self.drum_program = drum_program

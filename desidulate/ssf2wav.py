@@ -13,7 +13,7 @@ import sys
 import numpy as np
 import pandas as pd
 from desidulate.fileio import wav_path, out_path, read_csv
-from desidulate.sidlib import get_sid, timer_args, resampledf_to_pr
+from desidulate.sidlib import get_sid, resampledf_to_pr
 from desidulate.sidwav import df2wav
 from desidulate.sidmidi import SidMidiFile, midi_args
 from desidulate.ssf import add_freq_notes_df, SidSoundFragment
@@ -41,7 +41,6 @@ def main():
     pr_resample = parser.add_mutually_exclusive_group(required=False)
     pr_resample.add_argument('--pr_resample', dest='pr_resample', default=True, action='store_true', help='skip parsing of SSF')
     pr_resample.add_argument('--no-pr_resample', dest='pr_resample', action='store_false', help='do not skip parsing of SSF')
-    timer_args(parser)
     midi_args(parser)
     args = parser.parse_args()
 

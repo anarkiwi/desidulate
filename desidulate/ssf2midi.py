@@ -14,7 +14,7 @@ import os
 import sys
 import pandas as pd
 from desidulate.fileio import midi_path, out_path, read_csv
-from desidulate.sidlib import get_sid, timer_args
+from desidulate.sidlib import get_sid
 from desidulate.sidmidi import SidMidiFile, midi_args
 from desidulate.ssf import SidSoundFragment, SidSoundFragmentParser
 
@@ -28,7 +28,6 @@ def main():
     parser.add_argument('--maxclock', default=0, type=int, help='Max clock value')
     parser.add_argument('--voicemask', default=','.join([str(v) for v in ALL_VOICES]), type=str, help='Voice mask')
     parser.add_argument('--dfext', default='xz', help='default dataframe extension')
-    timer_args(parser)
     midi_args(parser)
     args = parser.parse_args()
     voicemask = frozenset([int(v) for v in args.voicemask.split(',')])
