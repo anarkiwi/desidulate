@@ -5,11 +5,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
-    - name: build 
+    - name: test
       run: |
         sudo apt-get update && sudo apt-get install python3-dev && \
-        sudo pip3 install . && \
         sudo pip3 install -U -r test-requirements.txt && \
+        sudp pip3 install . && \
         PYFILES=$(find . -type f -name \*py)
-        pylint -E ${PYFILES} && pytype -k ${PYFILES} && \
+        PYTHONPATH=. pylint -E ${PYFILES} && PYTHONPATH=. pytype -k ${PYFILES} && \
         coverage run --source=. -m unittest discover && coverage report -m

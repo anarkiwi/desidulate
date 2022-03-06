@@ -5,7 +5,7 @@ import os
 import sys
 from pyresidfp import SoundInterfaceDevice
 import pandas as pd
-from fileio import read_csv
+from desidulate.fileio import read_csv
 
 TUNEDEFAULT = True
 VICEIMAGE = 'anarkiwi/headlessvice'
