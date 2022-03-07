@@ -17,7 +17,7 @@ from desidulate.sidlib import set_sid_dtype, resampledf_to_pr
 from desidulate.sidmidi import ELECTRIC_SNARE, BASS_DRUM, LOW_TOM, HIGH_TOM, PEDAL_HIHAT, CLOSED_HIHAT, OPEN_HIHAT, ACCOUSTIC_SNARE, closest_midi
 from desidulate.sidwav import state2samples, samples_loudestf, readwav
 
-INITIAL_PERIOD_FRAMES = 4
+INITIAL_FRAMES = 4
 
 
 def add_freq_notes_df(sid, ssfs_df):
@@ -44,8 +44,9 @@ class SidSoundFragment:
             if pd.notna(getattr(row, waveform)) and getattr(row, waveform) > 0)
                 for row in ssf.itertuples()]
 
-    def __init__(self, percussion, sid, df, smf, wav_file=None):
+    def __init__(self, percussion, sid, df, smf, wav_file=None, initial_frames=INITIAL_FRAMES):
         self.df = resampledf_to_pr(df)
+        self.initial_clocks = sid.clockq * (initial_frames + 1)
         self.percussion = percussion
         waveform_states = self._waveform_state(self.df)
         self.waveform_order = tuple([frozenset(i[0]) for i in groupby(waveform_states)])
@@ -62,15 +63,12 @@ class SidSoundFragment:
         self.initial_midi_pitches = []
         if self.midi_notes:
             initial_midi_note = self.midi_notes[0]
-            initial_clock_end = initial_midi_note[1] + INITIAL_PERIOD_FRAMES
             self.initial_midi_notes = tuple(
-                [midi_note for midi_note in self.midi_notes if midi_note[1] <= initial_clock_end])
+                [midi_note for midi_note in self.midi_notes if midi_note[0] < self.initial_clocks])
             self.initial_midi_pitches = tuple(
-                [midi_note[2] for midi_note in self.initial_midi_notes])
+                [midi_note[1] for midi_note in self.initial_midi_notes])
             self.total_duration = sum(
-                [midi_note[3] for midi_note in self.midi_notes])
-            self.initial_duration = sum(
-                [midi_note[3] for midi_note in self.initial_midi_notes])
+                [midi_note[2] for midi_note in self.midi_notes])
             self.max_midi_note = max(self.midi_pitches)
             self.min_midi_note = min(self.midi_pitches)
         self.initial_pitch_drop = 0
@@ -113,7 +111,7 @@ class SidSoundFragment:
         return noise_pitch
 
     def _set_nondrum_pitches(self):
-        for clock, _vbi_frame, pitch, duration, velocity, _ in self.midi_notes:
+        for clock, pitch, duration, velocity, _ in self.midi_notes:
             assert duration > 0, self.midi_notes
             self.pitches.append((clock, duration, pitch, velocity))
 
@@ -123,7 +121,7 @@ class SidSoundFragment:
 
         # Percussion must be no longer than one half note.
         if self.total_clocks <= self.one_2n_clocks:
-            clock, _vbi_frame, _pitch, _duration, velocity, _ = self.midi_notes[0]
+            clock, _pitch, _duration, velocity, _ = self.midi_notes[0]
 
             # TODO: pitched noise percussion.
             if self.all_noise or self.noisephases > 1:

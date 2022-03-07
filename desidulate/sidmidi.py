@@ -236,7 +236,7 @@ class SidMidiFile:
             velocity = self.sid_adsr_to_velocity(vel_clock, last_gate_clock, atk1, dec1, sus1, rel1, row.gate1)
             assert velocity >= 0 and velocity <= 127, (velocity, row)
             if velocity:
-                return (row.Index, row.vbi_frame, int(row.closest_note), velocity, row.real_freq)
+                return (row.Index, int(row.closest_note), velocity, row.real_freq)
             return None
 
         rows = []
@@ -260,7 +260,7 @@ class SidMidiFile:
                 last_note = row.closest_note
             elif not notes_starts and not missing_initial_note and atk1 > 0:
                 missing_initial_note = row
-        notes_starts.append((last_clock, None, None, None, None))
+        notes_starts.append((last_clock, None, None, None))
         if missing_initial_note:
             new_note = add_new_note(notes_starts[0][0], missing_initial_note)
             if new_note:
@@ -271,11 +271,11 @@ class SidMidiFile:
     def get_notes(self, notes_starts):
         notes = []
         for i, note_clocks in enumerate(notes_starts[:-1]):
-            clock, vbi_frame, note, velocity, sid_f = note_clocks
+            clock, note, velocity, sid_f = note_clocks
             next_clock = notes_starts[i + 1][0]
             duration = self.get_duration(next_clock - clock)
             if duration:
-                notes.append((clock, vbi_frame, note, duration, velocity, sid_f))
+                notes.append((clock, note, duration, velocity, sid_f))
         return notes
 
     # Convert gated voice events into possibly many MIDI notes
