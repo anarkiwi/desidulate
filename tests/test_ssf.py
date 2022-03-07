@@ -5,7 +5,7 @@ import tempfile
 import unittest
 import pandas as pd
 from desidulate.sidlib import get_sid, reg2state, state2ssfs, calc_vbi_frame
-from desidulate.sidmidi import SidMidiFile, DEFAULT_BPM
+from desidulate.sidmidi import SidMidiFile
 from desidulate.ssf import SidSoundFragment, add_freq_notes_df
 
 
@@ -15,13 +15,21 @@ class SSFTestCase(unittest.TestCase):
     @staticmethod
     def _df2ssf(df, percussion=True):
         sid = get_sid(pal=True)
-        smf = SidMidiFile(sid, DEFAULT_BPM)
+        smf = SidMidiFile(sid)
         df = add_freq_notes_df(sid, df)
         df['pr_speed'] = 1
         df['vbi_frame'] = calc_vbi_frame(sid, df['clock'])
         df['pr_frame'] = df['vbi_frame'].floordiv(df['pr_speed'])
         df = df.fillna(method='ffill').set_index('clock')
         return SidSoundFragment(percussion=percussion, sid=sid, smf=smf, df=df)
+
+    def test_adsr(self):
+        sid = get_sid(pal=True)
+        smf = SidMidiFile(sid)
+        self.assertEqual(127, smf.sid_adsr_to_velocity(0, None, atk1=0, dec1=0, sus1=15, rel1=0, gate1=1))
+        self.assertEqual(59, smf.sid_adsr_to_velocity(0, None, atk1=0, dec1=0, sus1=7, rel1=0, gate1=1))
+        self.assertEqual(32, smf.sid_adsr_to_velocity(20e3, None, atk1=7, dec1=0, sus1=0, rel1=0, gate1=1))
+        self.assertEqual(32, smf.sid_adsr_to_velocity(20e3, None, atk1=7, dec1=0, sus1=1, rel1=0, gate1=1))
 
     def test_notest_ssf(self):
         df = pd.DataFrame(
@@ -30,8 +38,8 @@ class SSFTestCase(unittest.TestCase):
         s = self._df2ssf(df, percussion=True)
         self.assertEqual(s.waveforms, {'tri'})
         self.assertEqual(s.midi_pitches, (35,))
-        self.assertEqual(s.total_duration, 98525)
-        self.assertEqual(s.midi_notes, ((0, 0, 35, 98525, 127, 60.134765625),))
+        self.assertEqual(s.total_duration, 98280)
+        self.assertEqual(s.midi_notes, ((0, 35, s.total_duration, 127, 60.134765625),))
 
     def test_test_ssf(self):
         df = pd.DataFrame(
@@ -41,14 +49,14 @@ class SSFTestCase(unittest.TestCase):
         s = self._df2ssf(df, percussion=True)
         self.assertEqual(s.waveforms, {'tri'})
         self.assertEqual(s.midi_pitches, (35,))
-        self.assertEqual(s.total_duration, 78820)
-        self.assertEqual(s.midi_notes, ((20000, 1, 35, 78820, 127, 60.134765625),))
+        self.assertEqual(s.total_duration, 78624)
+        self.assertEqual(s.midi_notes, ((20000, 35, s.total_duration, 127, 60.134765625),))
 
     def test_ssf_parser(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             test_log = os.path.join(tmpdir, 'vicesnd.log')
             sid = get_sid(pal=True)
-            smf = SidMidiFile(sid, DEFAULT_BPM)
+            smf = SidMidiFile(sid)
             with open(test_log, 'w', encoding='utf8') as log:
                 log.write('\n'.join((
                     '1 24 15',
@@ -79,7 +87,7 @@ class SSFTestCase(unittest.TestCase):
                 ssf.smf_transcribe(smf, 0, 1)
                 smf.write(os.devnull)
                 self.assertEqual(ssf.midi_pitches, (95,))
-                self.assertEqual(ssf.total_duration, 118230)
+                self.assertEqual(ssf.total_duration, 117936)
 
 
 if __name__ == '__main__':

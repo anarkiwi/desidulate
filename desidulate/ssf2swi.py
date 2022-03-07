@@ -65,54 +65,59 @@ def filter_from_row(row):
     return '%4.4X' % val
 
 
-df = pd.read_csv(args.ssffile, dtype=pd.Int64Dtype())
-ssf_df = df[df.hashid == args.hashid].drop(['hashid_noclock', 'count', 'rate', 'vol', 'hashid', 'fltext'], axis=1)
-ssf_df = resampledf_to_pr(ssf_df).reset_index(drop=True)
+def main():
+    df = pd.read_csv(args.ssffile, dtype=pd.Int64Dtype())
+    ssf_df = df[df.hashid == args.hashid].drop(['hashid_noclock', 'count', 'rate', 'vol', 'hashid', 'fltext'], axis=1)
+    ssf_df = resampledf_to_pr(ssf_df).reset_index(drop=True)
 
-atk1, dec1, sus1, rel1, pr_speed, test1_initial = ssf_df[['atk1', 'dec1', 'sus1', 'rel1', 'pr_speed', 'test1']].iloc[0]
-ssf_df = ssf_df.drop(['atk1', 'dec1', 'sus1', 'rel1', 'pr_speed'], axis=1)
+    atk1, dec1, sus1, rel1, pr_speed, test1_initial = ssf_df[['atk1', 'dec1', 'sus1', 'rel1', 'pr_speed', 'test1']].iloc[0]
+    ssf_df = ssf_df.drop(['atk1', 'dec1', 'sus1', 'rel1', 'pr_speed'], axis=1)
 
-if atk1 == 0:
-    first_freq = ssf_df.index[ssf_df['freq1'].notna()][0]
-    ssf_df = ssf_df[first_freq:]
-    ssf_df['pr_frame'] = ssf_df['pr_frame'] - ssf_df['pr_frame'].min()
-if rel1 == 0:
-    ssf_df = ssf_df[ssf_df['gate1'] == 1]
+    if atk1 == 0:
+        first_freq = ssf_df.index[ssf_df['freq1'].notna()][0]
+        ssf_df = ssf_df[first_freq:]
+        ssf_df['pr_frame'] = ssf_df['pr_frame'] - ssf_df['pr_frame'].min()
+    if rel1 == 0:
+        ssf_df = ssf_df[ssf_df['gate1'] == 1]
 
-ssf_df = ssf_df.set_index('pr_frame')
-ssf_df = add_freq_notes_df(sid, ssf_df)
-ssf_df['real_freq'] = ssf_df['real_freq'].round(2)
+    ssf_df = ssf_df.set_index('pr_frame')
+    ssf_df = add_freq_notes_df(sid, ssf_df)
+    ssf_df['real_freq'] = ssf_df['real_freq'].round(2)
 
-ssf_df['F'] = ssf_df.apply(lambda x: '%2.2X' % x.name, axis=1)
-ssf_df['WF'] = ssf_df.apply(wf_from_row, axis=1)
-ssf_df['ARP'] = ssf_df.apply(arp_from_row, axis=1)
-ssf_df['PULSE'] = ssf_df.apply(pulse_from_row, axis=1)
-ssf_df['FILT'] = ssf_df.apply(filter_from_row, axis=1)
-ssf_df['FILT'] = sw_rle_diff(ssf_df['FILT'], diffmult=2**3)
-ssf_df['PULSE'] = sw_rle_diff(ssf_df['PULSE'], diffmult=1)
-ssf_df[['ARP', 'PULSE', 'FILT']] = ssf_df[['ARP', 'PULSE', 'FILT']].apply(
-    lambda row: [dot0(c) for c in row])
+    ssf_df['F'] = ssf_df.apply(lambda x: '%2.2X' % x.name, axis=1)
+    ssf_df['WF'] = ssf_df.apply(wf_from_row, axis=1)
+    ssf_df['ARP'] = ssf_df.apply(arp_from_row, axis=1)
+    ssf_df['PULSE'] = ssf_df.apply(pulse_from_row, axis=1)
+    ssf_df['FILT'] = ssf_df.apply(filter_from_row, axis=1)
+    ssf_df['FILT'] = sw_rle_diff(ssf_df['FILT'], diffmult=2**3)
+    ssf_df['PULSE'] = sw_rle_diff(ssf_df['PULSE'], diffmult=1)
+    ssf_df[['ARP', 'PULSE', 'FILT']] = ssf_df[['ARP', 'PULSE', 'FILT']].apply(
+        lambda row: [dot0(c) for c in row])
 
-ssf_df['WFARP'] = ssf_df.apply(lambda row: row.WF + row.ARP, axis=1)
-lastindex = ssf_df.index.max()
-lastwfarp = ssf_df['WFARP'].iloc[-1]
-while ssf_df['WFARP'].iloc[lastindex] == lastwfarp:
-    lastindex -= 1
-lastindex += 1
-ssf_df.loc[ssf_df.index > lastindex, ['WFARP']] = '....'
-ssf_df = ssf_df.drop(['WF', 'ARP'], axis=1)
+    ssf_df['WFARP'] = ssf_df.apply(lambda row: row.WF + row.ARP, axis=1)
+    lastindex = ssf_df.index.max()
+    lastwfarp = ssf_df['WFARP'].iloc[-1]
+    while ssf_df['WFARP'].iloc[lastindex] == lastwfarp:
+        lastindex -= 1
+    lastindex += 1
+    ssf_df.loc[ssf_df.index > lastindex, ['WFARP']] = '....'
+    ssf_df = ssf_df.drop(['WF', 'ARP'], axis=1)
 
-sw_cols = ['F', 'WFARP', 'PULSE', 'FILT']
-sw_sf = ssf_df[sw_cols]
-ssf_df = ssf_df.drop(sw_cols, axis=1)
+    sw_cols = ['F', 'WFARP', 'PULSE', 'FILT']
+    sw_sf = ssf_df[sw_cols]
+    ssf_df = ssf_df.drop(sw_cols, axis=1)
 
-print('multispeed: %u' % pr_speed)
+    print('multispeed: %u' % pr_speed)
 
-adsr = '%X%X%X%X' % (atk1, dec1, sus1, rel1)
-print('ADSR: %s' % adsr)
+    adsr = '%X%X%X%X' % (atk1, dec1, sus1, rel1)
+    print('ADSR: %s' % adsr)
 
-print()
-pd.set_option('display.max_rows', None)
-print(sw_sf)
-print()
-print(ssf_df)
+    print()
+    pd.set_option('display.max_rows', None)
+    print(sw_sf)
+    print()
+    print(ssf_df)
+
+
+if __name__ == '__main__':
+    main()

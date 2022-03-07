@@ -1,4 +1,4 @@
-# Copyright 2020 Josh Bailey (josh@vandervecken.com)
+# Copyright 2020-2022 Josh Bailey (josh@vandervecken.com)
 
 ## Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
 
@@ -89,7 +89,7 @@ def resampledf_to_pr(ssf_df):
     resample_df_clock = ssf_df[['pr_frame', 'vbi_frame']].reset_index().drop_duplicates('pr_frame', keep='first').copy()
     resample_df = resample_df.merge(resample_df_clock, on='pr_frame').set_index('clock').sort_index()
     for col in ADSR_COLS:
-        resample_df[col] = getattr(first_row, col)
+        resample_df[col] = int(getattr(first_row, col))
     return resample_df
 
 
@@ -188,17 +188,21 @@ class SidWrap:
     }
 
     def __init__(self, pal, model, sampling_frequency):
+        # https://codebase64.org/doku.php?id=magazines:chacking17
         if pal:
             self.clock_freq = SoundInterfaceDevice.PAL_CLOCK_FREQUENCY
-            self.int_freq = 50.0
+            self.raster_lines = 312
+            self.cycles_per_line = 63
         else:
             self.clock_freq = SoundInterfaceDevice.NTSC_CLOCK_FREQUENCY
-            self.int_freq = 60.0
+            self.raster_lines = 263
+            self.cycles_per_line = 65
+        self.clockq = self.raster_lines * self.cycles_per_line
+        self.int_freq = self.clock_freq / self.clockq
         self.freq_scaler = self.clock_freq / 16777216
         self.resid = SoundInterfaceDevice(
             model=model, clock_frequency=self.clock_freq,
             sampling_frequency=sampling_frequency)
-        self.clockq = int(round(self.clock_freq / self.int_freq))
         self.attack_clock = {
             k: int(v / 1e3 * self.clock_freq) for k, v in self.ATTACK_MS.items()}
         self.decay_release_clock = {

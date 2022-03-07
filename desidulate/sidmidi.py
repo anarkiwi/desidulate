@@ -1,4 +1,4 @@
-# Copyright 2020 Josh Bailey (josh@vandervecken.com)
+# Copyright 2020-2022 Josh Bailey (josh@vandervecken.com)
 
 ## Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
 
@@ -7,8 +7,7 @@
 from collections import defaultdict
 from functools import lru_cache
 from music21 import midi
-
-DEFAULT_BPM=125
+from desidulate.sidlib import timer_args
 
 A = 440
 MIDI_N_TO_F = {n: (A / 32) * (2 ** ((n - 9) / 12)) for n in range(128)}
@@ -29,7 +28,8 @@ CRASH_CYMBAL1 = 49
 
 
 def midi_args(parser):
-    parser.add_argument('--bpm', default=DEFAULT_BPM, type=int, help='MIDI BPM')
+    timer_args(parser)
+    parser.add_argument('--bpm', default=None, type=int, help='MIDI BPM (default derive from int. frequency)')
     parser.add_argument('--percussion', dest='percussion', action='store_true')
     parser.add_argument('--no-percussion', dest='percussion', action='store_false')
     parser.set_defaults(pal=True, percussion=True)
@@ -93,10 +93,16 @@ def read_midi(file_name):
     return input_mf
 
 
+def bpm_from_int(int_freq):
+    return int_freq * 60 / 24
+
+
 class SidMidiFile:
 
-    def __init__(self, sid, bpm, program=81, drum_program=0):
+    def __init__(self, sid, bpm=None, program=81, drum_program=0):
         self.sid = sid
+        if bpm is None:
+            bpm = bpm_from_int(sid.int_freq)
         self.bpm = bpm
         self.program = program
         self.drum_program = drum_program
@@ -108,6 +114,36 @@ class SidMidiFile:
         self.one_2n_clocks = self.one_4n_clocks * 2
         self.one_8n_clocks = self.one_4n_clocks / 2
         self.one_16n_clocks = self.one_4n_clocks / 4
+
+    @lru_cache
+    def vel_scale(self, x, x_max):
+        return int((x / x_max) * 127)
+
+    @lru_cache
+    def neg_vel_scale(self, x, x_max):
+        return int((1.0 - (x / x_max)) * 127)
+
+    @lru_cache
+    def get_duration(self, clocks):
+        return round(clocks / self.sid.clockq) * self.sid.clockq
+
+    #@lru_cache
+    def sid_adsr_to_velocity(self, clock, last_gate_clock, atk1, dec1, sus1, rel1, gate1):
+        if gate1:
+            attack_clock = self.sid.attack_clock[atk1]
+            decay_clock = attack_clock + self.sid.decay_release_clock[dec1]
+            if atk1 and clock < attack_clock:
+                return self.vel_scale(clock, attack_clock)
+            elif dec1 and clock < decay_clock:
+                decay_time = clock - attack_clock
+                return self.neg_vel_scale(decay_time, decay_clock)
+            return self.sid_velocity[sus1]
+        if last_gate_clock is not None:
+            rel_clock = self.sid.decay_release_clock[rel1]
+            rel_time = clock - last_gate_clock
+            if rel_time < rel_clock:
+                return self.neg_vel_scale(rel_time, rel_clock)
+        return 0
 
     def clock_to_ticks(self, clock):
         return self.sid.clock_to_ticks(clock, self.bpm, self.tpqn)
@@ -182,70 +218,64 @@ class SidMidiFile:
         assert duration > 0, duration
         self.drum_pitches[voicenum].append((clock, duration, pitch, velocity))
 
-    @lru_cache
-    def vel_scale(self, x, x_max):
-        return int((x / x_max) * 127)
-
-    @lru_cache
-    def neg_vel_scale(self, x, x_max):
-        return int((1.0 - (x / x_max)) * 127)
-
-    def sid_adsr_to_velocity(self, row, last_rel, last_gate_clock):
-        clock = row.Index
-        if row.gate1:
-            attack_clock = self.sid.attack_clock[row.atk1]
-            if clock < attack_clock:
-                if row.atk1 and not row.sus1:
-                    return self.vel_scale(clock, attack_clock)
-            else:
-                if row.dec1 and not row.sus1:
-                    decay_clock = self.sid.decay_release_clock[row.dec1]
-                    if clock < attack_clock + decay_clock:
-                        return self.neg_vel_scale(clock - attack_clock, decay_clock)
-            return self.sid_velocity[row.sus1]
-        if last_gate_clock is not None:
-            rel_clock = self.sid.decay_release_clock[last_rel]
-            if clock - last_gate_clock <= rel_clock:
-                return self.neg_vel_scale(clock - last_gate_clock, rel_clock)
-        return 0
-
     def get_note_starts(self, row_states):
         last_note = None
         last_clock = None
         last_gate_clock = None
+        atk1 = None
+        dec1 = None
+        sus1 = None
+        rel1 = None
+        missing_initial_note = None
         notes_starts = []
-        first_row = None
+
+        def add_new_note(vel_clock, row):
+            # TODO: add pitch bend if significantly different to canonical note.
+            # https://github.com/magenta/magenta/issues/1902
+            # TODO: use aftertouch to simulate envelopes.
+            velocity = self.sid_adsr_to_velocity(vel_clock, last_gate_clock, atk1, dec1, sus1, rel1, row.gate1)
+            assert velocity >= 0 and velocity <= 127, (velocity, row)
+            if velocity:
+                return (row.Index, int(row.closest_note), velocity, row.real_freq)
+            return None
+
+        rows = []
         for row, row_waveforms in row_states:
-            if first_row is None:
-                first_row = row
             clock = row.Index
+            last_clock = clock
+            rows.append(row)
+            if atk1 is None:
+                atk1, dec1, sus1, rel1 = (row.atk1, row.dec1, row.sus1, row.rel1)
             if row.gate1:
                 last_gate_clock = clock
-            if row_waveforms and not row.test1:
-                # TODO: add pitch bend if significantly different to canonical note.
-                # https://github.com/magenta/magenta/issues/1902
-                if row.closest_note != last_note:
-                    velocity = self.sid_adsr_to_velocity(first_row, first_row.rel1, last_gate_clock)
-                    assert velocity >= 0 and velocity <= 127, (velocity, row)
-                    if velocity:
-                        notes_starts.append((clock, row.vbi_frame, int(row.closest_note), velocity, row.real_freq))
-                        last_note = row.closest_note
-            last_clock = clock
-        notes_starts.append((last_clock, None, None, None, None))
-        return notes_starts
+            if row.test1:
+                continue
+            if not row_waveforms:
+                continue
+            if row.closest_note == last_note:
+                continue
+            new_note = add_new_note(clock, row)
+            if new_note:
+                notes_starts.append(new_note)
+                last_note = row.closest_note
+            elif not notes_starts and not missing_initial_note and atk1 > 0:
+                missing_initial_note = row
+        notes_starts.append((last_clock, None, None, None))
+        if missing_initial_note:
+            new_note = add_new_note(notes_starts[0][0], missing_initial_note)
+            if new_note:
+                notes_starts = [new_note] + notes_starts
 
-    @lru_cache
-    def get_duration(self, clocks):
-        return round(clocks / self.sid.clockq) * self.sid.clockq
+        return notes_starts
 
     def get_notes(self, notes_starts):
         notes = []
         for i, note_clocks in enumerate(notes_starts[:-1]):
-            clock, vbi_frame, note, velocity, sid_f = note_clocks
+            clock, note, velocity, sid_f = note_clocks
             next_clock = notes_starts[i + 1][0]
             duration = self.get_duration(next_clock - clock)
             if duration:
-                notes.append((clock, vbi_frame, note, duration, velocity, sid_f))
+                notes.append((clock, note, duration, velocity, sid_f))
         return notes
 
     # Convert gated voice events into possibly many MIDI notes
