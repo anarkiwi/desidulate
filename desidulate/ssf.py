@@ -87,7 +87,9 @@ class SidSoundFragment:
         self.one_8n_clocks = smf.one_8n_clocks
         self.one_16n_clocks = smf.one_16n_clocks
         if wav_file is not None:
-            rate, self.samples = readwav(wav_file)
+            rate, samples = readwav(wav_file)
+            max_samples = int(sid.clock_to_s(self.initial_clocks) * rate)
+            self.samples = samples[:max_samples]
         else:
             rate = sid.resid.sampling_frequency
             self.samples = state2samples(self.df, sid, skiptest=True, maxclock=self.one_2n_clocks)
