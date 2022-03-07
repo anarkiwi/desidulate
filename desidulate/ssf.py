@@ -55,7 +55,7 @@ class SidSoundFragment:
         self.pulsephases = len([waveforms for waveforms in self.waveform_order if 'pulse' in waveforms])
         self.all_noise = self.waveforms == {'noise'}
         self.midi_notes = tuple(smf.get_midi_notes_from_events(zip(self.df.itertuples(), waveform_states)))
-        self.midi_pitches = tuple([midi_note[2] for midi_note in self.midi_notes])
+        self.midi_pitches = tuple([midi_note[1] for midi_note in self.midi_notes])
         self.total_duration = 0
         self.max_midi_note = 0
         self.min_midi_note = 0
