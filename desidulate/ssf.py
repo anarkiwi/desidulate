@@ -62,7 +62,6 @@ class SidSoundFragment:
         self.initial_midi_notes = []
         self.initial_midi_pitches = []
         if self.midi_notes:
-            initial_midi_note = self.midi_notes[0]
             self.initial_midi_notes = tuple(
                 [midi_note for midi_note in self.midi_notes if midi_note[0] < self.initial_clocks])
             self.initial_midi_pitches = tuple(
