@@ -52,7 +52,7 @@ def calc_rates(sid, maxprspeed, vdf):
     for col, rate_col in rate_col_pairs:
         diff = vdf.astype(pd.Int64Dtype()).groupby(['ssf'], sort=False)[col].diff()
         rate_col_df[rate_col] = rate_col_df['clock']
-        rate_col_df.loc[diff == 0, [rate_col]] = pd.NA
+        rate_col_df.loc[(diff == 0) | diff.isna(), [rate_col]] = pd.NA
 
     control_col = bits2byte(vdf, [col + '1' for col in CONTROL_BITS])
     filter_col = bits2byte(vdf, ['flt1', 'fltlo', 'fltband', 'flthi'])
