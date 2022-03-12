@@ -16,15 +16,23 @@ DRUM_CHANNEL = 10
 VOICES = 3
 
 # https://en.wikipedia.org/wiki/General_MIDI#Percussion
-BASS_DRUM = 36
 PEDAL_HIHAT = 44
 CLOSED_HIHAT = 42
 OPEN_HIHAT = 46
-HIGH_TOM = 50
+KICK_DRUM = 35
+BASS_DRUM = 36
 LOW_TOM = 45
+LOW_MID_TOM = 47
+HIGH_MID_TOM = 48
+HIGH_TOM = 50
 ACCOUSTIC_SNARE = 38
 ELECTRIC_SNARE = 40
 CRASH_CYMBAL1 = 49
+
+HIGHEST_MEMBRANE_HZ = 400
+MEMBRANE_DRUMS = [KICK_DRUM, BASS_DRUM, LOW_TOM, LOW_MID_TOM, HIGH_MID_TOM, HIGH_TOM]
+MEMBRANE_DRUM_MAP = [(drum, int(i * (HIGHEST_MEMBRANE_HZ / len(MEMBRANE_DRUMS)))) for i, drum in enumerate(MEMBRANE_DRUMS, start=1)]
+CYMBAL_DRUMS = [PEDAL_HIHAT, CLOSED_HIHAT, OPEN_HIHAT, ACCOUSTIC_SNARE, ELECTRIC_SNARE]
 
 
 def midi_args(parser):
@@ -109,7 +117,8 @@ class SidMidiFile:
         self.pitches = defaultdict(list)
         self.drum_pitches = defaultdict(list)
         self.tpqn = 960
-        self.sid_velocity = {i: int(i / 15 * 127) for i in range(16)}
+        self.sid_env_max = 15
+        self.sid_velocity = {i: int(i / self.sid_env_max * 127) for i in range(self.sid_env_max + 1)}
         self.one_4n_clocks = sid.qn_to_clock(1, self.bpm)
         self.one_2n_clocks = self.one_4n_clocks * 2
         self.one_8n_clocks = self.one_4n_clocks / 2
@@ -117,11 +126,11 @@ class SidMidiFile:
 
     @lru_cache
     def vel_scale(self, x, x_max):
-        return int((x / x_max) * 127)
+        return round((x / x_max) * 127)
 
     @lru_cache
     def neg_vel_scale(self, x, x_max):
-        return int((1.0 - (x / x_max)) * 127)
+        return round((1.0 - (x / x_max)) * 127)
 
     @lru_cache
     def get_duration(self, clocks):
@@ -142,7 +151,7 @@ class SidMidiFile:
             rel_clock = self.sid.decay_release_clock[rel1]
             rel_time = clock - last_gate_clock
             if rel_time < rel_clock:
-                return self.neg_vel_scale(rel_time, rel_clock)
+                return round(self.neg_vel_scale(rel_time, rel_clock) * (sus1 / self.sid_env_max))
         return 0
 
     def clock_to_ticks(self, clock):
@@ -226,6 +235,7 @@ class SidMidiFile:
         dec1 = None
         sus1 = None
         rel1 = None
+        last_gate = None
         missing_initial_note = None
         notes_starts = []
 
@@ -246,8 +256,9 @@ class SidMidiFile:
             rows.append(row)
             if atk1 is None:
                 atk1, dec1, sus1, rel1 = (row.atk1, row.dec1, row.sus1, row.rel1)
-            if row.gate1:
+            if not row.gate1 and last_gate:
                 last_gate_clock = clock
+            last_gate = row.gate1
             if row.test1:
                 continue
             if not row_waveforms:

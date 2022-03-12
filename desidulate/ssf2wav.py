@@ -7,7 +7,6 @@
 ## The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 
 import argparse
-import concurrent.futures
 import os
 import sys
 import numpy as np
@@ -23,7 +22,6 @@ def main():
     parser = argparse.ArgumentParser(description='Convert .ssf into a WAV file')
     parser.add_argument('ssffile', default='', help='ssf to read')
     parser.add_argument('--hashid', default=0, help='hashid to reproduce, or 0 if all')
-    parser.add_argument('--workers', default=4, type=int, help='number of worker processes to use')
     parser.add_argument('--wavfile', default='', help='WAV file to write')
     parser.add_argument('--maxclock', default=0, type=int, help='max clock value to render, 0 for no limit')
     play_parser = parser.add_mutually_exclusive_group(required=False)
@@ -105,12 +103,11 @@ def main():
                     return True
             return False
 
-        with concurrent.futures.ProcessPoolExecutor(max_workers=args.workers) as executor:
-            for hashid, ssf_df in df.groupby('hashid'):
-                if args.skip_single_waveform and single_waveform(ssf_df):
-                    continue
-                wavfile = out_path(args.ssffile, '%u.wav' % hashid)
-                executor.submit(render_wav, ssf_df.copy(), wavfile, False)
+        for hashid, ssf_df in df.groupby('hashid'):
+            if args.skip_single_waveform and single_waveform(ssf_df):
+                continue
+            wavfile = out_path(args.ssffile, '%u.wav' % hashid)
+            render_wav(ssf_df.copy(), wavfile, False)
 
 
 if __name__ == '__main__':

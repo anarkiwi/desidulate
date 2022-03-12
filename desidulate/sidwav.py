@@ -7,18 +7,22 @@
 from collections import defaultdict
 import numpy as np
 import pandas as pd
+from scipy import signal
 from scipy.io import wavfile
 from scipy.fft import rfft, rfftfreq  # pylint: disable=no-name-in-module
 from pyresidfp import ControlBits, ModeVolBits, ResFiltBits, Voice
 
 
-def psfromsamples(samplerate, data):
+def psfromsamples(samplerate, samples, highpass=15):
+    sos = signal.butter(10, highpass, 'hp', fs=samplerate, output='sos')
+    data = signal.sosfilt(sos, samples)
     y = np.abs(rfft(data))
     x = rfftfreq(len(data), 1 / samplerate)
     e = defaultdict(int)
     for f, n in zip(x, y):
-        if n:
-            e[round(f)] += n
+        if not n:
+            continue
+        e[f] = n
     return e
 
 
@@ -44,20 +48,20 @@ def mostf(wav_file_name, threshold=0.65):
     return f
 
 
+def _loudest(e):
+    for f, _ in sorted(e.items(), key=lambda x: x[1], reverse=True):
+        return int(f)
+    return 0
+
+
 def loudestf(wav_file_name):
     e = psfromwav(wav_file_name)
-    for f, _ in sorted(e.items(), key=lambda x: x[1], reverse=True):
-        return f
-    return 0
+    return _loudest(e)
 
 
 def samples_loudestf(data, sample_rate):
     e = psfromsamples(sample_rate, data)
-    for f, _ in sorted(e.items(), key=lambda x: x[1], reverse=True):
-        if f <= 1:
-            continue
-        return f
-    return 0
+    return _loudest(e)
 
 
 def state2samples(orig_df, sid, skiptest=False, maxclock=None):
