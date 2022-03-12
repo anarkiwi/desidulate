@@ -226,6 +226,7 @@ class SidMidiFile:
         dec1 = None
         sus1 = None
         rel1 = None
+        last_gate = None
         missing_initial_note = None
         notes_starts = []
 
@@ -246,8 +247,9 @@ class SidMidiFile:
             rows.append(row)
             if atk1 is None:
                 atk1, dec1, sus1, rel1 = (row.atk1, row.dec1, row.sus1, row.rel1)
-            if row.gate1:
+            if not row.gate1 and last_gate:
                 last_gate_clock = clock
+            last_gate = row.gate1
             if row.test1:
                 continue
             if not row_waveforms:
