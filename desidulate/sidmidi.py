@@ -109,7 +109,8 @@ class SidMidiFile:
         self.pitches = defaultdict(list)
         self.drum_pitches = defaultdict(list)
         self.tpqn = 960
-        self.sid_velocity = {i: int(i / 15 * 127) for i in range(16)}
+        self.sid_env_max = 15
+        self.sid_velocity = {i: int(i / self.sid_env_max * 127) for i in range(self.sid_env_max + 1)}
         self.one_4n_clocks = sid.qn_to_clock(1, self.bpm)
         self.one_2n_clocks = self.one_4n_clocks * 2
         self.one_8n_clocks = self.one_4n_clocks / 2
@@ -117,11 +118,11 @@ class SidMidiFile:
 
     @lru_cache
     def vel_scale(self, x, x_max):
-        return int((x / x_max) * 127)
+        return round((x / x_max) * 127)
 
     @lru_cache
     def neg_vel_scale(self, x, x_max):
-        return int((1.0 - (x / x_max)) * 127)
+        return round((1.0 - (x / x_max)) * 127)
 
     @lru_cache
     def get_duration(self, clocks):
@@ -142,7 +143,7 @@ class SidMidiFile:
             rel_clock = self.sid.decay_release_clock[rel1]
             rel_time = clock - last_gate_clock
             if rel_time < rel_clock:
-                return self.neg_vel_scale(rel_time, rel_clock)
+                return round(self.neg_vel_scale(rel_time, rel_clock) * (sus1 / self.sid_env_max))
         return 0
 
     def clock_to_ticks(self, clock):
