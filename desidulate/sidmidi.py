@@ -139,7 +139,10 @@ class SidMidiFile:
     #@lru_cache
     def sid_adsr_to_velocity(self, clock, last_gate_clock, atk1, dec1, sus1, rel1, gate1):
         if gate1:
-            attack_clock = self.sid.attack_clock[atk1]
+            if atk1:
+                attack_clock = self.sid.attack_clock[atk1]
+            else:
+                attack_clock = 0
             decay_clock = attack_clock + self.sid.decay_release_clock[dec1]
             if atk1 and clock < attack_clock:
                 return self.vel_scale(clock, attack_clock)
@@ -244,6 +247,7 @@ class SidMidiFile:
             # https://github.com/magenta/magenta/issues/1902
             # TODO: use aftertouch to simulate envelopes.
             velocity = self.sid_adsr_to_velocity(vel_clock, last_gate_clock, atk1, dec1, sus1, rel1, row.gate1)
+            # velocity = min(velocity, 127)
             assert velocity >= 0 and velocity <= 127, (velocity, row)
             if velocity:
                 return (row.Index, int(row.closest_note), velocity, row.real_freq)

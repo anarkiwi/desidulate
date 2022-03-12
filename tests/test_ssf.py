@@ -31,6 +31,7 @@ class SSFTestCase(unittest.TestCase):
         self.assertEqual(32, smf.sid_adsr_to_velocity(20e3, None, atk1=7, dec1=0, sus1=0, rel1=0, gate1=1))
         self.assertEqual(32, smf.sid_adsr_to_velocity(20e3, None, atk1=7, dec1=0, sus1=1, rel1=0, gate1=1))
         self.assertEqual(8, smf.sid_adsr_to_velocity(20e3, 20e3, atk1=7, dec1=0, sus1=1, rel1=0, gate1=0))
+        self.assertEqual(127, smf.sid_adsr_to_velocity(0, None, atk1=0, dec1=1, sus1=8, rel1=8, gate1=1))
 
     def test_notest_ssf(self):
         df = pd.DataFrame(
