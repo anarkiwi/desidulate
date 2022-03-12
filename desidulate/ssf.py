@@ -14,7 +14,7 @@ from itertools import groupby
 import pandas as pd
 from desidulate.fileio import out_path, read_csv
 from desidulate.sidlib import set_sid_dtype, resampledf_to_pr
-from desidulate.sidmidi import ELECTRIC_SNARE, BASS_DRUM, LOW_TOM, HIGH_TOM, PEDAL_HIHAT, CLOSED_HIHAT, OPEN_HIHAT, ACCOUSTIC_SNARE, closest_midi
+from desidulate.sidmidi import closest_midi, MEMBRANE_DRUM_MAP, CYMBAL_DRUMS
 from desidulate.sidwav import state2samples, samples_loudestf, readwav
 
 INITIAL_FRAMES = 4
@@ -105,7 +105,7 @@ class SidSoundFragment:
     def drum_noise_duration(sid, duration):
         max_duration = sid.clockq
         noise_pitch = None
-        for noise_pitch in (PEDAL_HIHAT, CLOSED_HIHAT, OPEN_HIHAT, ACCOUSTIC_SNARE, ELECTRIC_SNARE):
+        for noise_pitch in CYMBAL_DRUMS:
             if duration <= max_duration:
                 break
             max_duration *= 2
@@ -133,20 +133,12 @@ class SidSoundFragment:
             # Membrane percussion must be no longer than 1 quarter note.
             if self.total_clocks <= self.one_4n_clocks:
                 if self.noisephases == 1 or self.initial_pitch_drop > 2:
-                    if self.loudestf < 100:
-                        # http://www.ucapps.de/howto_sid_wavetables_1.html
-                        self.drum_pitches.append(
-                            (clock, self.total_duration, BASS_DRUM, velocity))
-                        return
-
-                    if self.loudestf < 200:
-                        self.drum_pitches.append(
-                            (clock, self.total_duration, LOW_TOM, velocity))
-                        return
-
-                    self.drum_pitches.append(
-                        (clock, self.total_duration, HIGH_TOM, velocity))
-                    return
+                    for drum, drum_cutoff_hz in MEMBRANE_DRUM_MAP:
+                        if self.loudestf < drum_cutoff_hz:
+                            # http://www.ucapps.de/howto_sid_wavetables_1.html
+                            self.drum_pitches.append(
+                                (clock, self.total_duration, drum, velocity))
+                            return
 
         self._set_nondrum_pitches()
 
