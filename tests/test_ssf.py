@@ -5,7 +5,7 @@ import tempfile
 import unittest
 import pandas as pd
 from desidulate.sidlib import get_sid, reg2state, state2ssfs, calc_vbi_frame
-from desidulate.sidmidi import SidMidiFile
+from desidulate.sidmidi import SidMidiFile, MAX_VEL
 from desidulate.ssf import SidSoundFragment, add_freq_notes_df
 
 
@@ -41,7 +41,7 @@ class SSFTestCase(unittest.TestCase):
         self.assertEqual(s.waveforms, {'tri'})
         self.assertEqual(s.midi_pitches, (35,))
         self.assertEqual(s.total_duration, 98280)
-        self.assertEqual(s.midi_notes, ((0, 35, s.total_duration, 127, 60.134765625),))
+        self.assertEqual(s.midi_notes, ((0, 35, s.total_duration, MAX_VEL, 60.134765625),))
 
     def test_test_ssf(self):
         df = pd.DataFrame(
@@ -52,7 +52,7 @@ class SSFTestCase(unittest.TestCase):
         self.assertEqual(s.waveforms, {'tri'})
         self.assertEqual(s.midi_pitches, (35,))
         self.assertEqual(s.total_duration, 78624)
-        self.assertEqual(s.midi_notes, ((20000, 35, s.total_duration, 127, 60.134765625),))
+        self.assertEqual(s.midi_notes, ((20000, 35, s.total_duration, MAX_VEL, 60.134765625),))
 
     def test_ssf_parser(self):
         with tempfile.TemporaryDirectory() as tmpdir:

@@ -10,6 +10,10 @@ from music21 import midi
 from desidulate.sidlib import timer_args
 
 A = 440
+MAX_MIDI_VEL = 127
+MAX_VEL = 116
+MIN_VEL = 32
+VEL_RANGE = MAX_VEL - MIN_VEL
 MIDI_N_TO_F = {n: (A / 32) * (2 ** ((n - 9) / 12)) for n in range(128)}
 MIDI_F_TO_N = {f: n for n, f in MIDI_N_TO_F.items()}
 DRUM_CHANNEL = 10
@@ -105,6 +109,10 @@ def bpm_from_int(int_freq):
     return int_freq * 60 / 24
 
 
+def compand_velocity(velocity):
+    return round(((velocity / MAX_MIDI_VEL) * VEL_RANGE)) + MIN_VEL
+
+
 class SidMidiFile:
 
     def __init__(self, sid, bpm=None, program=81, drum_program=0):
@@ -118,7 +126,7 @@ class SidMidiFile:
         self.drum_pitches = defaultdict(list)
         self.tpqn = 960
         self.sid_env_max = 15
-        self.sid_velocity = {i: int(i / self.sid_env_max * 127) for i in range(self.sid_env_max + 1)}
+        self.sid_velocity = {i: int(i / self.sid_env_max * MAX_MIDI_VEL) for i in range(self.sid_env_max + 1)}
         self.one_4n_clocks = sid.qn_to_clock(1, self.bpm)
         self.one_2n_clocks = self.one_4n_clocks * 2
         self.one_8n_clocks = self.one_4n_clocks / 2
@@ -126,11 +134,11 @@ class SidMidiFile:
 
     @lru_cache
     def vel_scale(self, x, x_max):
-        return round((x / x_max) * 127)
+        return round((x / x_max) * MAX_MIDI_VEL)
 
     @lru_cache
     def neg_vel_scale(self, x, x_max):
-        return round((1.0 - (x / x_max)) * 127)
+        return round((1.0 - (x / x_max)) * MAX_MIDI_VEL)
 
     @lru_cache
     def get_duration(self, clocks):
@@ -247,8 +255,8 @@ class SidMidiFile:
             # https://github.com/magenta/magenta/issues/1902
             # TODO: use aftertouch to simulate envelopes.
             velocity = self.sid_adsr_to_velocity(vel_clock, last_gate_clock, atk1, dec1, sus1, rel1, row.gate1)
-            # velocity = min(velocity, 127)
-            assert velocity >= 0 and velocity <= 127, (velocity, row)
+            velocity = compand_velocity(velocity)
+            assert velocity >= MIN_VEL and velocity <= MAX_VEL, (velocity, row)
             if velocity:
                 return (row.Index, int(row.closest_note), velocity, row.real_freq)
             return None
