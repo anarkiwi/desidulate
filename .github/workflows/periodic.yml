@@ -1,0 +1,17 @@
+name: Periodic tests
+on:
+  schedule:
+    # NZST = UTC + 12
+    # Schedule to run at midnight & lunch-time
+    - cron: '0 0,12 * * *'
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: test
+      run: |
+        sudo apt-get update && sudo apt-get install python3-dev && \
+        sudo pip3 install -U -r test-requirements.txt -r requirements.txt && \
+        sudo pip3 install . && \
+        pytest .
