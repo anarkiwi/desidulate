@@ -43,11 +43,11 @@ $ vsid -sounddev dump -soundarg C64Music/MUSICIANS/L/Linus/Cauldron_II_Remix.sid
 
 #### Generating SSFs
 
-_reg2ssf_ identifies all SSFs (see above) and writes them to `C64Music/MUSICIANS/L/Linus/Cauldron_II_Remix.ssf.xz`, and log file `C64Music/MUSICIANS/L/Linus/Cauldron_II_Remix.log.xz`.
-
 ```
 $ reg2ssf C64Music/MUSICIANS/L/Linus/Cauldron_II_Remix.sid.dump
 ```
+
+_reg2ssf_ identifies all SSFs (see above) and writes them to `C64Music/MUSICIANS/L/Linus/Cauldron_II_Remix.ssf.xz`, and log file `C64Music/MUSICIANS/L/Linus/Cauldron_II_Remix.log.xz`.
 
 SSFs are output in order of frequency of occurence, most first:
 
