@@ -97,7 +97,7 @@ desidulate can, with some limitations, transcribe an SSF to a Sid Wizard instrum
 1. Generate WAVs for every SSF in a song:
 
 ```
-ssf2wav C64Music/MUSICIANS/L/Linus/Cauldron_II_Remix.ssf.xz
+$ ssf2wav C64Music/MUSICIANS/L/Linus/Cauldron_II_Remix.ssf.xz
 ```
 
 2. Listen to the WAVs, to find the instrument you wish to transcribe, which will be indentified with a hashid in the filename.
@@ -105,7 +105,7 @@ ssf2wav C64Music/MUSICIANS/L/Linus/Cauldron_II_Remix.ssf.xz
 3. Transcribe the SSF into an instrument (in this case, a kick sound): 
 
 ```
-ssf2swi C64Music/MUSICIANS/L/Linus/Cauldron_II_Remix.ssf.xz -1975247557004053752
+$ ssf2swi C64Music/MUSICIANS/L/Linus/Cauldron_II_Remix.ssf.xz -1975247557004053752
 multispeed: 1
 ADSR: 05F0
 
