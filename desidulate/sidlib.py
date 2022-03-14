@@ -189,6 +189,7 @@ class SidWrap:
 
     def __init__(self, pal, model, sampling_frequency):
         # https://codebase64.org/doku.php?id=magazines:chacking17
+        # https://codebase64.org/doku.php?id=base:making_stable_raster_routines
         if pal:
             self.clock_freq = SoundInterfaceDevice.PAL_CLOCK_FREQUENCY
             self.raster_lines = 312
