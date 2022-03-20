@@ -57,24 +57,65 @@ class SidWavTestCase(unittest.TestCase):
         self.assertTrue(self._same_samples(df1, df2))
 
     def test_initial_freq_while_test(self):
-        gateon = {'hashid': 1, 'clock': 0, 'freq1': 1024, 'sus1': 15, 'gate1': 1, 'pwduty1': 1024, 'pulse1': 1, 'vol': 15, 'freq3': 512, 'test1': 1}
+        gateon = {'hashid': 1, 'clock': 0, 'freq1': 1024, 'sus1': 15, 'gate1': 1, 'pwduty1': 1024, 'pulse1': 1, 'vol': 15, 'test1': 1}
         testoff = {'hashid': 1, 'clock': 1e5, 'test1': 0, 'freq1': 1024}
         end = {'hashid': 1, 'clock': 1e6, 'freq1': 0}
         df1 = self._make_wav_df([
-            gateon,
-            {'hashid': 1, 'clock': 1e4, 'freq1': 1024},
-            {'hashid': 1, 'clock': 1e4 * 2, 'freq1': 1024},
-            testoff,
-            end,
-        ])
-        df2 = self._make_wav_df([
             gateon,
             {'hashid': 1, 'clock': 1e4, 'freq1': 512},
             {'hashid': 1, 'clock': 1e4 * 2, 'freq1': 1024},
             testoff,
             end,
         ])
+        df2 = self._make_wav_df([
+            gateon,
+            {'hashid': 1, 'clock': 1e4, 'freq1': 1024},
+            {'hashid': 1, 'clock': 1e4 * 2, 'freq1': 1024},
+            testoff,
+            end,
+        ])
         self.assertTrue(self._same_samples(df1, df2))
+
+    def test_initial_pwduty_while_test(self):
+        gateon = {'hashid': 1, 'clock': 0, 'freq1': 1024, 'sus1': 15, 'gate1': 1, 'pwduty1': 1024, 'pulse1': 1, 'vol': 15, 'test1': 1}
+        testoff = {'hashid': 1, 'clock': 1e5, 'test1': 0, 'freq1': 1024}
+        end = {'hashid': 1, 'clock': 1e6, 'freq1': 0}
+        df1 = self._make_wav_df([
+            gateon,
+            {'hashid': 1, 'clock': 1e4, 'pwduty1': 1024},
+            {'hashid': 1, 'clock': 1e4 * 2, 'pwduty1': 1024},
+            testoff,
+            end,
+        ])
+        df2 = self._make_wav_df([
+            gateon,
+            {'hashid': 1, 'clock': 1e4, 'pwduty1': 512},
+            {'hashid': 1, 'clock': 1e4 * 2, 'pwduty1': 1024},
+            testoff,
+            end,
+        ])
+        self.assertTrue(self._same_samples(df1, df2))
+
+    def test_initial_noise_pulse_while_test(self):
+        gateon = {'hashid': 1, 'clock': 0, 'freq1': 1024, 'sus1': 15, 'gate1': 1, 'pwduty1': 1024, 'tri': 1, 'vol': 15, 'test1': 1}
+        testoff = {'hashid': 1, 'clock': 1e5, 'test1': 0, 'freq1': 1024}
+        changeback = {'hashid': 1, 'clock': 1e4 * 2, 'noise1': 0, 'pulse1': 1}
+        end = {'hashid': 1, 'clock': 1e6, 'freq1': 0}
+        df1 = self._make_wav_df([
+            gateon,
+            {'hashid': 1, 'clock': 1e4, 'pulse1': 1, 'noise1': 0},
+            changeback,
+            testoff,
+            end,
+        ])
+        df2 = self._make_wav_df([
+            gateon,
+            {'hashid': 1, 'clock': 1e4, 'pulse1': 0, 'noise1': 1},
+            changeback,
+            testoff,
+            end,
+        ])
+        self.assertFalse(self._same_samples(df1, df2))
 
     def test_sync_noise(self):
         gateon = {'hashid': 1, 'clock': 0, 'freq1': 1024, 'sus1': 15, 'gate1': 1, 'noise1': 1, 'vol': 15, 'freq3': 512}
