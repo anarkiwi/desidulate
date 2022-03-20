@@ -9,6 +9,7 @@
 import argparse
 import os
 import sys
+from concurrent.futures import ProcessPoolExecutor
 import numpy as np
 import pandas as pd
 from desidulate.fileio import wav_path, out_path, read_csv
@@ -18,12 +19,45 @@ from desidulate.sidmidi import SidMidiFile, midi_args
 from desidulate.ssf import add_freq_notes_df, SidSoundFragment
 
 
+class RenderWav:
+
+    def __init__(self, sid, smf, args, verbose):
+        self.sid = sid
+        self.smf = smf
+        self.args = args
+        self.verbose = verbose
+
+    def render(self, ssf_df, wavfile):
+        ssf_df = ssf_df.set_index('clock')
+        if self.args.pr_resample:
+            if pd.isna(ssf_df['pr_speed'].iat[0]):
+                return
+            ssf_df = resampledf_to_pr(ssf_df)
+        else:
+            ssf_df = ssf_df.fillna(method='ffill')
+        df2wav(ssf_df, self.sid, wavfile, skiptest=self.args.skiptest)
+        if self.verbose:
+            print(ssf_df.to_string())
+        if self.args.play:
+            os.system(' '.join(['aplay', wavfile]))
+        if self.args.skip_ssf_parser:
+            return
+        ssf = SidSoundFragment(self.args.percussion, self.sid, ssf_df, self.smf)
+        if self.verbose:
+            print(ssf.instrument({}))
+
+
+def render_wav(ssf_df, wavfile):
+    rw.render(ssf_df, wavfile)
+
+
 def main():
     parser = argparse.ArgumentParser(description='Convert .ssf into a WAV file')
     parser.add_argument('ssffile', default='', help='ssf to read')
     parser.add_argument('--hashid', default=0, help='hashid to reproduce, or 0 if all')
     parser.add_argument('--wavfile', default='', help='WAV file to write')
     parser.add_argument('--maxclock', default=0, type=int, help='max clock value to render, 0 for no limit')
+    parser.add_argument('--workers', default=4, type=int, help='workers to use when generating many wavs')
     play_parser = parser.add_mutually_exclusive_group(required=False)
     play_parser.add_argument('--play', dest='play', action='store_true', help='play the wavfile')
     play_parser.add_argument('--no-play', dest='play', action='store_false', help='do not play the wavfile')
@@ -58,26 +92,7 @@ def main():
         df = add_freq_notes_df(sid, df)
         smf = SidMidiFile(sid, args.bpm)
     hashid = np.int64(args.hashid)
-
-
-    def render_wav(ssf_df, wavfile, verbose):
-        ssf_df = ssf_df.set_index('clock')
-        if args.pr_resample:
-            if pd.isna(ssf_df['pr_speed'].iat[0]):
-                return
-            ssf_df = resampledf_to_pr(ssf_df)
-        else:
-            ssf_df = ssf_df.fillna(method='ffill')
-        df2wav(ssf_df, sid, wavfile, skiptest=args.skiptest)
-        if verbose:
-            print(ssf_df.to_string())
-        if args.play:
-            os.system(' '.join(['aplay', wavfile]))
-        if args.skip_ssf_parser:
-            return
-        ssf = SidSoundFragment(args.percussion, sid, ssf_df, smf)
-        if verbose:
-            print(ssf.instrument({}))
+    global rw
 
     if hashid:
         wavfile = args.wavfile
@@ -87,7 +102,8 @@ def main():
         ssf_df = df[df['hashid'] == hashid].copy()
 
         if len(ssf_df):
-            render_wav(ssf_df, wavfile, True)
+            rw = RenderWav(sid, smf, args, True)
+            rw.render(ssf_df, wavfile)
         else:
             print('SSF %d not found' % hashid)
     else:
@@ -103,11 +119,13 @@ def main():
                     return True
             return False
 
-        for hashid, ssf_df in df.groupby('hashid'):
-            if args.skip_single_waveform and single_waveform(ssf_df):
-                continue
-            wavfile = out_path(args.ssffile, '%u.wav' % hashid)
-            render_wav(ssf_df.copy(), wavfile, False)
+        rw = RenderWav(sid, smf, args, False)
+        with ProcessPoolExecutor(max_workers=args.workers) as pool:
+            for hashid, ssf_df in df.groupby('hashid'):
+                if args.skip_single_waveform and single_waveform(ssf_df):
+                    continue
+                wavfile = out_path(args.ssffile, '%u.wav' % hashid)
+                pool.submit(render_wav, ssf_df.copy(), wavfile)
 
 
 if __name__ == '__main__':
