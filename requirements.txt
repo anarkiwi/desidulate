@@ -1,7 +1,6 @@
 music21==7.1.0
-numpy
-pandas
-pyarrow
-pyresidfp
-pytest
-scipy
+numpy==1.22.3
+pandas==1.4.1
+pyarrow==7.0.0
+pyresidfp==0.5.1
+scipy==1.8.0
