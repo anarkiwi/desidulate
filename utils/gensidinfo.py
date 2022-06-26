@@ -9,11 +9,13 @@
 
 import csv
 import hashlib
+import logging
 import multiprocessing
 import os
 import pathlib
 import re
 import subprocess
+import tempfile
 import concurrent.futures
 import numpy as np
 import pandas as pd
@@ -25,22 +27,29 @@ fields_re = re.compile(r'^\|\s+([^:]+)\s+:\s+([^:]+)\s*$')
 subfields_re = re.compile(r'(.+)\s+\=\s+(.+)')
 year_re = re.compile(r'^([12][0-9]{3,3})\b.+')
 playlist_re = re.compile(r'\d+/\d+ \(tune (\d+)/(\d+)\[(\d+)\]\)')
+tunename_re = re.compile(r'^; (.+.sid)$')
 tunelength_re = re.compile(r'([a-z\d]+)=([\d+\s+\:\.]+)$')
 tunelength_time_re = re.compile(r'(\d+)\:(\d+)\.*(\d*)$')
 
 
-def scrape_sidinfo(sidfile, all_tunelengths):
+def scrape_sidinfo(sidfile, all_tunelengths, tmpdir):
+    logging.info('scraping %s', sidfile)
     with open(sidfile, 'rb') as f:
         md5_hash = hashlib.md5(f.read()).hexdigest()
-    tunelengths = all_tunelengths[md5_hash]
-    assert md5_hash in all_tunelengths, (md5_hash, sidfile)
+    if md5_hash in all_tunelengths:
+        tunelengths = all_tunelengths[md5_hash]
+    else:
+        logging.info('hash of %s not in songlengths, falling back to name', sidfile)
+        tunelengths = all_tunelengths[str(sidfile)]
 
     result = {
         'path': str(os.path.normpath(sidfile)),
         'mtime': sidfile.stat().st_mtime,
         'md5': md5_hash,
     }
-    cmd = ['/usr/bin/sidplayfp', '-w/dev/null', '-t1', '-v', str(sidfile)]
+    tmpfile = os.path.join(tmpdir, os.path.basename(sidfile))
+    cmd = ['/usr/bin/prlimit', '-c0', '-f0', '-t1',
+           '/usr/bin/sidplayfp', '-w%s' % tmpfile, '-t1', '-v', str(sidfile)]
     with subprocess.Popen(cmd,
             stdin=subprocess.DEVNULL,
             stdout=subprocess.DEVNULL,
@@ -70,8 +79,9 @@ def scrape_sidinfo(sidfile, all_tunelengths):
             if subfields_match:
                 for subfield in val.split(','):
                     subfield_match = subfields_re.match(subfield.strip())
-                    field, val = subfield_match.group(1).strip(), subfield_match.group(2).strip()
-                    result[field] = val
+                    if subfield_match:
+                        field, val = subfield_match.group(1).strip(), subfield_match.group(2).strip()
+                        result[field] = val
                 continue
 
             if val.startswith('None'):
@@ -106,11 +116,17 @@ def scrape_sidinfo(sidfile, all_tunelengths):
 
 def scrape_tunelengths(tunelengthfile):
     all_tunelengths = {}
+    tunename = None
     with open(tunelengthfile) as f:
         for line in f:
-            if line.startswith(';') or line.startswith('['):
+            tunename_match = tunename_re.match(line)
+            if tunename_match:
+                tunename = os.path.join('C64Music', tunename_match.group(1)[1:])
                 continue
             tunelength_match = tunelength_re.match(line)
+            if not tunelength_match:
+                continue
+            assert tunename
             md5_hash = tunelength_match.group(1)
             tunelength_raw = tunelength_match.group(2).split()
             tunelengths = {}
@@ -122,20 +138,25 @@ def scrape_tunelengths(tunelengthfile):
                     tunelength += 1
                 tunelengths[song] = tunelength
             all_tunelengths[md5_hash] = tunelengths
+            all_tunelengths[tunename] = tunelengths
+            tunename = None
     return all_tunelengths
 
 
 def scrape_sids():
     current = pathlib.Path(r'.')
     currentdocs = pathlib.Path(r'./C64Music/DOCUMENTS')
-    sidfiles = current.rglob(r'*.sid')
+    sidfiles = [sidfile for sidfile in sorted(current.rglob(r'*.sid'))]
+    logging.info('scraping %u sidfiles', len(sidfiles))
     all_tunelengths = {}
     for tunelengthfile in currentdocs.rglob(r'Songlengths.md5'):
         all_tunelengths.update(scrape_tunelengths(tunelengthfile))
+    assert len(all_tunelengths) / 2 == len(sidfiles), (len(all_tunelengths), len(sidfiles))
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
-        result_futures = map(lambda x: executor.submit(scrape_sidinfo, x, all_tunelengths), sidfiles)
-        results = [future.result() for future in concurrent.futures.as_completed(result_futures)]
+    with tempfile.TemporaryDirectory() as tmpdir:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+            result_futures = map(lambda x: executor.submit(scrape_sidinfo, x, all_tunelengths, tmpdir), sidfiles)
+            results = [future.result() for future in concurrent.futures.as_completed(result_futures)]
     subprocess.check_call(['stty', 'sane'])
 
     df = pd.DataFrame(results)
@@ -163,5 +184,6 @@ def scrape_sids():
 
     return df
 
+logging.basicConfig(level=logging.DEBUG)
 df = scrape_sids()
 df.to_csv('sidinfo.csv', index=False, quoting=csv.QUOTE_NONNUMERIC)
