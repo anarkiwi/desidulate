@@ -53,14 +53,14 @@ SSFs are output in order of frequency of occurence, most first:
 
 ```
 $ xzcat C64Music/MUSICIANS/L/Linus/Cauldron_II_Remix.ssf.xz |head
-hashid,clock,vbi_frame,pr_frame,gate1,freq1,pwduty1,pulse1,noise1,tri1,saw1,test1,sync1,ring1,freq3,test3,flt1,fltcoff,fltres,fltlo,fltband,flthi,fltext,atk1,dec1,sus1,rel1,vol,rate,pr_speed,hashid_noclock,count
--2174233589037180891,0,0,0,1,,,,,,,1,,,,,,,,,,,,0,2,10,0,15,19339,1,-6871201304917122305,286
--2174233589037180891,19689,1,1,1,53414,,0,1,0,0,0,,,,,0,,,,,,,,,,,15,19339,1,-6871201304917122305,286
--2174233589037180891,39399,2,2,1,5614,,0,1,0,0,0,,,,,0,,,,,,,,,,,15,19339,1,-6871201304917122305,286
--2174233589037180891,39421,2,2,0,5614,,0,0,1,0,0,,,,,0,,,,,,,,,,,15,19339,1,-6871201304917122305,286
--2174233589037180891,58738,3,3,0,2650,,0,0,1,0,0,,,,,0,,,,,,,,,,,15,19339,1,-6871201304917122305,286
--2174233589037180891,78605,4,4,0,2650,,0,0,1,0,0,,,,,0,,,,,,,,,,,15,19339,1,-6871201304917122305,286
--5281139747119741370,0,0,0,1,,,,,,,1,,,,,,,,,,,,0,2,14,0,15,19383,1,757979854999595997,193
+hashid,clock,pr_frame,gate1,freq1,pwduty1,pulse1,noise1,tri1,saw1,test1,sync1,ring1,freq3,test3,flt1,fltcoff,fltres,fltlo,fltband,flthi,fltext,atk1,dec1,sus1,rel1,vol,rate,pr_speed,hashid_noclock,count
+-2174233589037180891,0,0,1,,,,,,,1,,,,,,,,,,,,0,2,10,0,15,19339,1,-6871201304917122305,286
+-2174233589037180891,19689,1,1,53414,,0,1,0,0,0,,,,,0,,,,,,,,,,,15,19339,1,-6871201304917122305,286
+-2174233589037180891,39399,2,1,5614,,0,1,0,0,0,,,,,0,,,,,,,,,,,15,19339,1,-6871201304917122305,286
+-2174233589037180891,39421,2,0,5614,,0,0,1,0,0,,,,,0,,,,,,,,,,,15,19339,1,-6871201304917122305,286
+-2174233589037180891,58738,3,0,2650,,0,0,1,0,0,,,,,0,,,,,,,,,,,15,19339,1,-6871201304917122305,286
+-2174233589037180891,78605,4,0,2650,,0,0,1,0,0,,,,,0,,,,,,,,,,,15,19339,1,-6871201304917122305,286
+-5281139747119741370,0,0,1,,,,,,,1,,,,,,,,,,,,0,2,14,0,15,19383,1,757979854999595997,193
 ```
 
 ### Transcribing to SMF
@@ -77,13 +77,13 @@ desidulate will generate a multitrack SMF (one track for each voice, and an addi
 
 ```
 $ ssf2wav C64Music/MUSICIANS/L/Linus/Cauldron_II_Remix.log.xz --hashid -5281139747119741370 --play
-		     hashid  pr_frame  gate1  freq1  pwduty1  pulse1  noise1  tri1  saw1  test1  sync1  ring1  freq3  test3  flt1  fltcoff  fltres  fltlo  fltband  flthi  fltext  atk1  dec1  sus1  rel1  vol   rate  pr_speed      hashid_noclock  count    real_freq  closest_note  vbi_frame
+		     hashid  pr_frame  gate1  freq1  pwduty1  pulse1  noise1  tri1  saw1  test1  sync1  ring1  freq3  test3  flt1  fltcoff  fltres  fltlo  fltband  flthi  fltext  atk1  dec1  sus1  rel1  vol   rate  pr_speed      hashid_noclock  count    real_freq  closest_note
 clock
-0      -5281139747119741370         0      1   <NA>     <NA>    <NA>    <NA>  <NA>  <NA>      1   <NA>   <NA>   <NA>   <NA>  <NA>     <NA>    <NA>   <NA>     <NA>   <NA>    <NA>     0     2    14     0   15  19383         1  757979854999595997    193         <NA>          <NA>          0
-19694  -5281139747119741370         1      1  50416     <NA>       0       1     0     0      0   <NA>   <NA>   <NA>   <NA>     1      768      15      1        1      0       0     0     2    14     0   15  19383         1  757979854999595997    193  2960.697601           102          1
-39063  -5281139747119741370         2      0   3537     2048       1       0     0     0      0   <NA>   <NA>   <NA>   <NA>     1       40      15      0        0      1       0     0     2    14     0   15  19383         1  757979854999595997    193   207.711588            56          2
-58720  -5281139747119741370         3      0   2974     2048       1       0     0     0      0   <NA>   <NA>   <NA>   <NA>     1       16      15      0        1      1       0     0     2    14     0   15  19383         1  757979854999595997    193   174.649212            53          3
-78378  -5281139747119741370         4      0   2974     2048       1       0     0     0      0   <NA>   <NA>   <NA>   <NA>     1      128      15      0        0      1       0     0     2    14     0   15  19383         1  757979854999595997    193   174.649212            53          4
+0      -5281139747119741370         0      1   <NA>     <NA>    <NA>    <NA>  <NA>  <NA>      1   <NA>   <NA>   <NA>   <NA>  <NA>     <NA>    <NA>   <NA>     <NA>   <NA>    <NA>     0     2    14     0   15  19383         1  757979854999595997    193         <NA>          <NA>
+19694  -5281139747119741370         1      1  50416     <NA>       0       1     0     0      0   <NA>   <NA>   <NA>   <NA>     1      768      15      1        1      0       0     0     2    14     0   15  19383         1  757979854999595997    193  2960.697601           102
+39063  -5281139747119741370         2      0   3537     2048       1       0     0     0      0   <NA>   <NA>   <NA>   <NA>     1       40      15      0        0      1       0     0     2    14     0   15  19383         1  757979854999595997    193   207.711588            56
+58720  -5281139747119741370         3      0   2974     2048       1       0     0     0      0   <NA>   <NA>   <NA>   <NA>     1       16      15      0        1      1       0     0     2    14     0   15  19383         1  757979854999595997    193   174.649212            53
+78378  -5281139747119741370         4      0   2974     2048       1       0     0     0      0   <NA>   <NA>   <NA>   <NA>     1      128      15      0        0      1       0     0     2    14     0   15  19383         1  757979854999595997    193   174.649212            53
 Playing WAVE 'C64Music/MUSICIANS/L/Linus/Cauldron_II_Remix.wav' : Signed 16 bit Little Endian, Rate 11025 Hz, Mono
 {'drum_instrument': 45, 'samples': 657, 'loudestf': 167, 'last_clock': 78378, 'initial_pitch_drop': 4}
 ```

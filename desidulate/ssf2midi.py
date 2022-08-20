@@ -10,6 +10,7 @@
 # http://www.ucapps.de/howto_sid_wavetables_1.html
 
 import argparse
+import logging
 import os
 import sys
 import pandas as pd
@@ -20,6 +21,7 @@ from desidulate.ssf import SidSoundFragment, SidSoundFragmentParser
 
 
 def main():
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
     ALL_VOICES = frozenset([1, 2, 3])
     parser = argparse.ArgumentParser(description='Convert ssf log into a MIDI file')
     parser.add_argument('ssflogfile', default='', help='SSF log file to read')
@@ -53,6 +55,8 @@ def main():
     if voicemask != ALL_VOICES:
         ssf_log_df = ssf_log_df[ssf_log_df['voice'].isin(voicemask)]
 
+    logging.info('read %u ssf log entries from %s', len(ssf_log_df), args.ssflogfile)
+
     vdfs = []
     for v, vdf in ssf_log_df.groupby('voice'):
         vdf['duration'] = vdf['clock'].shift(-1)
@@ -61,7 +65,7 @@ def main():
         vdfs.append(vdf)
     ssf_log_df = pd.concat(vdfs)
 
-    sid = get_sid(args.pal)
+    sid = get_sid(args.pal, args.cia)
     smf = SidMidiFile(sid, args.bpm)
     parser = SidSoundFragmentParser(args.ssflogfile, args.percussion, sid)
     parser.read_patches(args.dfext)

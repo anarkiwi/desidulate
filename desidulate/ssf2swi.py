@@ -16,7 +16,7 @@ parser.add_argument('hashid', type=int, help='hashid to transcribe')
 timer_args(parser)
 
 args = parser.parse_args()
-sid = get_sid(args.pal)
+sid = get_sid(args.pal, args.cia)
 
 
 def wf_from_row(row):

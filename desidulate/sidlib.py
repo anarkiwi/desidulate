@@ -36,8 +36,7 @@ def bits2byte(df, cols):
     return byte_col
 
 
-def calc_rates(sid, maxprspeed, vdf):
-    ratemin = int(sid.clockq / (maxprspeed + 1))
+def calc_rates(sid, maxprspeed, vdf, ratemin=128):
     rate_cols = []
     rate_col_pairs = []
     for col in {'freq1', 'pwduty1', 'freq3', 'test3', 'fltcoff', 'fltres', 'vol'}:
@@ -47,7 +46,7 @@ def calc_rates(sid, maxprspeed, vdf):
             rate_cols.append(rate_col)
             rate_col_pairs.append((col, rate_col))
 
-    rate_col_df = pd.DataFrame(vdf['clock'])
+    rate_col_df = pd.DataFrame(vdf[['clock', 'clock_start']])
 
     for col, rate_col in rate_col_pairs:
         diff = vdf.astype(pd.Int64Dtype()).groupby(['ssf'], sort=False)[col].diff()
@@ -62,31 +61,30 @@ def calc_rates(sid, maxprspeed, vdf):
         rate_col_df.loc[diff == 0, [rate_col]] = pd.NA
         rate_cols.append(rate_col)
 
-    rate_col_df.drop(['clock'], axis=1, inplace=True)
     rate_col_df[rate_cols] = rate_col_df.groupby(['ssf'], sort=False)[rate_cols].fillna(
         method='ffill').diff().astype(pd.Int64Dtype())
+    # remove diffs that cross SSF boundaries.
+    rate_col_df.loc[rate_col_df.clock == rate_col_df.clock_start, rate_cols] = pd.NA
+    rate_col_df.drop(['clock', 'clock_start'], axis=1, inplace=True)
 
     for col in rate_col_df.columns:
         rate_col_df.loc[rate_col_df[col] <= ratemin, col] = pd.NA
+
     rate_cols = [col for col in rate_col_df.columns if not rate_col_df[rate_col_df[col].notna()].empty]
     rate = rate_col_df.groupby(['ssf'], sort=False)[rate_cols].min().min(axis=1).astype(pd.Int64Dtype()).clip(upper=sid.clockq)
     pr_speed = rate.rdiv(sid.clockq).round().astype(pd.UInt8Dtype())
     pr_speed.loc[pr_speed == 0] = int(1)
+    pr_speed.loc[pr_speed.isna()] = 0
+    pr_speed.loc[pr_speed > maxprspeed] = 0
 
     return (rate, pr_speed)
-
-
-def calc_vbi_frame(sid, clock):
-    vbi_frame = clock.astype(pd.Float32Dtype())
-    vbi_frame = vbi_frame.floordiv(sid.clockq).astype(pd.Int64Dtype())
-    return vbi_frame
 
 
 def resampledf_to_pr(ssf_df):
     pr_speed = ssf_df['pr_speed'].iat[0]
     first_row = ssf_df.iloc[0]
-    resample_df = ssf_df.drop_duplicates('pr_frame', keep='last').reset_index(drop=True).drop('vbi_frame', axis=1).copy()
-    resample_df_clock = ssf_df[['pr_frame', 'vbi_frame']].reset_index().drop_duplicates('pr_frame', keep='first').copy()
+    resample_df = ssf_df.drop_duplicates('pr_frame', keep='last').reset_index(drop=True).copy()
+    resample_df_clock = ssf_df[['pr_frame']].reset_index().drop_duplicates('pr_frame', keep='first').copy()
     resample_df = resample_df.merge(resample_df_clock, on='pr_frame').set_index('clock').sort_index()
     for col in ADSR_COLS:
         resample_df[col] = int(getattr(first_row, col))
@@ -124,9 +122,10 @@ def df_waveform_order(df):
 
 
 def timer_args(parser):
-    pal_parser = parser.add_mutually_exclusive_group(required=False)
-    pal_parser.add_argument('--pal', dest='pal', action='store_true', help='Use PAL clock')
-    pal_parser.add_argument('--ntsc', dest='pal', action='store_false', help='Use NTSC clock')
+    video_parser = parser.add_mutually_exclusive_group(required=False)
+    video_parser.add_argument('--pal', dest='pal', action='store_true', help='Use PAL clock')
+    video_parser.add_argument('--ntsc', dest='pal', action='store_false', help='Use NTSC clock')
+    parser.add_argument('--cia', default=0, type=float, help='If > 0, use CIA timer in Hz')
     parser.set_defaults(pal=True, skiptest=True)
 
 
@@ -187,7 +186,7 @@ class SidWrap:
         15: 24000,
     }
 
-    def __init__(self, pal, model, sampling_frequency):
+    def __init__(self, pal, cia, model, sampling_frequency):
         # https://codebase64.org/doku.php?id=magazines:chacking17
         # https://codebase64.org/doku.php?id=base:making_stable_raster_routines
         if pal:
@@ -198,9 +197,15 @@ class SidWrap:
             self.clock_freq = SoundInterfaceDevice.NTSC_CLOCK_FREQUENCY
             self.raster_lines = 263
             self.cycles_per_line = 65
-        self.clockq = self.raster_lines * self.cycles_per_line
-        self.int_freq = self.clock_freq / self.clockq
         self.freq_scaler = self.clock_freq / 16777216
+
+        if cia:
+            self.clockq = int(self.clock_freq / cia)
+        else:
+            self.clockq = self.raster_lines * self.cycles_per_line
+        self.int_freq = self.clock_freq / self.clockq
+
+        logging.info('using PR frequency %f Hz (%u cycles)', self.int_freq, self.clockq)
         self.resid = SoundInterfaceDevice(
             model=model, clock_frequency=self.clock_freq,
             sampling_frequency=sampling_frequency)
@@ -230,8 +235,8 @@ class SidWrap:
         return self.resid.clock(timedelta(seconds=timeoffset_seconds))
 
 
-def get_sid(pal, model=ChipModel.MOS8580, sampling_frequency=SID_SAMPLE_FREQ):
-    return SidWrap(pal, model, sampling_frequency)
+def get_sid(pal, cia, model=ChipModel.MOS8580, sampling_frequency=SID_SAMPLE_FREQ):
+    return SidWrap(pal, cia, model, sampling_frequency)
 
 
 # Read a VICE "-sounddev dump" register dump (emulator or vsid)
@@ -335,7 +340,43 @@ def coalesce_near_writes(vdf, cols, near=16):
     return vdf
 
 
-def split_vdf(sid, df, near=16, guard=96, maxprspeed=20):
+def calc_pr_frames(vdf, sid, pr_speeds):
+    if max(pr_speeds) == 0:
+        vdf['pr_frame'] = int(0)
+        return vdf
+    min_pr_speed = min([pr_speed for pr_speed in pr_speeds if pr_speed])
+    max_offset = int(sid.clockq / min_pr_speed / 2)
+    orig_cols = list(vdf.columns)
+    vdf['pr_speed_q'] = (sid.clockq / vdf['pr_speed']).astype(pd.Int64Dtype())
+    vdf['pr_offset'] = int(0)
+    offsets = []
+    offset = 0
+    while offset < max_offset:
+        offset += 16
+        colname = 'clock_%u' % offset
+        vdf[colname] = (vdf['clock'] + offset).div(vdf['pr_speed_q'])
+        vdf[colname] -= vdf[colname].astype(pd.Int64Dtype())
+        offsets.append((offset, colname))
+
+    for pr_speed in pr_speeds:
+        if pr_speed:
+            pr_df = vdf[vdf['pr_speed'] == pr_speed]
+            max_pr_speed_q = int(pr_df['pr_speed_q'].iat[0] / 2)
+            errors = sorted([(pr_df[colname].max(), offset) for offset, colname in offsets if offset <= max_pr_speed_q])
+            max_error, offset = errors[0]
+            vdf.loc[vdf['pr_speed'] == pr_speed, 'pr_offset'] == offset
+            logging.info('calculated pr_frame %u offsets, max offset fraction %.2f with offset %u (up to max offset %u)',
+                pr_speed, max_error, offset, max_pr_speed_q)
+
+    vdf['pr_frame'] = (vdf['clock'] + vdf['pr_offset']).floordiv(vdf['pr_speed_q']).astype(pd.Int64Dtype())
+    vdf.loc[vdf['pr_speed'] == 0, 'pr_frame'] = 0
+    min_pr_frame = vdf.groupby('ssf', sort=False)['pr_frame'].min()
+    vdf['pr_frame'] -= min_pr_frame
+    vdf = vdf[orig_cols + ['pr_frame']]
+    return vdf
+
+
+def split_vdf(sid, df, near=16, guard=96, maxprspeed=8):
     fltcols = [col for col in df.columns if col.startswith('flt') and not col[-1].isdigit()]
     mod_cols = ['freq3', 'test3', 'sync1', 'ring1']
 
@@ -512,26 +553,15 @@ def split_vdf(sid, df, near=16, guard=96, maxprspeed=20):
 
         logging.debug('calculating rates for voice %u', v)
         v_df['rate'], v_df['pr_speed'] = calc_rates(sid, maxprspeed, v_df)
-        pr_speeds = v_df[v_df['pr_speed'].notna()]['pr_speed'].unique()
-        if len(pr_speeds) == 0:
-            logging.debug('no pr_speed detected for voice %u', v)
-        else:
-            logging.debug('pr_speeds for voice %u: %s', v, sorted(pr_speeds))
-            pr_speeds = v_df[v_df['pr_speed'].notna()].reset_index()[['ssf', 'pr_speed']].groupby('pr_speed')['ssf'].nunique().to_dict()
-            sorted_pr_speeds = sorted(pr_speeds.items(), key=lambda x: x[1], reverse=True)
-            logging.debug('min/mean/max rate %u/%u/%u for voice %u (counts %s)',
-                v_df['rate'].min(), v_df['rate'].mean(), v_df['rate'].max(), v, sorted_pr_speeds)
+        pr_speeds = v_df['pr_speed'].unique()
+        logging.debug('pr_speeds for voice %u: %s', v, sorted(pr_speeds))
+        pr_speeds = v_df.reset_index()[['ssf', 'pr_speed']].groupby('pr_speed')['ssf'].nunique().to_dict()
+        sorted_pr_speeds = sorted(pr_speeds.items(), key=lambda x: x[1], reverse=True)
+        logging.debug('min/mean/max rate %u/%u/%u for voice %u (counts %s)',
+            v_df['rate'].min(), v_df['rate'].mean(), v_df['rate'].max(), v, sorted_pr_speeds)
 
-        v_df['vbi_frame'] = calc_vbi_frame(sid, v_df['clock'])
-        v_df['pr_frame'] = v_df['clock'].floordiv(v_df['rate']).astype(pd.Int64Dtype())
-        # not playroutine? default to vbi.
-        v_df['pr_frame'].where(v_df['pr_frame'].notna(), v_df['vbi_frame'], inplace=True)
-
-        for col in ('vbi_frame', 'pr_frame'):
-            col_min = v_df.groupby('ssf', sort=False)[col].min()
-            v_df[col] -= col_min
+        v_df = calc_pr_frames(v_df, sid, pr_speeds)
         v_df['clock'] -= v_df['clock_start']
-
         v_df.reset_index(level=0, inplace=True)
 
         v_df['v'] = v
@@ -543,9 +573,7 @@ def split_vdf(sid, df, near=16, guard=96, maxprspeed=20):
         v_dfs = pd.concat(v_dfs)
         logging.debug('calculating row hashes on %s', sorted(non_meta_cols))
         v_dfs = hash_vdf(v_dfs, non_meta_cols)
-        logging.debug('calculating clock hashes')
-        v_dfs['hashid_clock'] = v_dfs.groupby(['ssf'], sort=False)['clock'].transform(hash_tuple).astype(np.int64)
-        prefix_cols = ['clock', 'vbi_frame', 'pr_frame']
+        prefix_cols = ['pr_speed', 'pr_frame', 'clock']
         meta_cols = [col for col in v_dfs.columns if col not in CANON_REG_ORDER and col not in prefix_cols]
         v_dfs = v_dfs[prefix_cols + [col for col in CANON_REG_ORDER if col in v_dfs.columns] + meta_cols]
 
@@ -567,6 +595,8 @@ def ssf_start_duration(sid, ssf_df):
     clock_duration = ssf_df['clock'].max() + sid.clockq
     next_clock_start = ssf_df['next_clock_start'].iat[-1]
     clock_start = ssf_df['clock_start'].iat[-1]
+
+
     if pd.notna(next_clock_start):
         if next_clock_start > clock_start:
             clock_duration = next_clock_start - clock_start - 1
@@ -575,60 +605,33 @@ def ssf_start_duration(sid, ssf_df):
 
 def pad_ssf_duration(sid, ssf_df):
     clock_start, clock_duration = ssf_start_duration(sid, ssf_df)
-    normalized_ssf_df = ssf_df.drop(['ssf', 'clock_start', 'next_clock_start', 'hashid_clock'], axis=1)
+    normalized_ssf_df = ssf_df.drop(['ssf', 'clock_start', 'next_clock_start'], axis=1)
     last_row_df = normalized_ssf_df[-1:].copy()
     last_row_df['clock'] = clock_duration
-    end = last_row_df['clock'] + clock_start
-    start = end - clock_duration
-
-    for col, frame_calc in (
-            ('vbi_frame', lambda x: calc_vbi_frame(sid, x)),
-            ('pr_frame', lambda x: x.floordiv(last_row_df['rate']).astype(pd.Int64Dtype()))):
-        last_row_df[col] = frame_calc(end) - frame_calc(start)
-
-    last_row_df['pr_frame'].where(
-        last_row_df['pr_frame'].notna(), last_row_df['vbi_frame'], inplace=True)
     last_row_df = last_row_df.astype(normalized_ssf_df.dtypes.to_dict())
     return pd.concat([normalized_ssf_df, last_row_df], ignore_index=True).reset_index(drop=True)
-
-
-def normalize_ssf(sid, hashid_clock, hashid_noclock, ssf_df, remap_ssf_dfs, ssf_noclock_dfs, ssf_dfs, ssf_count):
-    hashid = hash((hashid_clock, hashid_noclock))
-
-    if hashid not in ssf_dfs:
-        if hashid in remap_ssf_dfs:
-            remapped_hashid = remap_ssf_dfs[hashid]
-            hashid = remapped_hashid
-        else:
-            last_vbi_frame = ssf_df['vbi_frame'].iat[-1]
-            remap_hashid_noclock = (last_vbi_frame, hashid_noclock)
-            remapped_hashid = ssf_noclock_dfs.get(remap_hashid_noclock, None)
-            if remapped_hashid is not None and jittermatch_df(ssf_dfs[remapped_hashid][:-1], ssf_df, 'clock', 1024):
-                remap_ssf_dfs[hashid] = remapped_hashid
-                hashid = remapped_hashid
-            else:
-                ssf_dfs[hashid] = pad_ssf_duration(sid, ssf_df)
-                ssf_noclock_dfs[remap_hashid_noclock] = hashid
-
-    ssf_count[hashid] += 1
-    return hashid
 
 
 def state2ssfs(sid, df):
     ssf_log = []
     ssf_dfs = {}
     ssf_count = defaultdict(int)
-    remap_ssf_dfs = {}
-    ssf_noclock_dfs = {}
 
     for v, v_df in split_vdf(sid, df):
         ssfs = v_df['ssf'].nunique()
+        voice_ssfs = set()
         logging.debug('splitting %u SSFs for voice %u', ssfs, v)
-        for hashid_noclock, hashid_noclock_df in v_df.groupby(['hashid_noclock'], sort=False):
-            for _, ssf_df in hashid_noclock_df.groupby(['ssf'], sort=False):
-                hashid_clock = ssf_df['hashid_clock'].iat[0]
-                hashid = normalize_ssf(sid, hashid_clock, hashid_noclock, ssf_df, remap_ssf_dfs, ssf_noclock_dfs, ssf_dfs, ssf_count)
-                ssf_log.append({'clock': ssf_df['clock_start'].iat[0], 'hashid': hashid, 'voice': v})
+        for hashid_noclock_pr_speed, hashid_noclock_df in v_df.groupby(['hashid_noclock', 'pr_speed'], sort=False):
+            hashid_noclock, pr_speed = hashid_noclock_pr_speed
+            hashid = hash((hashid_noclock, pr_speed))
+            group_ssf_dfs = [ssf_df for _, ssf_df in hashid_noclock_df.groupby(['ssf'], sort=True)]
+            ssf_df = group_ssf_dfs[0]
+            ssf_dfs[hashid] = pad_ssf_duration(sid, ssf_df)
+            ssf_count[hashid] += len(group_ssf_dfs)
+            clock_starts = [ssf_df['clock_start'].iat[0] for ssf_df in group_ssf_dfs]
+            ssf_log.extend([{'clock': clock_start, 'hashid': hashid, 'voice': v} for clock_start in clock_starts])
+            voice_ssfs.add(hashid)
+        logging.debug('reduced to unique %u SSFs for voice %u', len(voice_ssfs), v)
 
     for hashid, count in ssf_count.items():
         ssf_dfs[hashid]['count'] = count

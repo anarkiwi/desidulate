@@ -7,6 +7,7 @@
 ## The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 
 import argparse
+import logging
 import os
 import sys
 from concurrent.futures import ProcessPoolExecutor
@@ -85,7 +86,7 @@ def main():
     if args.maxclock:
         df = df[df['clock'] < args.maxclock]
 
-    sid = get_sid(pal=args.pal)
+    sid = get_sid(args.pal, args.cia)
     smf = None
 
     if not args.skip_ssf_parser:

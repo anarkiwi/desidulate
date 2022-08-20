@@ -4,7 +4,7 @@ import unittest
 from io import StringIO
 import pandas as pd
 from desidulate.fileio import read_csv
-from desidulate.sidlib import jittermatch_df, squeeze_diffs, coalesce_near_writes, remove_end_repeats, df_waveform_order, get_sid, calc_vbi_frame, calc_rates, bits2byte
+from desidulate.sidlib import squeeze_diffs, coalesce_near_writes, remove_end_repeats, df_waveform_order, get_sid, calc_rates, bits2byte
 
 
 class SIDLibTestCase(unittest.TestCase):
@@ -30,7 +30,7 @@ class SIDLibTestCase(unittest.TestCase):
         return df
 
     def test_calc_rates(self):
-        sid = get_sid(pal=True)
+        sid = get_sid(pal=True, cia=0)
         df = self.ssfdf('''
 clock,gate1,freq1,pwduty1,pulse1,noise1,tri1,saw1,test1,sync1,ring1,freq3,test3,flt1,fltcoff,fltres,fltlo,fltband,flthi,fltext,atk1,dec1,sus1,rel1,vol
 0,1,,,,,,,1,,,,,,,,,,,,9,0,10,0,15
@@ -68,9 +68,9 @@ clock,gate1,freq1,pwduty1,pulse1,noise1,tri1,saw1,test1,sync1,ring1,freq3,test3,
 272,1,,,0,0,0,0,0,,,,,,,,,,,,,,,,
 378,1,32768,,0,0,1,0,0,,,,,0,,,,,,,,,,,
 ''')
-        rate, pr_speed = calc_rates(sid, 20, df)
-        self.assertTrue(pd.isna(rate.iat[-1]))
-        self.assertTrue(pd.isna(pr_speed.iat[-1]))
+        rate, pr_speed = calc_rates(sid, 20, df, ratemin=64)
+        self.assertEqual(106, rate.iat[-1])
+        self.assertEqual(0, pr_speed.iat[-1])
 
         df = self.ssfdf('''
 clock,gate1,freq1,pwduty1,pulse1,noise1,tri1,saw1,test1,sync1,ring1,freq3,test3,flt1,fltcoff,fltres,fltlo,fltband,flthi,fltext,atk1,dec1,sus1,rel1,vol
@@ -84,7 +84,7 @@ clock,gate1,freq1,pwduty1,pulse1,noise1,tri1,saw1,test1,sync1,ring1,freq3,test3,
 ''')
         rate, pr_speed = calc_rates(sid, 20, df)
         self.assertEqual(19452, rate.iat[-1])
-        self.assertTrue(1, pr_speed.iat[-1])
+        self.assertEqual(1, pr_speed.iat[-1])
 
         df = self.ssfdf('''
 clock,gate1,freq1,pwduty1,pulse1,noise1,tri1,saw1,test1,sync1,ring1,freq3,test3,flt1,fltcoff,fltres,fltlo,fltband,flthi,fltext,atk1,dec1,sus1,rel1,vol
@@ -217,9 +217,9 @@ clock,gate1,freq1,pwduty1,pulse1,noise1,tri1,saw1,test1,sync1,ring1,freq3,test3,
 85164,0,4455,,0,1,0,0,0,,,,,3,1554,5,1,0,0,0,,,,,15
 170351,0,4455,,0,1,0,0,0,,,,,3,1554,5,1,0,0,0,,,,,15
 ''')
-        rate, pr_speed = calc_rates(sid, 20, df)
-        self.assertEqual(1634, rate.iat[-1])
-        self.assertEqual(12, pr_speed.iat[-1])
+        rate, pr_speed = calc_rates(sid, 30, df)
+        self.assertEqual(815, rate.iat[-1])
+        self.assertEqual(24, pr_speed.iat[-1])
 
         df = self.ssfdf('''
 clock,gate1,freq1,pwduty1,pulse1,noise1,tri1,saw1,test1,sync1,ring1,freq3,test3,flt1,fltcoff,fltres,fltlo,fltband,flthi,fltext,atk1,dec1,sus1,rel1,vol
@@ -246,20 +246,6 @@ clock,gate1,freq1,pwduty1,pulse1,noise1,tri1,saw1,test1,sync1,ring1,freq3,test3,
         self.assertEqual(19277, rate.iat[-1])
         self.assertEqual(1, pr_speed.iat[-1])
 
-    def test_frames(self):
-        df = pd.DataFrame([
-            {'clock': 5000, 'pal_vbi_frame': 0, 'ntsc_vbi_frame': 0},
-            {'clock': 10000, 'pal_vbi_frame': 0, 'ntsc_vbi_frame': 0},
-            {'clock': 15000, 'pal_vbi_frame': 0, 'ntsc_vbi_frame': 0},
-            {'clock': 18000, 'pal_vbi_frame': 0, 'ntsc_vbi_frame': 1},
-            {'clock': 20000, 'pal_vbi_frame': 1, 'ntsc_vbi_frame': 1},
-            {'clock': 25000, 'pal_vbi_frame': 1, 'ntsc_vbi_frame': 1}])
-        self.assertEqual(
-            df['pal_vbi_frame'].to_list(),
-            calc_vbi_frame(get_sid(pal=True), df['clock']).to_list())
-        self.assertEqual(
-            df['ntsc_vbi_frame'].to_list(),
-            calc_vbi_frame(get_sid(pal=False), df['clock']).to_list())
 
     def test_remove_end_repeats(self):
         self.assertEqual([1, 2], remove_end_repeats([1, 2]))
@@ -317,31 +303,6 @@ clock,pulse1,noise1,sync1,ring1,test1,tri1,saw1
 200,1,0,,,,,
 ''').reset_index()
         self.assertEqual(['p', '0', 'n', 'p'], df_waveform_order(df))
-
-    def test_jittermatch(self):
-        df1 = self.str2df('''
-clock,vbi_frame,freq1,pwduty1,gate1,sync1,ring1,test1,tri1,saw1,pulse1,noise1,atk1,dec1,sus1,rel1,vol,fltlo,fltband,flthi,flt1,fltext,fltres,fltcoff,freq3,test3,freq1nunique,pwduty1nunique,volnunique
-0,0,,,1,,,1,,,,,0,0,5,5,15,0,0,1,1,0,15,128,,,1,0,1
-19346,1,,,1,,,1,,,,,0,0,5,5,15,0,0,1,1,0,15,640,,,1,0,1
-19636,1,50416,,1,0,0,0,0,0,0,1,0,0,5,5,15,0,0,1,1,0,15,640,,,1,0,1
-39225,2,50416,,1,0,0,0,0,0,0,1,0,15,5,5,15,0,0,1,1,0,15,640,,,1,0,1
-39234,2,50416,,1,0,0,0,0,0,0,1,0,15,0,0,15,0,0,1,1,0,15,640,,,1,0,1
-39283,2,50416,,0,0,0,0,0,0,0,1,,,,,15,0,0,1,1,0,15,640,,,1,0,1
-''').reset_index()
-        df2 = self.str2df('''
-clock,vbi_frame,freq1,pwduty1,gate1,sync1,ring1,test1,tri1,saw1,pulse1,noise1,atk1,dec1,sus1,rel1,vol,fltlo,fltband,flthi,flt1,fltext,fltres,fltcoff,freq3,test3,freq1nunique,pwduty1nunique,volnunique
-0,0,,,1,,,1,,,,,0,0,5,5,15,0,0,1,1,0,15,128,,,1,0,1
-19410,1,,,1,,,1,,,,,0,0,5,5,15,0,0,1,1,0,15,640,,,1,0,1
-19700,1,50416,,1,0,0,0,0,0,0,1,0,0,5,5,15,0,0,1,1,0,15,640,,,1,0,1
-39289,2,50416,,1,0,0,0,0,0,0,1,0,15,5,5,15,0,0,1,1,0,15,640,,,1,0,1
-39298,2,50416,,1,0,0,0,0,0,0,1,0,15,0,0,15,0,0,1,1,0,15,640,,,1,0,1
-39347,2,50416,,0,0,0,0,0,0,0,1,,,,,15,0,0,1,1,0,15,640,,,1,0,1
-''').reset_index()
-        self.assertEqual(
-            df1.drop(['clock'], axis=1).to_string(),
-            df2.drop(['clock'], axis=1).to_string())
-        self.assertTrue(jittermatch_df(df1, df2, 'clock', 1024))
-        self.assertFalse(jittermatch_df(df1, df2, 'clock', 32))
 
     def test_squeeze_diffs(self):
         df = self.str2df('''

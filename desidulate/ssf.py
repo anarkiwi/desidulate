@@ -9,6 +9,7 @@
 # https://codebase64.org/doku.php?id=base:building_a_music_routine
 # http://www.ucapps.de/howto_sid_wavetables_1.html
 
+import logging
 from collections import Counter
 from itertools import groupby
 import pandas as pd
@@ -175,3 +176,4 @@ class SidSoundFragmentParser:
             self.patch_count[hashid] = ssf_df['count'].max()
             self.ssf_dfs[hashid] = ssf_df.drop(
                 ['hashid', 'count'], axis=1).set_index('clock').fillna(method='ffill')
+        logging.info('read %u patches from %s', len(self.ssf_dfs), patch_log)
