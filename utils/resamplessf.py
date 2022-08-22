@@ -28,7 +28,7 @@ sid_cols = { # exclude vol, fltext
     'fltlo', 'fltband', 'flthi', 'flt1', 'fltres', 'fltcoff',
     'freq3', 'test3'}.union(waveform_cols).union(adsr_cols)
 big_regs = {'freq1': 8, 'freq3': 8, 'pwduty1': 4, 'fltcoff': 3}
-sid = get_sid(pal=args.pal)
+sid = get_sid(pal=args.pal, cia=args.cia)
 
 
 def col_diffs(col):
@@ -71,10 +71,10 @@ def resample():
             print(hashid)
             print(pre_waveforms)
             print(waveforms)
-            orig = ssf_df.reset_index(drop=True).set_index('clock').drop(['hashid', 'hashid_noclock', 'vbi_frame'], axis=1)
+            orig = ssf_df.reset_index(drop=True).set_index('clock').drop(['hashid', 'hashid_noclock'], axis=1)
             # orig.drop(['rate', 'pr_speed', 'count', 'pr_frame'], axis=1)
             print(orig)
-            print(resample_df.drop(['hashid', 'hashid_noclock', 'vbi_frame'], axis=1))
+            print(resample_df.drop(['hashid', 'hashid_noclock'], axis=1))
             # assert False
 
         for row in resample_df.itertuples():

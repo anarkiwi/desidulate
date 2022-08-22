@@ -25,7 +25,7 @@ def main():
     timer_args(parser)
     args = parser.parse_args()
 
-    sid = get_sid(args.pal)
+    sid = get_sid(args.pal, args.cia)
     df = reg2state(args.logfile, nrows=int(args.maxstates))
     ssf_log_df, ssf_df = state2ssfs(sid, df)
 

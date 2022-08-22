@@ -17,9 +17,9 @@ class SidWavTestCase(unittest.TestCase):
         return pd.DataFrame(rows, dtype=pd.UInt64Dtype()).set_index('clock').fillna(method='ffill').astype(pd.UInt64Dtype())
 
     def _same_samples(self, df1, df2):
-        sid = get_sid(pal=True)
+        sid = get_sid(pal=True, cia=0)
         raw_samples = state2samples(df1, sid)
-        sid = get_sid(pal=True)
+        sid = get_sid(pal=True, cia=0)
         raw_samples2 = state2samples(df2, sid)
         self.assertTrue(len(raw_samples))
         self.assertTrue(len(raw_samples2))
@@ -27,7 +27,7 @@ class SidWavTestCase(unittest.TestCase):
         return np.array_equal(raw_samples, raw_samples2)
 
     def test_skiptest(self):
-        sid = get_sid(pal=True)
+        sid = get_sid(pal=True, cia=0)
 
         with tempfile.TemporaryDirectory() as tmpdir:
             test_wav = os.path.join(tmpdir, 'test.wav')
@@ -233,7 +233,7 @@ class SidWavTestCase(unittest.TestCase):
         self.assertTrue(self._same_samples(df1, df2))
 
     def test_df2wav(self):
-        sid = get_sid(pal=True)
+        sid = get_sid(pal=True, cia=0)
 
         with tempfile.TemporaryDirectory() as tmpdir:
             test_wav = os.path.join(tmpdir, 'test.wav')

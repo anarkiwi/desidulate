@@ -32,7 +32,12 @@ for row in df.itertuples():
     except OSError:
         continue
     if args.timer:
-        sidinfo_args = ' '.join(['--%s' % timerflag[row.pal], filename])
+        cia = 'CIA' in row.Playspeed
+        if cia:
+            cia = 60
+        else:
+            cia = 0
+        sidinfo_args = ' '.join(['--%s' % timerflag[row.pal], '--cia=%u' % cia, filename])
     else:
         sidinfo_args = filename
     outputs.append((size, sidinfo_args))
