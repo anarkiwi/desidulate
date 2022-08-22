@@ -18,7 +18,7 @@ if args.filter:
     filter_re = re.compile(args.filter)
 
 timerflag = {0: 'ntsc', 1: 'pal'}
-df = pd.read_csv('sidinfo.csv', usecols=['path', 'pal'])
+df = pd.read_csv('sidinfo.csv', usecols=['path', 'pal', 'Playspeed'])
 outputs = []
 for row in df.itertuples():
     filename = os.path.normpath(row.path)
