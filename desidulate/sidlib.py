@@ -340,40 +340,13 @@ def coalesce_near_writes(vdf, cols, near=16):
     return vdf
 
 
-def calc_pr_frames(vdf, sid, pr_speeds):
-    if max(pr_speeds) == 0:
-        vdf['pr_frame'] = int(0)
-        return vdf
-    min_pr_speed = min([pr_speed for pr_speed in pr_speeds if pr_speed])
-    max_offset = int(sid.clockq / min_pr_speed / 2)
-    orig_cols = list(vdf.columns)
-    vdf['pr_speed_q'] = (sid.clockq / vdf['pr_speed']).astype(pd.Int64Dtype())
-    vdf['pr_offset'] = int(0)
-    offsets = []
-    offset = 0
-    while offset < max_offset:
-        offset += 16
-        colname = 'clock_%u' % offset
-        vdf[colname] = (vdf['clock'] + offset).div(vdf['pr_speed_q'])
-        vdf[colname] -= vdf[colname].astype(pd.Int64Dtype())
-        offsets.append((offset, colname))
-
-    for pr_speed in pr_speeds:
-        if pr_speed:
-            pr_df = vdf[vdf['pr_speed'] == pr_speed]
-            max_pr_speed_q = int(pr_df['pr_speed_q'].iat[0] / 2)
-            errors = sorted([(pr_df[colname].max(), offset) for offset, colname in offsets if offset <= max_pr_speed_q])
-            max_error, offset = errors[0]
-            vdf.loc[vdf['pr_speed'] == pr_speed, 'pr_offset'] == offset
-            logging.info('calculated pr_frame %u offsets, max offset fraction %.2f with offset %u (up to max offset %u)',
-                pr_speed, max_error, offset, max_pr_speed_q)
-
-    vdf['pr_frame'] = (vdf['clock'] + vdf['pr_offset']).floordiv(vdf['pr_speed_q']).astype(pd.Int64Dtype())
-    vdf.loc[vdf['pr_speed'] == 0, 'pr_frame'] = 0
-    min_pr_frame = vdf.groupby('ssf', sort=False)['pr_frame'].min()
-    vdf['pr_frame'] -= min_pr_frame
-    vdf = vdf[orig_cols + ['pr_frame']]
-    return vdf
+def calc_pr_frames(ssf_df, sid):
+    pr_speed_q = (sid.clockq / ssf_df['pr_speed']).astype(pd.Int32Dtype())
+    orig_clock = ssf_df['clock'] + ssf_df['clock_start']
+    ssf_df['pr_frame'] = orig_clock.floordiv(pr_speed_q).astype(pd.Int32Dtype())
+    ssf_df['pr_frame'] -= ssf_df['pr_frame'].min()
+    ssf_df.loc[ssf_df['pr_speed'] == 0, 'pr_frame'] = 0
+    return ssf_df
 
 
 def split_vdf(sid, df, near=16, guard=96, maxprspeed=8):
@@ -489,8 +462,7 @@ def split_vdf(sid, df, near=16, guard=96, maxprspeed=8):
         v_df['test1_first'] = v_df['clock']
         v_df.loc[v_df['test1'] == 1, ['test1_first']] = pd.NA
         v_df['test1_first'] = v_df.groupby(['ssf'], sort=False)['test1_first'].min()
-        v_df.loc[
-            (v_df['test1'] == 1) & (v_df['clock'] <= v_df['test1_first']), ['freq1', 'pwduty1', 'flt1']] = pd.NA
+        v_df.loc[(v_df['test1'] == 1) & (v_df['clock'] <= v_df['test1_first']), ['freq1', 'pwduty1', 'flt1']] = pd.NA
         v_df.drop(['test1_first'], axis=1, inplace=True)
 
         # fold noise1 + other waveforms, to waveform 0.
@@ -500,7 +472,7 @@ def split_vdf(sid, df, near=16, guard=96, maxprspeed=8):
         v_df.loc[(v_df['ring1'] == 1) & (v_df['tri1'] == 0), ['ring1']] = 0
         v_df.loc[~((v_df['sync1'] == 1) | ((v_df['ring1'] == 1) & (v_df['tri1'] == 1))), mod_cols] = pd.NA
         # remove carrier state when waveform 0
-        v_df.loc[~((v_df['tri1'] == 1) | (v_df['saw1'] == 1) | (v_df['noise1'] == 1) | (v_df['pulse1'] == 1)), ['freq1', 'flt1'] + mod_cols] = pd.NA
+        v_df.loc[~((v_df['tri1'] == 1) | (v_df['saw1'] == 1) | (v_df['noise1'] == 1) | (v_df['pulse1'] == 1)), ['freq1'] + mod_cols] = pd.NA
         # remove filter state when no filter.
         v_df.loc[(v_df['flt1'] == 0) | v_df['flt1'].isna(), fltcols] = pd.NA
         # remove pwduty state when no pulse1 set.
@@ -560,7 +532,6 @@ def split_vdf(sid, df, near=16, guard=96, maxprspeed=8):
         logging.debug('min/mean/max rate %u/%u/%u for voice %u (counts %s)',
             v_df['rate'].min(), v_df['rate'].mean(), v_df['rate'].max(), v, sorted_pr_speeds)
 
-        v_df = calc_pr_frames(v_df, sid, pr_speeds)
         v_df['clock'] -= v_df['clock_start']
         v_df.reset_index(level=0, inplace=True)
 
@@ -573,7 +544,7 @@ def split_vdf(sid, df, near=16, guard=96, maxprspeed=8):
         v_dfs = pd.concat(v_dfs)
         logging.debug('calculating row hashes on %s', sorted(non_meta_cols))
         v_dfs = hash_vdf(v_dfs, non_meta_cols)
-        prefix_cols = ['pr_speed', 'pr_frame', 'clock']
+        prefix_cols = ['pr_speed', 'clock']
         meta_cols = [col for col in v_dfs.columns if col not in CANON_REG_ORDER and col not in prefix_cols]
         v_dfs = v_dfs[prefix_cols + [col for col in CANON_REG_ORDER if col in v_dfs.columns] + meta_cols]
 
@@ -605,11 +576,12 @@ def ssf_start_duration(sid, ssf_df):
 
 def pad_ssf_duration(sid, ssf_df):
     clock_start, clock_duration = ssf_start_duration(sid, ssf_df)
-    normalized_ssf_df = ssf_df.drop(['ssf', 'clock_start', 'next_clock_start'], axis=1)
-    last_row_df = normalized_ssf_df[-1:].copy()
+    last_row_df = ssf_df[-1:].copy()
     last_row_df['clock'] = clock_duration
-    last_row_df = last_row_df.astype(normalized_ssf_df.dtypes.to_dict())
-    return pd.concat([normalized_ssf_df, last_row_df], ignore_index=True).reset_index(drop=True)
+    last_row_df = last_row_df.astype(ssf_df.dtypes.to_dict())
+    ssf_df = pd.concat([ssf_df, last_row_df], ignore_index=True).reset_index(drop=True)
+    ssf_df = calc_pr_frames(ssf_df, sid).drop(['ssf', 'clock_start', 'next_clock_start'], axis=1)
+    return ssf_df
 
 
 def state2ssfs(sid, df):
