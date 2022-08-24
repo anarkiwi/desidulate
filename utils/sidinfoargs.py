@@ -18,7 +18,7 @@ if args.filter:
     filter_re = re.compile(args.filter)
 
 timerflag = {0: 'ntsc', 1: 'pal'}
-df = pd.read_csv('sidinfo.csv', usecols=['path', 'pal', 'Playspeed'])
+df = pd.read_csv('sidinfo.csv', usecols=['path', 'pal', 'Playspeed', 'ciatimer'])
 outputs = []
 for row in df.itertuples():
     filename = os.path.normpath(row.path)
@@ -34,7 +34,7 @@ for row in df.itertuples():
     if args.timer:
         cia = 'CIA' in row.Playspeed
         if cia:
-            cia = 60
+            cia = row.ciatimer
         else:
             cia = 0
         sidinfo_args = ' '.join(['--%s' % timerflag[row.pal], '--cia=%u' % cia, filename])

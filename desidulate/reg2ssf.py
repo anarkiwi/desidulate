@@ -22,12 +22,13 @@ def main():
     parser.add_argument('logfile', default='vicesnd.sid', help='log file to read')
     parser.add_argument('--maxstates', default=int(10 * 1e6), help='maximum number of SID states to analyze')
     parser.add_argument('--dfext', default='xz', help='default dataframe extension')
+    parser.add_argument('--maxprspeed', default=20, type=int, help='max prspeed to detect')
     timer_args(parser)
     args = parser.parse_args()
 
     sid = get_sid(args.pal, args.cia)
     df = reg2state(args.logfile, nrows=int(args.maxstates))
-    ssf_log_df, ssf_df = state2ssfs(sid, df)
+    ssf_log_df, ssf_df = state2ssfs(sid, df, maxprspeed=args.maxprspeed)
 
     for ext, filedf in (
             ('.'.join(('log', args.dfext)), ssf_log_df),
