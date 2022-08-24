@@ -34,7 +34,7 @@ for row in df.itertuples():
     if args.timer:
         cia = 'CIA' in row.Playspeed
         if cia:
-            cia = 60
+            cia = row.ciatimer
         else:
             cia = 0
         sidinfo_args = ' '.join(['--%s' % timerflag[row.pal], '--cia=%u' % cia, filename])

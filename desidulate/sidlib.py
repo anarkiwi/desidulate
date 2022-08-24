@@ -125,7 +125,7 @@ def timer_args(parser):
     video_parser = parser.add_mutually_exclusive_group(required=False)
     video_parser.add_argument('--pal', dest='pal', action='store_true', help='Use PAL clock')
     video_parser.add_argument('--ntsc', dest='pal', action='store_false', help='Use NTSC clock')
-    parser.add_argument('--cia', default=0, type=float, help='If > 0, use CIA timer in Hz')
+    parser.add_argument('--cia', default=0, type=float, help='If > 0, use CIA timer cycles')
     parser.set_defaults(pal=True, skiptest=True)
 
 
@@ -200,7 +200,7 @@ class SidWrap:
         self.freq_scaler = self.clock_freq / 16777216
 
         if cia:
-            self.clockq = int(self.clock_freq / cia)
+            self.clockq = cia
         else:
             self.clockq = self.raster_lines * self.cycles_per_line
         self.int_freq = self.clock_freq / self.clockq
@@ -529,7 +529,8 @@ def split_vdf(sid, df, near=16, guard=96, maxprspeed=8):
         logging.debug('pr_speeds for voice %u: %s', v, sorted(pr_speeds))
         pr_speeds = v_df.reset_index()[['ssf', 'pr_speed']].groupby('pr_speed')['ssf'].nunique().to_dict()
         sorted_pr_speeds = sorted(pr_speeds.items(), key=lambda x: x[1], reverse=True)
-        logging.debug('min/mean/max rate %u/%u/%u for voice %u (counts %s)',
+        # handle NaN
+        logging.debug('min/mean/max rate %s/%s/%s for voice %u (counts %s)',
             v_df['rate'].min(), v_df['rate'].mean(), v_df['rate'].max(), v, sorted_pr_speeds)
 
         v_df['clock'] -= v_df['clock_start']
@@ -562,20 +563,19 @@ def jittermatch_df(df1, df2, jitter_col, jitter_max):
     return False
 
 
-def ssf_start_duration(sid, ssf_df):
+def ssf_duration(sid, ssf_df):
     clock_duration = ssf_df['clock'].max() + sid.clockq
     next_clock_start = ssf_df['next_clock_start'].iat[-1]
     clock_start = ssf_df['clock_start'].iat[-1]
 
-
     if pd.notna(next_clock_start):
         if next_clock_start > clock_start:
             clock_duration = next_clock_start - clock_start - 1
-    return (clock_start, clock_duration)
+    return clock_duration
 
 
 def pad_ssf_duration(sid, ssf_df):
-    clock_start, clock_duration = ssf_start_duration(sid, ssf_df)
+    clock_duration = ssf_duration(sid, ssf_df)
     last_row_df = ssf_df[-1:].copy()
     last_row_df['clock'] = clock_duration
     last_row_df = last_row_df.astype(ssf_df.dtypes.to_dict())
@@ -584,12 +584,12 @@ def pad_ssf_duration(sid, ssf_df):
     return ssf_df
 
 
-def state2ssfs(sid, df):
+def state2ssfs(sid, df, maxprspeed):
     ssf_log = []
     ssf_dfs = {}
     ssf_count = defaultdict(int)
 
-    for v, v_df in split_vdf(sid, df):
+    for v, v_df in split_vdf(sid, df, maxprspeed=maxprspeed):
         ssfs = v_df['ssf'].nunique()
         voice_ssfs = set()
         logging.debug('splitting %u SSFs for voice %u', ssfs, v)

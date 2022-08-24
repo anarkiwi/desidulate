@@ -30,6 +30,7 @@ playlist_re = re.compile(r'\d+/\d+ \(tune (\d+)/(\d+)\[(\d+)\]\)')
 tunename_re = re.compile(r'^; (.+.sid)$')
 tunelength_re = re.compile(r'([a-z\d]+)=([\d+\s+\:\.]+)$')
 tunelength_time_re = re.compile(r'(\d+)\:(\d+)\.*(\d*)$')
+ciatimer_re = re.compile(r'timerA(Lo|Hi): (\d+)$')
 
 
 def scrape_sidinfo(sidfile, all_tunelengths, tmpdir):
@@ -48,8 +49,12 @@ def scrape_sidinfo(sidfile, all_tunelengths, tmpdir):
         'md5': md5_hash,
     }
     tmpfile = os.path.join(tmpdir, os.path.basename(sidfile))
-    cmd = ['/usr/bin/prlimit', '-c0', '-f0', '-t1',
-           '/usr/bin/sidplayfp', '-w%s' % tmpfile, '-t1', '-v', str(sidfile)]
+    cmd = ['/usr/bin/prlimit', '-c0', '-f0', '-t2',
+           '/usr/local/bin/sidplayfp',
+           '-w%s' % tmpfile,
+           '-t1', '-v', str(sidfile)]
+    ciatimerregs = {'Hi': 0, 'Lo': 0}
+
     with subprocess.Popen(cmd,
             stdin=subprocess.DEVNULL,
             stdout=subprocess.DEVNULL,
@@ -58,6 +63,12 @@ def scrape_sidinfo(sidfile, all_tunelengths, tmpdir):
             errors='ignore') as process:
         _, err = process.communicate()
         for line in err.splitlines():
+            ciatimer_match = ciatimer_re.match(line.strip())
+            if ciatimer_match:
+                reg, value = ciatimer_match.group(1).strip(), int(ciatimer_match.group(2).strip())
+                ciatimerregs[reg] = value
+                continue
+
             fields_match = fields_re.match(line.strip())
             if not fields_match:
                 continue
@@ -100,6 +111,7 @@ def scrape_sidinfo(sidfile, all_tunelengths, tmpdir):
             result[field] = val
     speed = result.get('SongSpeed', '')
     result['pal'] = int('PAL' in speed)
+    result['ciatimer'] = ciatimerregs['Hi'] * 256 + ciatimerregs['Lo']
     int_result = {}
     for field, val in result.items():
         if isinstance(val, str):
