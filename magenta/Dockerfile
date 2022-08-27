@@ -11,7 +11,8 @@ RUN apt-get update && apt-get install --no-install-recommends -yq \
     gpg-agent \
     python3-pip \
     libsndfile1 \
-    ffmpeg
+    ffmpeg \
+    libasound2-dev
 RUN add-apt-repository -y ppa:deadsnakes/ppa
 RUN apt-get install -yq python3.8-dev python3.8-full
 WORKDIR /root
