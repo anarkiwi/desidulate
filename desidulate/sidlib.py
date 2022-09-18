@@ -125,7 +125,7 @@ def timer_args(parser):
     video_parser = parser.add_mutually_exclusive_group(required=False)
     video_parser.add_argument('--pal', dest='pal', action='store_true', help='Use PAL clock')
     video_parser.add_argument('--ntsc', dest='pal', action='store_false', help='Use NTSC clock')
-    parser.add_argument('--cia', default=0, type=float, help='If > 0, use CIA timer in ')
+    parser.add_argument('--cia', default=0, type=float, help='If > 0, use CIA timer in cycles')
     parser.set_defaults(pal=True, skiptest=True)
 
 
