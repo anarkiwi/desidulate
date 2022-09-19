@@ -198,12 +198,14 @@ class SidWrap:
             self.raster_lines = 263
             self.cycles_per_line = 65
         self.freq_scaler = self.clock_freq / 16777216
+        self.video_clockq = self.raster_lines * self.cycles_per_line
 
         if cia:
             self.clockq = cia
         else:
-            self.clockq = self.raster_lines * self.cycles_per_line
+            self.clockq = self.video_clockq
         self.int_freq = self.clock_freq / self.clockq
+        self.vid_int_freq = self.video_clockq / self.clockq
 
         logging.info('using PR frequency %f Hz (%u cycles)', self.int_freq, self.clockq)
         self.resid = SoundInterfaceDevice(

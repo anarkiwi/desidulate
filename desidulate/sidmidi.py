@@ -41,7 +41,7 @@ CYMBAL_DRUMS = [PEDAL_HIHAT, CLOSED_HIHAT, OPEN_HIHAT, ACCOUSTIC_SNARE, ELECTRIC
 
 def midi_args(parser):
     timer_args(parser)
-    parser.add_argument('--bpm', default=None, type=int, help='MIDI BPM (default derive from int. frequency)')
+    parser.add_argument('--bpm', default=None, type=int, help='MIDI BPM (default derive from video int. frequency)')
     parser.add_argument('--percussion', dest='percussion', action='store_true')
     parser.add_argument('--no-percussion', dest='percussion', action='store_false')
     parser.set_defaults(pal=True, percussion=True)
@@ -118,7 +118,7 @@ class SidMidiFile:
     def __init__(self, sid, bpm=None, program=81, drum_program=0):
         self.sid = sid
         if bpm is None:
-            bpm = bpm_from_int(sid.int_freq)
+            bpm = bpm_from_int(sid.vid_int_freq)
         self.bpm = bpm
         self.program = program
         self.drum_program = drum_program
