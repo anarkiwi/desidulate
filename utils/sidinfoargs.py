@@ -18,7 +18,8 @@ if args.filter:
     filter_re = re.compile(args.filter)
 
 timerflag = {0: 'ntsc', 1: 'pal'}
-df = pd.read_csv('sidinfo.csv', usecols=['path', 'pal', 'Playspeed'])
+df = pd.read_csv('sidinfo.csv', usecols=['path', 'magicID', 'sids', 'pal', 'cia'])
+df = df[(df.magicID == 'PSID') & (df.sids == 1)]
 outputs = []
 for row in df.itertuples():
     filename = os.path.normpath(row.path)
@@ -32,9 +33,8 @@ for row in df.itertuples():
     except OSError:
         continue
     if args.timer:
-        cia = 'CIA' in row.Playspeed
-        if cia:
-            cia = 60
+        if row.cia:
+            cia = row.cia
         else:
             cia = 0
         sidinfo_args = ' '.join(['--%s' % timerflag[row.pal], '--cia=%u' % cia, filename])

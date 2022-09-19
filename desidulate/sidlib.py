@@ -125,7 +125,7 @@ def timer_args(parser):
     video_parser = parser.add_mutually_exclusive_group(required=False)
     video_parser.add_argument('--pal', dest='pal', action='store_true', help='Use PAL clock')
     video_parser.add_argument('--ntsc', dest='pal', action='store_false', help='Use NTSC clock')
-    parser.add_argument('--cia', default=0, type=float, help='If > 0, use CIA timer in Hz')
+    parser.add_argument('--cia', default=0, type=float, help='If > 0, use CIA timer in cycles')
     parser.set_defaults(pal=True, skiptest=True)
 
 
@@ -200,7 +200,7 @@ class SidWrap:
         self.freq_scaler = self.clock_freq / 16777216
 
         if cia:
-            self.clockq = int(self.clock_freq / cia)
+            self.clockq = cia
         else:
             self.clockq = self.raster_lines * self.cycles_per_line
         self.int_freq = self.clock_freq / self.clockq
@@ -584,12 +584,12 @@ def pad_ssf_duration(sid, ssf_df):
     return ssf_df
 
 
-def state2ssfs(sid, df):
+def state2ssfs(sid, df, maxprspeed=8):
     ssf_log = []
     ssf_dfs = {}
     ssf_count = defaultdict(int)
 
-    for v, v_df in split_vdf(sid, df):
+    for v, v_df in split_vdf(sid, df, maxprspeed=maxprspeed):
         ssfs = v_df['ssf'].nunique()
         voice_ssfs = set()
         logging.debug('splitting %u SSFs for voice %u', ssfs, v)
