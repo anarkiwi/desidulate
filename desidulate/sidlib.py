@@ -203,9 +203,9 @@ class SidWrap:
         if cia:
             self.clockq = cia
         else:
-            self.clockq = video_clockq
+            self.clockq = self.video_clockq
         self.int_freq = self.clock_freq / self.clockq
-        self.vid_int_freq = video_clockq / self.clockq
+        self.vid_int_freq = self.video_clockq / self.clockq
 
         logging.info('using PR frequency %f Hz (%u cycles)', self.int_freq, self.clockq)
         self.resid = SoundInterfaceDevice(
