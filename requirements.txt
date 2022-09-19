@@ -1,4 +1,4 @@
-music21==7.3.3
+music21==8.1.0
 numpy==1.23.3
 pandas==1.4.4
 pyarrow==9.0.0
