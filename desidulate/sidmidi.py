@@ -4,6 +4,7 @@
 
 ## The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 
+import logging
 from collections import defaultdict
 from functools import lru_cache
 from music21 import midi
@@ -119,6 +120,7 @@ class SidMidiFile:
         self.sid = sid
         if bpm is None:
             bpm = bpm_from_int(sid.vid_int_freq)
+            logging.info('using %f BPM (video int. freq %fHz)', bpm, sid.vid_int_freq)
         self.bpm = bpm
         self.program = program
         self.drum_program = drum_program
