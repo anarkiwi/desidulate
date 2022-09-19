@@ -102,7 +102,7 @@ def main():
     for pr_speed_waveforms, dfs in df_raws.items():
         pr_speed, waveforms = pr_speed_waveforms
         df = pd.DataFrame(dfs, dtype=pd.Int64Dtype()).set_index('hashid')
-        nacols = [col for col in df.columns if df[col].isnull().all() or df[col].max() == 0]
+        nacols = [col for col in df.columns if df[col].isnull().all() or df[col].max() == 0]  # pylint: disable=unsubscriptable-object
         df.drop(nacols, axis=1, inplace=True)
         df.drop_duplicates(inplace=True)
         outfile = out_path(args.ssffile, 'resample_ssf.%u.%s.xz' % (pr_speed, waveforms))
