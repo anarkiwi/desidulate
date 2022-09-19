@@ -584,12 +584,12 @@ def pad_ssf_duration(sid, ssf_df):
     return ssf_df
 
 
-def state2ssfs(sid, df):
+def state2ssfs(sid, df, maxprspeed=8):
     ssf_log = []
     ssf_dfs = {}
     ssf_count = defaultdict(int)
 
-    for v, v_df in split_vdf(sid, df):
+    for v, v_df in split_vdf(sid, df, maxprspeed=maxprspeed):
         ssfs = v_df['ssf'].nunique()
         voice_ssfs = set()
         logging.debug('splitting %u SSFs for voice %u', ssfs, v)
