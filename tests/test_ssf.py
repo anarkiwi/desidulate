@@ -84,7 +84,7 @@ class SSFTestCase(unittest.TestCase):
                 self.assertEqual(row.voice, 2)
             self.assertTrue(ssf is not None)
             if ssf:
-                ssf.smf_transcribe(smf, 0, 1)
+                ssf.smf_transcribe(smf, 0, 1, ssf.total_duration)
                 smf.write(os.devnull)
                 self.assertEqual(ssf.midi_pitches, (95,))
                 self.assertEqual(ssf.total_duration, 117936)

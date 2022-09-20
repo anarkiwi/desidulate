@@ -143,11 +143,15 @@ class SidSoundFragment:
 
         self._set_nondrum_pitches()
 
-    def smf_transcribe(self, smf, first_clock, voicenum):
+    def smf_transcribe(self, smf, first_clock, voicenum, total_duration):
         for clock, duration, pitch, velocity in self.pitches:
+            if pd.notna(total_duration) and clock > total_duration:
+                break
             smf.add_pitch(voicenum, first_clock + clock, duration, pitch, velocity)
         if self.percussion:
             for clock, duration, pitch, velocity in self.drum_pitches:
+                if pd.notna(total_duration) and clock > total_duration:
+                    break
                 smf.add_drum_pitch(voicenum, first_clock + clock, duration, pitch, velocity)
 
     def instrument(self, base_instrument):
