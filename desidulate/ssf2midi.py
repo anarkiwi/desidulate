@@ -85,7 +85,7 @@ def main():
             ssf = SidSoundFragment(args.percussion, sid, ssf_df, smf, wav_file=wav_file)
             ssf_cache[row.hashid] = ssf
             ssf_instruments.append(ssf.instrument({'hashid': row.hashid}))
-        ssf.smf_transcribe(smf, row.clock, row.voice)
+        ssf.smf_transcribe(smf, row.clock, row.voice, row.duration)
 
     ssf_instrument_file = out_path(args.ssflogfile, '.'.join(('inst.txt', args.dfext)))
     ssf_instrument_df = pd.DataFrame(ssf_instruments)
