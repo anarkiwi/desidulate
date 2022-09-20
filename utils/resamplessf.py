@@ -49,7 +49,7 @@ def resample():
     meta_cols = set(df.columns) - sid_cols
     meta_cols -= {'clock'}
 
-    for hashid, ssf_df in df.groupby(['hashid']):  # pylint: disable=no-member
+    for hashid, ssf_df in df.groupby('hashid'):  # pylint: disable=no-member
         vol_changes = col_diffs(ssf_df['vol'])
         test_changes = col_diffs(ssf_df['test1'])
         if vol_changes > 2 or test_changes > 2:
@@ -68,7 +68,7 @@ def resample():
             if pre_waveforms[0] == '0':
                 pre_waveforms = pre_waveforms[1:]
         if pre_waveforms != waveforms:
-            print(hashid)
+            print(args.ssffile, hashid)
             print(pre_waveforms)
             print(waveforms)
             orig = ssf_df.reset_index(drop=True).set_index('clock').drop(['hashid', 'hashid_noclock'], axis=1)

@@ -343,11 +343,9 @@ def coalesce_near_writes(vdf, cols, near=16):
 
 
 def calc_pr_frames(ssf_df, sid):
-    pr_speed_q = (sid.clockq / ssf_df['pr_speed']).astype(pd.Int32Dtype())
-    orig_clock = ssf_df['clock'] + ssf_df['clock_start']
-    ssf_df['pr_frame'] = orig_clock.floordiv(pr_speed_q).astype(pd.Int32Dtype())
-    ssf_df['pr_frame'] -= ssf_df['pr_frame'].min()
-    ssf_df.loc[ssf_df['pr_speed'] == 0, 'pr_frame'] = 0
+    pr_speed = ssf_df['pr_speed'].clip(lower=1)
+    pr_speed_q = (sid.clockq / pr_speed).astype(pd.Int32Dtype())
+    ssf_df['pr_frame'] = ssf_df['clock'].floordiv(pr_speed_q).astype(pd.Int32Dtype())
     return ssf_df
 
 
@@ -598,7 +596,7 @@ def state2ssfs(sid, df, maxprspeed=8):
         for hashid_noclock_pr_speed, hashid_noclock_df in v_df.groupby(['hashid_noclock', 'pr_speed'], sort=False):
             hashid_noclock, pr_speed = hashid_noclock_pr_speed
             hashid = hash((hashid_noclock, pr_speed))
-            group_ssf_dfs = [ssf_df for _, ssf_df in hashid_noclock_df.groupby(['ssf'], sort=True)]
+            group_ssf_dfs = [ssf_df for _, ssf_df in hashid_noclock_df.groupby('ssf', sort=True)]
             ssf_df = group_ssf_dfs[0]
             ssf_dfs[hashid] = pad_ssf_duration(sid, ssf_df)
             ssf_count[hashid] += len(group_ssf_dfs)
