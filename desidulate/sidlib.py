@@ -342,10 +342,12 @@ def coalesce_near_writes(vdf, cols, near=16):
     return vdf
 
 
-def calc_pr_frames(ssf_df, sid):
+def calc_pr_frames(ssf_df, sid, first_clock_start):
     pr_speed = ssf_df['pr_speed'].clip(lower=1)
     pr_speed_q = (sid.clockq / pr_speed).astype(pd.Int32Dtype())
-    ssf_df['pr_frame'] = ssf_df['clock'].floordiv(pr_speed_q).astype(pd.Int32Dtype())
+    pr_clock = ssf_df['clock'] + ssf_df['clock_start'] - first_clock_start
+    ssf_df['pr_frame'] = pr_clock.floordiv(pr_speed_q).astype(pd.Int32Dtype())
+    ssf_df['pr_frame'] -= ssf_df['pr_frame'].min()
     return ssf_df
 
 
@@ -567,20 +569,19 @@ def ssf_start_duration(sid, ssf_df):
     next_clock_start = ssf_df['next_clock_start'].iat[-1]
     clock_start = ssf_df['clock_start'].iat[-1]
 
-
     if pd.notna(next_clock_start):
         if next_clock_start > clock_start:
             clock_duration = next_clock_start - clock_start - 1
     return (clock_start, clock_duration)
 
 
-def pad_ssf_duration(sid, ssf_df):
+def pad_ssf_duration(sid, ssf_df, first_clock_duration):
     clock_start, clock_duration = ssf_start_duration(sid, ssf_df)
     last_row_df = ssf_df[-1:].copy()
     last_row_df['clock'] = clock_duration
     last_row_df = last_row_df.astype(ssf_df.dtypes.to_dict())
     ssf_df = pd.concat([ssf_df, last_row_df], ignore_index=True).reset_index(drop=True)
-    ssf_df = calc_pr_frames(ssf_df, sid).drop(['ssf', 'clock_start', 'next_clock_start'], axis=1)
+    ssf_df = calc_pr_frames(ssf_df, sid, first_clock_duration).drop(['ssf', 'clock_start', 'next_clock_start'], axis=1)
     return ssf_df
 
 
@@ -593,12 +594,13 @@ def state2ssfs(sid, df, maxprspeed=8):
         ssfs = v_df['ssf'].nunique()
         voice_ssfs = set()
         logging.debug('splitting %u SSFs for voice %u', ssfs, v)
+        first_clock_start = int(v_df['clock_start'].iat[0] / sid.clockq) * sid.clockq
         for hashid_noclock_pr_speed, hashid_noclock_df in v_df.groupby(['hashid_noclock', 'pr_speed'], sort=False):
             hashid_noclock, pr_speed = hashid_noclock_pr_speed
             hashid = hash((hashid_noclock, pr_speed))
             group_ssf_dfs = [ssf_df for _, ssf_df in hashid_noclock_df.groupby('ssf', sort=True)]
             ssf_df = group_ssf_dfs[0]
-            ssf_dfs[hashid] = pad_ssf_duration(sid, ssf_df)
+            ssf_dfs[hashid] = pad_ssf_duration(sid, ssf_df, first_clock_start)
             ssf_count[hashid] += len(group_ssf_dfs)
             clock_starts = [ssf_df['clock_start'].iat[0] for ssf_df in group_ssf_dfs]
             ssf_log.extend([{'clock': clock_start, 'hashid': hashid, 'voice': v} for clock_start in clock_starts])
