@@ -17,7 +17,6 @@ MIN_VEL = 32
 VEL_RANGE = MAX_VEL - MIN_VEL
 MIDI_N_TO_F = {n: (A / 32) * (2 ** ((n - 9) / 12)) for n in range(128)}
 MIDI_F_TO_N = {f: n for n, f in MIDI_N_TO_F.items()}
-DRUM_CHANNEL = 10
 VOICES = 3
 
 # https://en.wikipedia.org/wiki/General_MIDI#Percussion
@@ -38,6 +37,9 @@ HIGHEST_MEMBRANE_HZ = 400
 MEMBRANE_DRUMS = [KICK_DRUM, BASS_DRUM, LOW_TOM, LOW_MID_TOM, HIGH_MID_TOM, HIGH_TOM]
 MEMBRANE_DRUM_MAP = [(drum, int(i * (HIGHEST_MEMBRANE_HZ / len(MEMBRANE_DRUMS)))) for i, drum in enumerate(MEMBRANE_DRUMS, start=1)]
 CYMBAL_DRUMS = [PEDAL_HIHAT, CLOSED_HIHAT, OPEN_HIHAT, ACCOUSTIC_SNARE, ELECTRIC_SNARE]
+
+BASS_SPLIT_PITCH = 60
+DRUM_CHANNEL = 10
 
 
 def midi_args(parser):
@@ -116,13 +118,14 @@ def compand_velocity(velocity):
 
 class SidMidiFile:
 
-    def __init__(self, sid, bpm=None, program=81, drum_program=0):
+    def __init__(self, sid, bpm=None, lead_program=81, bass_program=39, drum_program=0):
         self.sid = sid
         if bpm is None:
             bpm = bpm_from_int(sid.vid_int_freq)
             logging.info('using %f BPM (video int. freq %fHz)', bpm, sid.vid_int_freq)
         self.bpm = bpm
-        self.program = program
+        self.lead_program = lead_program
+        self.bass_program = bass_program
         self.drum_program = drum_program
         self.pitches = defaultdict(list)
         self.drum_pitches = defaultdict(list)
@@ -218,7 +221,19 @@ class SidMidiFile:
 
         for voicenum, voice_pitch_data in self.pitches.items():
             if voice_pitch_data:
-                track_pitches.append((None, self.program, voice_pitch_data))
+                bass_pitch_data = []
+                lead_pitch_data = []
+                for pitch_data in voice_pitch_data:
+                    clock, duration, pitch, velocity = pitch_data
+                    if pitch < BASS_SPLIT_PITCH:
+                        bass_pitch_data.append(pitch_data)
+                    else:
+                        lead_pitch_data.append(pitch_data)
+                for program, pitch_data in (
+                        (self.lead_program, lead_pitch_data),
+                        (self.bass_program, bass_pitch_data)):
+                    if pitch_data:
+                        track_pitches.append((None, program, pitch_data))
         for voicenum, voice_pitch_data in self.drum_pitches.items():
             if voice_pitch_data:
                 track_pitches.append((DRUM_CHANNEL, self.drum_program, voice_pitch_data))
