@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 
 from desidulate.fileio import out_path, read_csv
-from desidulate.sidlib import df_waveform_order, resampledf_to_pr, timer_args, get_sid, ADSR_COLS
+from desidulate.sidlib import df_waveform_order, resampledf_to_pr, hash_vdf, timer_args, get_sid, ADSR_COLS
 
 parser = argparse.ArgumentParser(description='Downsample SSFs to frames')
 parser.add_argument('ssffile', help='SSF file')
@@ -48,6 +48,7 @@ def resample():
     df['clockrq'] = df['clock'].floordiv(clockrq)
     meta_cols = set(df.columns) - sid_cols
     meta_cols -= {'clock'}
+    meta_cols.add('resample_hashid_noclock')
 
     for hashid, ssf_df in df.groupby('hashid'):  # pylint: disable=no-member
         vol_changes = col_diffs(ssf_df['vol'])
@@ -61,6 +62,7 @@ def resample():
         pre_waveforms = df_waveform_order(ssf_df)
         resample_df = ssf_df.reset_index(drop=True).set_index('clock')
         resample_df = resampledf_to_pr(resample_df)
+        resample_df = hash_vdf(resample_df, sid_cols, hashid='resample_hashid_noclock', ssf='hashid')
         cols = (set(resample_df.columns) - meta_cols)
         df_raw = {col: resample_df[col].iat[-1] for col in meta_cols - {'pr_frame'}}
         waveforms = df_waveform_order(resample_df)
