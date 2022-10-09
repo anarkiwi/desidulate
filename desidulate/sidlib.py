@@ -351,6 +351,18 @@ def calc_pr_frames(ssf_df, sid, first_clock_start):
     return ssf_df
 
 
+def hash_vdf(vdf, non_meta_cols, hashid='hashid_noclock', ssf='ssf'):
+    meta_cols = set(vdf.columns) - non_meta_cols
+    uniq = vdf.drop(list(meta_cols), axis=1).drop_duplicates(ignore_index=True)
+    merge_cols = list(uniq.columns)
+    uniq['row_hash'] = uniq.apply(hash_tuple, axis=1)
+    logging.debug('%u unique voice states', len(uniq))
+    vdf = vdf.merge(uniq, how='left', on=merge_cols)
+    vdf[hashid] = vdf.groupby([ssf], sort=False)['row_hash'].transform(hash_tuple).astype(np.int64)
+    vdf.drop(['row_hash'], inplace=True, axis=1)
+    return vdf
+
+
 def split_vdf(sid, df, near=16, guard=96, maxprspeed=8):
     fltcols = [col for col in df.columns if col.startswith('flt') and not col[-1].isdigit()]
     mod_cols = ['freq3', 'test3', 'sync1', 'ring1']
@@ -386,17 +398,6 @@ def split_vdf(sid, df, near=16, guard=96, maxprspeed=8):
                 col = ''.join((prefix, suffix))
             new_cols.append(col)
         return new_cols
-
-    def hash_vdf(vdf, non_meta_cols):
-        meta_cols = set(vdf.columns) - non_meta_cols
-        uniq = vdf.drop(list(meta_cols), axis=1).drop_duplicates(ignore_index=True)
-        merge_cols = list(uniq.columns)
-        uniq['row_hash'] = uniq.apply(hash_tuple, axis=1)
-        logging.debug('%u unique voice states', len(uniq))
-        vdf = vdf.merge(uniq, how='left', on=merge_cols)
-        vdf['hashid_noclock'] = vdf.groupby(['ssf'], sort=False)['row_hash'].transform(hash_tuple).astype(np.int64)
-        vdf.drop(['row_hash'], inplace=True, axis=1)
-        return vdf
 
     df = set_sid_dtype(df)
     df = coalesce_near_writes(df, ('fltcoff',), near=near)
