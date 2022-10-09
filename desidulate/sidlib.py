@@ -351,6 +351,10 @@ def calc_pr_frames(ssf_df, sid, first_clock_start):
     return ssf_df
 
 
+def hash_tuple(s):
+    return hash(tuple(s))
+
+
 def hash_vdf(vdf, non_meta_cols, hashid='hashid_noclock', ssf='ssf'):
     meta_cols = set(vdf.columns) - non_meta_cols
     uniq = vdf.drop(list(meta_cols), axis=1).drop_duplicates(ignore_index=True)
@@ -366,9 +370,6 @@ def hash_vdf(vdf, non_meta_cols, hashid='hashid_noclock', ssf='ssf'):
 def split_vdf(sid, df, near=16, guard=96, maxprspeed=8):
     fltcols = [col for col in df.columns if col.startswith('flt') and not col[-1].isdigit()]
     mod_cols = ['freq3', 'test3', 'sync1', 'ring1']
-
-    def hash_tuple(s):
-        return hash(tuple(s))
 
     def v_cols(v):
         sync_map = {
