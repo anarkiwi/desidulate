@@ -113,7 +113,7 @@ SID_HEADERS = (
 
 
 def scrape_cia_timer(sidfile, cutoff_time=1):
-    siddir = os.path.dirname(sidfile)
+    siddir = os.path.realpath(os.path.dirname(sidfile))
     cmd = ['docker', 'run', '--rm', '-v', f'{siddir}:/tmp', SIDPLAYFP_IMAGE,
             f'-t{cutoff_time}', '-q', '--none', '--cpu-debug',
             os.path.join('tmp', os.path.basename(sidfile))]
@@ -150,11 +150,11 @@ def scrape_cia_timer(sidfile, cutoff_time=1):
             else:
                 timer_high = val
         process.terminate()
+    if not instructions:
+        raise ValueError('saw no instructions')
     timer = (timer_high << 8) + timer_low
     if not timer:
         raise ValueError('CIA timer 0')
-    if not instructions:
-        raise ValueError('saw no instructions')
     return timer
 
 
@@ -185,7 +185,6 @@ def sidinfo(sidfile):
         decoded['cia'] = 1
     else:
         decoded['cia'] = int(decoded['speed'] == 'CIA')
-
     if decoded['cia']:
         decoded['cia'] = scrape_cia_timer(sidfile)
 
