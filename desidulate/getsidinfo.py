@@ -1,11 +1,16 @@
 #!/usr/bin/python3
 
+import argparse
 import sys
 from desidulate.sidinfo import sidinfo
 
 
 def main():
-    for f in sys.argv[1:]:
+    parser = argparse.ArgumentParser()
+    parser.add_argument('sidfile', nargs='+')
+    args = parser.parse_args()
+
+    for f in args.sidfile:
         print(sidinfo(f))
 
 

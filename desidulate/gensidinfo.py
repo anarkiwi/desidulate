@@ -79,9 +79,9 @@ def scrape_tunelengths(tunelengthfile):
     return all_tunelengths
 
 
-def scrape_sids():
-    current = pathlib.Path(r'.')
-    currentdocs = pathlib.Path(r'./C64Music/DOCUMENTS')
+def scrape_sids(hvscdir):
+    current = pathlib.Path(hvscdir)
+    currentdocs = pathlib.Path(os.path.join(current, 'C64Music/DOCUMENTS'))
     sidfiles = [sidfile for sidfile in sorted(current.rglob(r'*.sid'))]
     random.shuffle(sidfiles)
     logging.info('scraping %u sidfiles', len(sidfiles))
@@ -117,14 +117,17 @@ def scrape_sids():
         df = df.drop(drops, axis=1)
 
     df = df[non_tunelengths + sorted(tunelengths)]
-
     return df
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--hvscdir', default='.', type=str)
+    args = parser.parse_args()
+
     logging.basicConfig(level=logging.DEBUG)
-    df = scrape_sids()
-    df.to_csv('sidinfo.csv', index=False, quoting=csv.QUOTE_NONNUMERIC)
+    df = scrape_sids(args.hvscdir)
+    df.to_csv(os.path.join((args.hvscdir, 'sidinfo.csv'), index=False, quoting=csv.QUOTE_NONNUMERIC)
 
 
 if __name__ == '__main__':
