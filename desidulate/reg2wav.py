@@ -12,6 +12,7 @@ from desidulate.fileio import wav_path
 from desidulate.sidlib import get_sid, reg2state, timer_args
 from desidulate.sidwav import state2samples, write_wav
 
+
 def main():
     logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
 
