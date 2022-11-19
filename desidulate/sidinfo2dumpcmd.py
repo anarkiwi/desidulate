@@ -2,7 +2,6 @@
 
 import argparse
 import os
-import sys
 from pyresidfp import SoundInterfaceDevice
 import pandas as pd
 from desidulate.fileio import read_csv
@@ -16,7 +15,6 @@ def main():
     parser.add_argument('sidinfo', type=str)
     args = parser.parse_args()
 
-    csv = sys.argv[1]
     df = read_csv(args.sidinfo)
     cwd = os.getcwd()
 

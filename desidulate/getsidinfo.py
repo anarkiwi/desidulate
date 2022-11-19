@@ -1,7 +1,6 @@
 #!/usr/bin/python3
 
 import argparse
-import sys
 from desidulate.sidinfo import sidinfo
 
 
