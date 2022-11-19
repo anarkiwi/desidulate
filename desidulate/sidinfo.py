@@ -108,7 +108,7 @@ SID_HEADERS = (
         # +7A    BYTE secondSIDAddress
         ('secondSIDAddress', 'B', intdecode),
         # +7B    BYTE thirdSIDAddress
-        ('thirdSIDAddresss', 'B', intdecode),
+        ('thirdSIDAddress', 'B', intdecode),
 )
 
 
@@ -176,7 +176,7 @@ def sidinfo(sidfile):
     decoded['pal'] = int('PAL' in decoded['clock'])
 
     decoded['sids'] = 1
-    for sid in ('secondSIDAddress', 'thirdSIDAddresss'):
+    for sid in ('secondSIDAddress', 'thirdSIDAddress'):
         if decoded[sid]:
             decoded['sids'] += 1
 
