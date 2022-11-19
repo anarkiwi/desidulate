@@ -125,7 +125,7 @@ def main():
     parser.add_argument('--hvscdir', default='.', type=str)
     args = parser.parse_args()
 
-    logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=logging.INFO)
     df = scrape_sids(args.hvscdir)
     df.to_csv(os.path.join(args.hvscdir, 'sidinfo.csv'), index=False, quoting=csv.QUOTE_NONNUMERIC)
 
