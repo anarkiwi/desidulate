@@ -120,6 +120,12 @@ def scrape_sids():
 
     return df
 
-logging.basicConfig(level=logging.DEBUG)
-df = scrape_sids()
-df.to_csv('sidinfo.csv', index=False, quoting=csv.QUOTE_NONNUMERIC)
+
+def main():
+    logging.basicConfig(level=logging.DEBUG)
+    df = scrape_sids()
+    df.to_csv('sidinfo.csv', index=False, quoting=csv.QUOTE_NONNUMERIC)
+
+
+if __name__ == '__main__':
+    main()
