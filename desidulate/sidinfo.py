@@ -128,15 +128,15 @@ def scrape_cia_timer(sidfile, cutoff_time=1):
         remove=True, stdout=True, detach=True,
         volumes=[f'{siddir}:/tmp:ro'],
         ulimits=[docker.types.Ulimit(name='cpu', hard=(cutoff_time*2))])
-    for line in sidplayfp.logs(stream=True):
+    for line in sidplayfp.logs(stream=True, stdout=True, stderr=False):
         line = line.decode('utf8').strip()
         if not line:
             continue
         match = INSTRUCTION_RE.match(line)
         if match:
             instructions = int(match.group(1))
-            if instructions > instruction_cutoff:
-                break
+            continue
+        if instructions > instruction_cutoff:
             continue
         match = CIA_TIMER_RE.match(line)
         if not match:
@@ -150,6 +150,7 @@ def scrape_cia_timer(sidfile, cutoff_time=1):
             timer_low = val
         else:
             timer_high = val
+    client.close()
     if not instructions:
         raise ValueError('saw no instructions')
     timer = (timer_high << 8) + timer_low
