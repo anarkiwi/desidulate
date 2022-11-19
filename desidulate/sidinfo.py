@@ -114,7 +114,7 @@ SID_HEADERS = (
 
 def scrape_cia_timer(sidfile, cutoff_time=1):
     siddir = os.path.realpath(os.path.dirname(sidfile))
-    cmd = ['docker', 'run', '--rm', '-v', f'{siddir}:/tmp', SIDPLAYFP_IMAGE,
+    cmd = ['docker', 'run', '-i', '--rm', '-v', f'{siddir}:/tmp', SIDPLAYFP_IMAGE,
             f'-t{cutoff_time}', '-q', '--none', '--cpu-debug',
             os.path.join('tmp', os.path.basename(sidfile))]
     timer_low = 0
