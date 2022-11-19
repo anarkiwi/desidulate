@@ -1,17 +1,17 @@
 #!/usr/bin/python3
 
 # https://hvsc.c64.org/download/C64Music/DOCUMENTS/SID_file_format.txt
-
 import os
 import re
-import subprocess
 import struct
+import time
+import docker
 import pandas as pd
 
 
 SIDPLAYFP_IMAGE = 'anarkiwi/sidplayfp'
 CIA_TIMER_RE = re.compile('^.+\s+ST([AXY])a\s+dc0([45])$')
-INSTRUCTION_RE = re.compile('^.+Instruction\s+\(\d+\)$')
+INSTRUCTION_RE = re.compile('^.+Instruction\s+\((\d+)\)$')
 
 
 def intdecode(_, x):
@@ -114,43 +114,42 @@ SID_HEADERS = (
 
 def scrape_cia_timer(sidfile, cutoff_time=1):
     siddir = os.path.realpath(os.path.dirname(sidfile))
-    cmd = ['docker', 'run', '--rm', '-v', f'{siddir}:/tmp:ro', '--ulimit', 'cpu=10', SIDPLAYFP_IMAGE,
-            f'-t{cutoff_time}', '-q', '--none', '--cpu-debug', '--delay=0',
-            os.path.join('tmp', os.path.basename(sidfile))]
+    client = docker.from_env()
     timer_low = 0
     timer_high = 0
     instruction_cutoff = cutoff_time * 1e6 / 2
     instructions = 0
-
-    with subprocess.Popen(cmd,
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-            shell=False,
-            encoding='utf8') as process:
-        while process.poll() is None:
-            line = process.stdout.readline().strip()
-            if not line:
-                continue
-            if INSTRUCTION_RE.match(line):
-                instructions += 1
-                if instructions > instruction_cutoff:
-                    break
-                continue
-            match = CIA_TIMER_RE.match(line)
-            if not match:
-                continue
-            cpu_reg = match.group(1)
-            cia_reg = int(match.group(2))
-            cpu_reg_map = {'A': 2, 'X': 3, 'Y': 4}
-            raw_val = line.split()[cpu_reg_map[cpu_reg]]
-            val = int(raw_val, 16)
-            if cia_reg == 4:
-                timer_low = val
-            else:
-                timer_high = val
-        process.kill()
-        process.wait()
+    # TODO: the defaut tune, only
+    cmd = [
+        f'-t{cutoff_time}', '-q', '--none', '--cpu-debug', '-os', '--delay=0',
+        os.path.join('tmp', os.path.basename(sidfile))]
+    sidplayfp = client.containers.run(
+        SIDPLAYFP_IMAGE, cmd,
+        remove=True, stdout=True, detach=True,
+        volumes=[f'{siddir}:/tmp:ro'],
+        ulimits=[docker.types.Ulimit(name='cpu', hard=(cutoff_time*2))])
+    for line in sidplayfp.logs(stream=True):
+        line = line.decode('utf8').strip()
+        if not line:
+            continue
+        match = INSTRUCTION_RE.match(line)
+        if match:
+            instructions = int(match.group(1))
+            if instructions > instruction_cutoff:
+                break
+            continue
+        match = CIA_TIMER_RE.match(line)
+        if not match:
+            continue
+        cpu_reg = match.group(1)
+        cia_reg = int(match.group(2))
+        cpu_reg_map = {'A': 2, 'X': 3, 'Y': 4}
+        raw_val = line.split()[cpu_reg_map[cpu_reg]]
+        val = int(raw_val, 16)
+        if cia_reg == 4:
+            timer_low = val
+        else:
+            timer_high = val
     if not instructions:
         raise ValueError('saw no instructions')
     timer = (timer_high << 8) + timer_low
