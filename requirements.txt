@@ -1,3 +1,4 @@
+docker==6.0.1
 music21==8.1.0
 numpy==1.23.4
 pandas==1.5.1
