@@ -149,7 +149,7 @@ def scrape_cia_timer(sidfile, cutoff_time=1):
                 timer_low = val
             else:
                 timer_high = val
-        process.terminate()
+        process.kill()
         process.wait()
     if not instructions:
         raise ValueError('saw no instructions')
