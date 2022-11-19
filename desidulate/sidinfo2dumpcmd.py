@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-
+import argparse
 import os
 import sys
 from pyresidfp import SoundInterfaceDevice
@@ -12,8 +12,12 @@ VICEIMAGE = 'anarkiwi/headlessvice'
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('sidinfo', type=str)
+    args = parser.parse_args()
+
     csv = sys.argv[1]
-    df = read_csv(csv)
+    df = read_csv(args.sidinfo)
     cwd = os.getcwd()
 
     for row in df.itertuples():
