@@ -53,7 +53,7 @@ def scrape_sidinfo(sidfile, all_tunelengths):
 def scrape_tunelengths(tunelengthfile):
     all_tunelengths = {}
     tunename = None
-    with open(tunelengthfile) as f:
+    with open(tunelengthfile, encoding='utf8') as f:
         for line in f:
             tunename_match = tunename_re.match(line)
             if tunename_match:
