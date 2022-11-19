@@ -9,6 +9,11 @@ import struct
 import pandas as pd
 
 
+SIDPLAYFP_IMAGE = 'anarkiwi/sidplayfp'
+CIA_TIMER_RE = re.compile('^.+\s+ST([AXY])a\s+dc0([45])$')
+INSTRUCTION_RE = re.compile('^.+Instruction\s+\(\d+\)$')
+
+
 def intdecode(_, x):
     return int(x)
 
@@ -107,6 +112,52 @@ SID_HEADERS = (
 )
 
 
+def scrape_cia_timer(sidfile, cutoff_time=1):
+    siddir = os.path.dirname(sidfile)
+    cmd = ['docker', 'run', '--rm', '-v', f'{siddir}:/tmp', SIDPLAYFP_IMAGE,
+            f'-t{cutoff_time}', '-q', '--none', '--cpu-debug',
+            os.path.join('tmp', os.path.basename(sidfile))]
+    timer_low = 0
+    timer_high = 0
+    instruction_cutoff = cutoff_time * 1e6 / 2
+    instructions = 0
+
+    with subprocess.Popen(cmd,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            shell=False,
+            encoding='utf8') as process:
+        while process.poll() is None:
+            line = process.stdout.readline().strip()
+            if not line:
+                continue
+            if INSTRUCTION_RE.match(line):
+                instructions += 1
+                if instructions > instruction_cutoff:
+                    break
+                continue
+            match = CIA_TIMER_RE.match(line)
+            if not match:
+                continue
+            cpu_reg = match.group(1)
+            cia_reg = int(match.group(2))
+            cpu_reg_map = {'A': 2, 'X': 3, 'Y': 4}
+            raw_val = line.split()[cpu_reg_map[cpu_reg]]
+            val = int(raw_val, 16)
+            if cia_reg == 4:
+                timer_low = val
+            else:
+                timer_high = val
+        process.terminate()
+    timer = (timer_high << 8) + timer_low
+    if not timer:
+        raise ValueError('CIA timer 0')
+    if not instructions:
+        raise ValueError('saw no instructions')
+    return timer
+
+
 def sidinfo(sidfile):
     with open(sidfile, 'rb') as f:
         data = f.read()[:SID_HEADER_LEN]
@@ -122,6 +173,8 @@ def sidinfo(sidfile):
         else:
             decoded[field] = decoded_field
 
+    decoded['pal'] = int('PAL' in decoded['clock'])
+
     decoded['sids'] = 1
     for sid in ('secondSIDAddress', 'thirdSIDAddresss'):
         if decoded[sid]:
@@ -133,36 +186,7 @@ def sidinfo(sidfile):
     else:
         decoded['cia'] = int(decoded['speed'] == 'CIA')
 
-    decoded['pal'] = int('PAL' in decoded['clock'])
-
     if decoded['cia']:
-        siddir = os.path.dirname(sidfile)
-        cmd = ['docker', 'run', '--rm', '-v', f'{siddir}:/tmp', 'sidplayfp',
-                '-t1', '-q', '--none', '--cpu-debug', os.path.join('tmp', os.path.basename(sidfile))]
-        timer_write_re = re.compile('^.+\s+ST([AXY])a\s+dc0([45])$')
-        timer_low = 0
-        timer_high = 0
-
-        with subprocess.Popen(cmd,
-                stdin=subprocess.DEVNULL,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.DEVNULL,
-                shell=False,
-                errors='ignore') as process:
-            out, _ = process.communicate()
-            for line in out.splitlines():
-                match = timer_write_re.match(line)
-                if match:
-                    cpu_reg = match.group(1)
-                    cia_reg = int(match.group(2))
-                    cpu_reg_map = {'A': 2, 'X': 3, 'Y': 4}
-                    raw_val = line.split()[cpu_reg_map[cpu_reg]]
-                    val = int(raw_val, 16)
-                    if cia_reg == 4:
-                        timer_low = val
-                    else:
-                        timer_high = val
-        decoded['cia'] = (timer_high << 8) + timer_low
-        # subprocess.check_call(['stty', 'sane'])
+        decoded['cia'] = scrape_cia_timer(sidfile)
 
     return decoded
