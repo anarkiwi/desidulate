@@ -6,7 +6,7 @@
 
 ## The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 
-
+import argparse
 import csv
 import hashlib
 import logging
@@ -127,7 +127,7 @@ def main():
 
     logging.basicConfig(level=logging.DEBUG)
     df = scrape_sids(args.hvscdir)
-    df.to_csv(os.path.join((args.hvscdir, 'sidinfo.csv'), index=False, quoting=csv.QUOTE_NONNUMERIC)
+    df.to_csv(os.path.join(args.hvscdir, 'sidinfo.csv'), index=False, quoting=csv.QUOTE_NONNUMERIC)
 
 
 if __name__ == '__main__':
