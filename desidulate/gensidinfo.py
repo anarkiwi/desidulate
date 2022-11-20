@@ -9,6 +9,7 @@
 import argparse
 import csv
 import hashlib
+import json
 import logging
 import multiprocessing
 import os
@@ -21,33 +22,40 @@ import pandas as pd
 
 from desidulate.sidinfo import sidinfo
 
-MAX_WORKERS = multiprocessing.cpu_count()
+MAX_WORKERS = int(multiprocessing.cpu_count() / 2)
 UNKNOWNS = pd.DataFrame([{'val': val} for val in ('<?>', 'UNKNOWN')])
 tunename_re = re.compile(r'^; (.+.sid)$')
 tunelength_re = re.compile(r'([a-z\d]+)=([\d+\s+\:\.]+)$')
 tunelength_time_re = re.compile(r'(\d+)\:(\d+)\.*(\d*)$')
 
 
-def scrape_sidinfo(sidfile, all_tunelengths):
+def scrape_sidinfo(sidfile, all_tunelengths, cache):
     logging.info('scraping %s', sidfile)
-    with open(sidfile, 'rb') as f:
-        md5_hash = hashlib.md5(f.read()).hexdigest()
-    if md5_hash in all_tunelengths:
-        tunelengths = all_tunelengths[md5_hash]
-    else:
-        logging.info('hash of %s not in songlengths, falling back to name', sidfile)
-        tunelengths = all_tunelengths[str(sidfile)]
+    sidinfo_file = str(sidfile).replace('.sid', '.sidinfo')
+    if not os.path.exists(sidinfo_file) or not cache:
+        with open(sidfile, 'rb') as f:
+            md5_hash = hashlib.md5(f.read()).hexdigest()
+        if md5_hash in all_tunelengths:
+            tunelengths = all_tunelengths[md5_hash]
+        else:
+            logging.info('hash of %s not in songlengths, falling back to name', sidfile)
+            tunelengths = all_tunelengths[str(sidfile)]
 
-    result = {
-        'path': str(os.path.normpath(sidfile)),
-        'mtime': sidfile.stat().st_mtime,
-        'md5': md5_hash,
-    }
-    result.update(sidinfo(result['path']))
-    for tune, tune_length in tunelengths.items():
-        result['TuneLength%u' % tune] = tune_length
-
-    return result
+        result = {
+            'path': str(os.path.normpath(sidfile)),
+            'mtime': sidfile.stat().st_mtime,
+            'md5': md5_hash,
+        }
+        result.update(sidinfo(result['path']))
+        for tune, tune_length in tunelengths.items():
+            result['TuneLength%u' % tune] = tune_length
+        sidinfo_file_tmp = sidinfo_file.replace(
+            os.path.basename(sidinfo_file), '.' + os.path.basename(sidinfo_file))
+        with open(sidinfo_file_tmp, 'w', encoding='utf8') as f:
+            f.write(json.dumps(result))
+        os.rename(sidinfo_file_tmp, sidinfo_file)
+    with open(sidinfo_file, 'r', encoding='utf8') as f:
+        return json.loads(f.read())
 
 
 def scrape_tunelengths(tunelengthfile):
@@ -79,7 +87,7 @@ def scrape_tunelengths(tunelengthfile):
     return all_tunelengths
 
 
-def scrape_sids(hvscdir):
+def scrape_sids(hvscdir, cache):
     current = pathlib.Path(hvscdir)
     currentdocs = pathlib.Path(os.path.join(current, 'C64Music/DOCUMENTS'))
     sidfiles = [sidfile for sidfile in sorted(current.rglob(r'*.sid'))]
@@ -91,7 +99,7 @@ def scrape_sids(hvscdir):
     assert len(all_tunelengths) / 2 == len(sidfiles), (len(all_tunelengths), len(sidfiles))
 
     with concurrent.futures.ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor:
-        result_futures = map(lambda x: executor.submit(scrape_sidinfo, x, all_tunelengths), sidfiles)
+        result_futures = map(lambda x: executor.submit(scrape_sidinfo, x, all_tunelengths, cache), sidfiles)
         results = [future.result() for future in concurrent.futures.as_completed(result_futures)]
 
     df = pd.DataFrame(results)
@@ -123,10 +131,15 @@ def scrape_sids(hvscdir):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--hvscdir', default='.', type=str)
+    cache_parser = parser.add_mutually_exclusive_group(required=False)
+    cache_parser.add_argument('--cache', dest='cache', action='store_true', help='Use cache')
+    cache_parser.add_argument('--nocache', dest='cache', action='store_false', help='Do not cache')
+    parser.set_defaults(cache=True)
+
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO)
-    df = scrape_sids(args.hvscdir)
+    df = scrape_sids(args.hvscdir, args.cache)
     df.to_csv(os.path.join(args.hvscdir, 'sidinfo.csv'), index=False, quoting=csv.QUOTE_NONNUMERIC)
 
 

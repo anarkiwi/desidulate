@@ -11,7 +11,6 @@ class SidInfoTestCase(unittest.TestCase):
 
     def run_sidinfo(self, sidfile):
         with tempfile.TemporaryDirectory() as tmpdir:
-            tmpdir = '/tmp'
             temp_sidfile = os.path.join(tmpdir, 'test.sid')
             with open(temp_sidfile, 'wb') as f:
                 with urllib.request.urlopen(f'http://www.hvsc.c64.org/download/{sidfile}') as r:
