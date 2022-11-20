@@ -61,15 +61,6 @@ def decodeflags(rsid, x):
     }
 
 
-def decodespeed(rsid, x):
-    x = int(x)
-    if not rsid:
-        # assume all same speed scheme
-        if x:
-            return 'CIA'
-    return 'VBI'
-
-
 SID_HEADER_LEN = 0x7C
 SID_HEADERS = (
         # +00    STRING magicID: 'PSID' or 'RSID'
@@ -89,7 +80,7 @@ SID_HEADERS = (
         # +10    WORD startSong
         ('startSong', 'H', intdecode),
         # +12    LONGWORD speed
-        ('speed', 'I', decodespeed),
+        ('speed', 'I', intdecode),
         # +16    STRING ``<name>''
         ('name', '32s', strdecode),
         # +36    STRING ``<author>''
@@ -183,6 +174,13 @@ def sidinfo(sidfile):
             decoded.update(decoded_field)
         else:
             decoded[field] = decoded_field
+
+    raw_speed = decoded['speed']
+    start_song = decoded['startSong']
+    decoded['speed'] = 'VBI'
+
+    if not rsid and raw_speed & 2**(start_song-1):
+        decoded['speed'] = 'CIA'
 
     decoded['pal'] = int('PAL' in decoded['clock'])
 
