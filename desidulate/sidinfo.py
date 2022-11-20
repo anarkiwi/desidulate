@@ -4,14 +4,12 @@
 import os
 import re
 import struct
-import time
 import docker
-import pandas as pd
 
 
 SIDPLAYFP_IMAGE = 'anarkiwi/sidplayfp'
-CIA_TIMER_RE = re.compile('^.+\s+ST([AXY])a\s+dc0([45])$')
-INSTRUCTION_RE = re.compile('^.+Instruction\s+\((\d+)\)$')
+CIA_TIMER_RE = re.compile(r'^.+\s+ST([AXY])a\s+dc0([45])$')
+INSTRUCTION_RE = re.compile(r'^.+Instruction\s+\((\d+)\)$')
 
 
 def intdecode(_, x):
@@ -48,8 +46,7 @@ def binformat(x):
 def psidspecific(rsid, x):
     if rsid:
         return bitsdecode(x, {0: 'c64', 1: 'basic'})
-    else:
-        return bitsdecode(x, {0: 'c64', 1: 'psid'})
+    return bitsdecode(x, {0: 'c64', 1: 'psid'})
 
 
 def decodeflags(rsid, x):
@@ -152,10 +149,10 @@ def scrape_cia_timer(sidfile, cutoff_time=0.5):
             timer_high = val
     client.close()
     if not instructions:
-        raise ValueError('saw no instructions')
+        raise ValueError(f'{sidfile}: saw no instructions')
     timer = (timer_high << 8) + timer_low
     if not timer:
-        raise ValueError('CIA timer 0')
+        raise ValueError(f'{sidfile}: CIA timer 0')
     return timer
 
 
