@@ -114,9 +114,10 @@ def scrape_cia_timer(sidfile, cutoff_time=0.5):
     client = docker.from_env()
     timer_low = 0
     timer_high = 0
-    instruction_cutoff = cutoff_time * 1e6 / 2
+    timer = 0
+    instruction_cutoff = cutoff_time * 1e6
     instructions = 0
-    # TODO: the defaut tune, only
+    # TODO: the default tune, only
     cmd = [
         f'-t{cutoff_time}', '-q', '--none', '--cpu-debug', '-os', '--delay=0',
         os.path.join('tmp', os.path.basename(sidfile))]
@@ -147,10 +148,10 @@ def scrape_cia_timer(sidfile, cutoff_time=0.5):
             timer_low = val
         else:
             timer_high = val
+            timer = (timer_high << 8) + timer_low
     client.close()
     if not instructions:
         raise ValueError(f'{sidfile}: saw no instructions')
-    timer = (timer_high << 8) + timer_low
     if not timer:
         raise ValueError(f'{sidfile}: CIA timer 0 after {instructions} instructions')
     return timer
