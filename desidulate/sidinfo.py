@@ -8,7 +8,7 @@ import docker
 
 
 SIDPLAYFP_IMAGE = 'anarkiwi/sidplayfp'
-CIA_TIMER_RE = re.compile(r'^.+\s+ST([AXY])a\s+dc0([45])$')
+CIA1_TIMERA_RE = re.compile(r'^.+\s+ST([AXY])a\s+dc0([45e])$')
 INSTRUCTION_RE = re.compile(r'^.+Instruction\s+\((\d+)\)$')
 
 
@@ -109,12 +109,13 @@ SID_HEADERS = (
 )
 
 
-def scrape_cia_timer(sidfile, cutoff_time=0.5):
+def scrape_cia_timer(sidfile, validate_ctrl, cutoff_time=0.5):
     siddir = os.path.realpath(os.path.dirname(sidfile))
     client = docker.from_env()
     timer_low = 0
     timer_high = 0
     timer = 0
+    ctrl = 0
     instruction_cutoff = cutoff_time * 1e6
     instructions = 0
     # TODO: the default tune, only
@@ -127,6 +128,9 @@ def scrape_cia_timer(sidfile, cutoff_time=0.5):
         volumes=[f'{siddir}:/tmp:ro'],
         ulimits=[docker.types.Ulimit(name='cpu', hard=round(cutoff_time*2))])
     for line in sidplayfp.logs(stream=True, stdout=True, stderr=False):
+        # need to drain log buffer to avoid docker client socket leak.
+        if instructions > instruction_cutoff:
+            continue
         line = line.decode('utf8').strip()
         if not line:
             continue
@@ -134,22 +138,30 @@ def scrape_cia_timer(sidfile, cutoff_time=0.5):
         if match:
             instructions = int(match.group(1))
             continue
-        if instructions > instruction_cutoff:
-            continue
-        match = CIA_TIMER_RE.match(line)
+        match = CIA1_TIMERA_RE.match(line)
         if not match:
             continue
         cpu_reg = match.group(1)
-        cia_reg = int(match.group(2))
+        cia_reg = int(match.group(2), 16)
         cpu_reg_map = {'A': 2, 'X': 3, 'Y': 4}
         raw_val = line.split()[cpu_reg_map[cpu_reg]]
         val = int(raw_val, 16)
-        if cia_reg == 4:
-            timer_low = val
+        if cia_reg == 0xe:
+            ctrl = val
         else:
-            timer_high = val
+            if cia_reg == 4:
+                timer_low = val
+            elif cia_reg == 5:
+                timer_high = val
             timer = (timer_high << 8) + timer_low
     client.close()
+    if validate_ctrl:
+        start_timer = ctrl & 2**0
+        if not start_timer:
+            raise ValueError(f'{sidfile}: CIA timer not started: {ctrl}')
+        one_shot = ctrl & 2**3
+        if one_shot:
+            raise ValueError(f'{sidfile}: CIA timer was set to one-shot: {ctrl}')
     if not instructions:
         raise ValueError(f'{sidfile}: saw no instructions')
     if not timer:
@@ -185,6 +197,6 @@ def sidinfo(sidfile):
     else:
         decoded['cia'] = int(decoded['speed'] == 'CIA')
     if decoded['cia']:
-        decoded['cia'] = scrape_cia_timer(sidfile)
+        decoded['cia'] = scrape_cia_timer(sidfile, not rsid)
 
     return decoded
