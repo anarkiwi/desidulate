@@ -122,7 +122,7 @@ def scrape_cia_timer(sidfile, cutoff_time=0.5):
         os.path.join('tmp', os.path.basename(sidfile))]
     sidplayfp = client.containers.run(
         SIDPLAYFP_IMAGE, cmd,
-        remove=True, stdout=True, detach=True,
+        remove=True, stdout=True, detach=True, network=None,
         volumes=[f'{siddir}:/tmp:ro'],
         ulimits=[docker.types.Ulimit(name='cpu', hard=round(cutoff_time*2))])
     for line in sidplayfp.logs(stream=True, stdout=True, stderr=False):
