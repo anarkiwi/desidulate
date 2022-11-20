@@ -53,6 +53,13 @@ class SSFTestCase(unittest.TestCase):
         self.assertEqual(s.total_duration, 78624)
         self.assertEqual(s.midi_notes, ((20000, 35, s.total_duration, MAX_VEL, 60.134765625),))
 
+    def test_write_smf(self):
+        sid = get_sid(pal=True, cia=0)
+        smf = SidMidiFile(sid)
+        smf.add_pitch(1, 1, 100, 1, 127)
+        smf.add_drum_pitch(1, 1, 100, 1, 127)
+        smf.write(os.devnull)
+
     def test_ssf_parser(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             test_log = os.path.join(tmpdir, 'vicesnd.log')
@@ -85,7 +92,6 @@ class SSFTestCase(unittest.TestCase):
             self.assertTrue(ssf is not None)
             if ssf:
                 ssf.smf_transcribe(smf, 0, 1, ssf.total_duration)
-                smf.write(os.devnull)
                 self.assertEqual(ssf.midi_pitches, (95,))
                 self.assertEqual(ssf.total_duration, 117936)
 
