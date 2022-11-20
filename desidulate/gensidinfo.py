@@ -21,7 +21,7 @@ import pandas as pd
 
 from desidulate.sidinfo import sidinfo
 
-MAX_WORKERS = multiprocessing.cpu_count()
+MAX_WORKERS = int(multiprocessing.cpu_count() / 2)
 UNKNOWNS = pd.DataFrame([{'val': val} for val in ('<?>', 'UNKNOWN')])
 tunename_re = re.compile(r'^; (.+.sid)$')
 tunelength_re = re.compile(r'([a-z\d]+)=([\d+\s+\:\.]+)$')

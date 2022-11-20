@@ -152,7 +152,7 @@ def scrape_cia_timer(sidfile, cutoff_time=0.5):
         raise ValueError(f'{sidfile}: saw no instructions')
     timer = (timer_high << 8) + timer_low
     if not timer:
-        raise ValueError(f'{sidfile}: CIA timer 0')
+        raise ValueError(f'{sidfile}: CIA timer 0 after {instructions} instructions')
     return timer
 
 
