@@ -90,12 +90,17 @@ def scrape_tunelengths(tunelengthfile):
 def scrape_sids(hvscdir, cache):
     current = pathlib.Path(hvscdir)
     currentdocs = pathlib.Path(os.path.join(current, 'C64Music/DOCUMENTS'))
-    sidfiles = [sidfile for sidfile in sorted(current.rglob(r'*.sid'))]
+    sidfiles = [str(sidfile) for sidfile in sorted(current.rglob(r'*.sid'))]
     random.shuffle(sidfiles)
     logging.info('scraping %u sidfiles', len(sidfiles))
     all_tunelengths = {}
     for tunelengthfile in currentdocs.rglob(r'Songlengths.md5'):
         all_tunelengths.update(scrape_tunelengths(tunelengthfile))
+    missing_sidfiles = set(sidfiles) - set(all_tunelengths)
+    if missing_sidfiles:
+        print('no tunelengths for %s' % missing_sidfiles)
+        for sidfile in missing_sidfiles:
+            sidfiles.remove(sidfile)
     assert len(all_tunelengths) / 2 == len(sidfiles), (len(all_tunelengths), len(sidfiles))
 
     with concurrent.futures.ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor:
