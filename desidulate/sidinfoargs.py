@@ -22,7 +22,7 @@ def main():
         filter_re = re.compile(args.filter)
 
     timerflag = {0: 'ntsc', 1: 'pal'}
-    df = pd.read_csv(os.path.join(args.hvscdir, 'sidinfo.csv'), usecols=['path', 'magicID', 'sids', 'pal', 'cia'])
+    df = pd.read_csv(os.path.join(args.hvscdir, 'sidinfo.csv'), usecols=['path', 'magicID', 'sids', 'pal', 'cia', 'song'])
     df = df[(df.magicID == 'PSID') & (df.sids == 1)]
     outputs = []
     for row in df.itertuples():
@@ -31,7 +31,7 @@ def main():
         if filter_re and not filter_re.match(filename):
             continue
         if args.ext:
-            filename = '.'.join((filename, args.ext))
+            filename = '.'.join(('%s-%u' % (filename, row.song), args.ext))
         try:
             size = os.path.getsize(filename)
         except OSError:

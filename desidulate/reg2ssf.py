@@ -12,7 +12,8 @@
 import argparse
 import logging
 from desidulate.fileio import out_path
-from desidulate.sidlib import get_sid, reg2state, state2ssfs, timer_args
+from desidulate.sidlib import reg2state, state2ssfs, timer_args
+from desidulate.sidwrap import get_sid
 
 
 def main():
@@ -21,7 +22,7 @@ def main():
     parser = argparse.ArgumentParser(description='Convert vicesnd.sid log into SSF log files')
     parser.add_argument('logfile', default='vicesnd.sid', help='log file to read')
     parser.add_argument('--maxstates', default=int(10 * 1e6), help='maximum number of SID states to analyze')
-    parser.add_argument('--dfext', default='xz', help='default dataframe extension')
+    parser.add_argument('--dfext', default='zst', help='default dataframe extension')
     parser.add_argument('--maxprspeed', default=1, help='max prspeed to detect')
     timer_args(parser)
     args = parser.parse_args()

@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 
 # https://hvsc.c64.org/download/C64Music/DOCUMENTS/SID_file_format.txt
+import copy
 import os
 import re
 import struct
@@ -32,7 +33,7 @@ def bitsdecode(x, d):
 
 
 def sidmodel(x):
-    return bitsdecode(x, {0: None, 1: '6581', 2: '8580', 3: '6581+8580'})
+    return bitsdecode(x, {0: 'Unknown', 1: '6581', 2: '8580', 3: '6581+8580'})
 
 
 def clock(x):
@@ -100,7 +101,7 @@ SID_HEADERS = (
 )
 
 
-def scrape_cia_timer(sidfile, validate_ctrl, cutoff_time=0.5):
+def scrape_cia_timer(sidfile, validate_ctrl, tune, cutoff_time=0.5):
     siddir = os.path.realpath(os.path.dirname(sidfile))
     client = docker.from_env()
     timer_low = 0
@@ -109,15 +110,15 @@ def scrape_cia_timer(sidfile, validate_ctrl, cutoff_time=0.5):
     ctrl = 0
     instruction_cutoff = cutoff_time * 1e6
     instructions = 0
-    # TODO: the default tune, only
     cmd = [
-        f'-t{cutoff_time}', '-q', '--none', '--cpu-debug', '-os', '--delay=0',
+        f'-t{cutoff_time}', '-q', '--none', '--cpu-debug', '-os', '--delay=0', f'-o{tune}',
         os.path.join('tmp', os.path.basename(sidfile))]
     sidplayfp = client.containers.run(
         SIDPLAYFP_IMAGE, cmd,
         remove=True, stdout=True, detach=True, network='none',
         volumes=[f'{siddir}:/tmp:ro'],
         ulimits=[docker.types.Ulimit(name='cpu', hard=round(cutoff_time*2))])
+    timer_starts = 0
     for line in sidplayfp.logs(stream=True, stdout=True, stderr=False):
         # need to drain log buffer to avoid docker client socket leak.
         if instructions > instruction_cutoff:
@@ -139,6 +140,8 @@ def scrape_cia_timer(sidfile, validate_ctrl, cutoff_time=0.5):
         val = int(raw_val, 16)
         if cia_reg == 0xe:
             ctrl = val
+            if ctrl & 2**0:
+                timer_starts += 1
         else:
             if cia_reg == 4:
                 timer_low = val
@@ -147,8 +150,7 @@ def scrape_cia_timer(sidfile, validate_ctrl, cutoff_time=0.5):
             timer = (timer_high << 8) + timer_low
     client.close()
     if validate_ctrl:
-        start_timer = ctrl & 2**0
-        if not start_timer:
+        if not timer_starts:
             raise ValueError(f'{sidfile}: CIA timer not started: {ctrl}')
         one_shot = ctrl & 2**3
         if one_shot:
@@ -158,6 +160,22 @@ def scrape_cia_timer(sidfile, validate_ctrl, cutoff_time=0.5):
     if not timer:
         raise ValueError(f'{sidfile}: CIA timer 0 after {instructions} instructions')
     return timer
+
+
+
+def sidinfo_song(sidfile, song, decoded, rsid, raw_speed):
+    decoded_song = copy.deepcopy(decoded)
+    decoded_song['song'] = song
+
+    if not rsid:
+        if raw_speed & 2**min((song-1), 31):
+            decoded_song['speed'] = 'CIA'
+        decoded_song['cia'] = int(decoded_song['speed'] == 'CIA')
+
+    if decoded_song['cia']:
+        decoded_song['cia'] = scrape_cia_timer(sidfile, not rsid, song)
+    return decoded_song
+
 
 
 def sidinfo(sidfile):
@@ -176,25 +194,18 @@ def sidinfo(sidfile):
             decoded[field] = decoded_field
 
     raw_speed = decoded['speed']
-    start_song = decoded['startSong']
     decoded['speed'] = 'VBI'
-
-    if not rsid and raw_speed & 2**(start_song-1):
-        decoded['speed'] = 'CIA'
-
     decoded['pal'] = int('PAL' in decoded['clock'])
-
     decoded['sids'] = 1
-    for sid in ('secondSIDAddress', 'thirdSIDAddress'):
+    for sid, sidmodel in (('secondSIDAddress', 'sidmodel2'), ('thirdSIDAddress', 'sidmodel3')):
         if decoded[sid]:
             decoded['sids'] += 1
+            if decoded[sidmodel] == 'Unknown':
+                decoded[sidmodel] = decoded['sidmodel']
+    decoded['cia'] = int(rsid)
 
-    decoded['cia'] = 0
-    if rsid:
-        decoded['cia'] = 1
-    else:
-        decoded['cia'] = int(decoded['speed'] == 'CIA')
-    if decoded['cia']:
-        decoded['cia'] = scrape_cia_timer(sidfile, not rsid)
+    decoded_songs = []
+    for song in range(1, decoded['songs']+1):
+        decoded_songs.append(sidinfo_song(sidfile, song, decoded, rsid, raw_speed))
 
-    return decoded
+    return decoded_songs
