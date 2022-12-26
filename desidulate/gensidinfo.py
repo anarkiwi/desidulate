@@ -29,8 +29,8 @@ tunelength_re = re.compile(r'([a-z\d]+)=([\d+\s+\:\.]+)$')
 tunelength_time_re = re.compile(r'(\d+)\:(\d+)\.*(\d*)$')
 
 
-def scrape_sidinfo(sidfile, all_tunelengths, cache):
-    logging.info('scraping %s', sidfile)
+def scrape_sidinfo(i, sidfile, all_tunelengths, cache):
+    logging.info('scraping %u: %s', i, sidfile)
     sidinfo_file = str(sidfile).replace('.sid', '.sidinfo')
     if not os.path.exists(sidinfo_file) or not cache:
         with open(sidfile, 'rb') as f:
@@ -104,7 +104,9 @@ def scrape_sids(hvscdir, cache):
     assert len(all_tunelengths) / 2 == len(sidfiles), (len(all_tunelengths), len(sidfiles))
 
     with concurrent.futures.ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor:
-        result_futures = map(lambda x: executor.submit(scrape_sidinfo, x, all_tunelengths, cache), sidfiles)
+        result_futures = []
+        for i, sidfile in enumerate(sidfiles, start=1):
+            result_futures.append(executor.submit(scrape_sidinfo, i, sidfile, all_tunelengths, cache))
         results = [future.result() for future in concurrent.futures.as_completed(result_futures)]
 
     df = pd.DataFrame(results)
