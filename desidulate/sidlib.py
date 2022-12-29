@@ -6,16 +6,13 @@
 
 ## THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABL E FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+import copy
 import logging
 from collections import defaultdict
-from datetime import timedelta
 import pandas as pd
 import numpy as np
-from pyresidfp import SoundInterfaceDevice
-from pyresidfp.sound_interface_device import ChipModel
 from desidulate.fileio import read_csv
 
-SID_SAMPLE_FREQ = 11025
 # use of external filter will be non deterministic.
 FLTEXT = False
 ADSR_COLS = ['atk1', 'dec1', 'sus1', 'rel1']
@@ -144,101 +141,6 @@ def set_sid_dtype(df):
 
 def squeeze_diffs(df, diff_cols, fill_value=0):
     return df.loc[(df[diff_cols].shift(fill_value=fill_value) != df[diff_cols]).any(axis=1)]
-
-
-class SidWrap:
-
-    ATTACK_MS = {
-        0: 2,
-        1: 8,
-        2: 16,
-        3: 24,
-        4: 38,
-        5: 56,
-        6: 68,
-        7: 80,
-        8: 100,
-        9: 250,
-        10: 500,
-        11: 800,
-        12: 1000,
-        13: 3000,
-        14: 5000,
-        15: 8000,
-    }
-
-    DECAY_RELEASE_MS = {
-        0: 6,
-        1: 24,
-        2: 48,
-        3: 72,
-        4: 114,
-        5: 168,
-        6: 204,
-        7: 240,
-        8: 300,
-        9: 750,
-        10: 1500,
-        11: 2400,
-        12: 3000,
-        13: 9000,
-        14: 15000,
-        15: 24000,
-    }
-
-    def __init__(self, pal, cia, model, sampling_frequency):
-        # https://codebase64.org/doku.php?id=magazines:chacking17
-        # https://codebase64.org/doku.php?id=base:making_stable_raster_routines
-        if pal:
-            self.clock_freq = SoundInterfaceDevice.PAL_CLOCK_FREQUENCY
-            self.raster_lines = 312
-            self.cycles_per_line = 63
-        else:
-            self.clock_freq = SoundInterfaceDevice.NTSC_CLOCK_FREQUENCY
-            self.raster_lines = 263
-            self.cycles_per_line = 65
-        self.freq_scaler = self.clock_freq / 16777216
-        self.video_clockq = self.raster_lines * self.cycles_per_line
-
-        if cia:
-            self.clockq = cia
-        else:
-            self.clockq = self.video_clockq
-        self.int_freq = self.clock_freq / self.clockq
-        self.vid_int_freq = self.clock_freq / self.video_clockq
-
-        logging.info('using PR frequency %f Hz (%u cycles)', self.int_freq, self.clockq)
-        self.resid = SoundInterfaceDevice(
-            model=model, clock_frequency=self.clock_freq,
-            sampling_frequency=sampling_frequency)
-        self.attack_clock = {
-            k: int(v / 1e3 * self.clock_freq) for k, v in self.ATTACK_MS.items()}
-        self.decay_release_clock = {
-            k: int(v / 1e3 * self.clock_freq) for k, v in self.DECAY_RELEASE_MS.items()}
-
-    def qn_to_clock(self, qn, bpm):
-        return self.clock_freq * 60 / bpm * qn
-
-    def clock_to_s(self, clock):
-        return clock / self.clock_freq
-
-    def clock_to_qn(self, clock, bpm):
-        return self.clock_to_s(clock) * bpm / 60
-
-    def clock_to_ticks(self, clock, bpm, tpqn):
-        return self.clock_to_qn(clock, bpm) * tpqn
-
-    def real_sid_freq(self, freq_reg):
-        # http://www.sidmusic.org/sid/sidtech2.html
-        return freq_reg * self.freq_scaler
-
-    def add_samples(self, offset):
-        timeoffset_seconds = offset / self.clock_freq
-        return self.resid.clock(timedelta(seconds=timeoffset_seconds))
-
-
-def get_sid(pal, cia, model=ChipModel.MOS8580, sampling_frequency=SID_SAMPLE_FREQ):
-    return SidWrap(pal, cia, model, sampling_frequency)
 
 
 # Read a VICE "-sounddev dump" register dump (emulator or vsid)
@@ -400,27 +302,7 @@ def split_vdf(sid, df, near=16, guard=96, maxprspeed=8):
             new_cols.append(col)
         return new_cols
 
-    df = set_sid_dtype(df)
-    df = coalesce_near_writes(df, ('fltcoff',), near=near)
-    # when filter is not routed, cutoff and resonance do not matter.
-    df.loc[(df['flthi'] == 0) & (df['fltband'] == 0) & (df['fltlo'] == 0), ['fltcoff', 'fltres']] = pd.NA
-    v_dfs = []
-    ssfs = 0
-    non_meta_cols = set()
-
-    for v in (1, 2, 3):
-        logging.debug('splitting voice %u', v)
-        if df['gate%u' % v].max() == 0:
-            continue
-        cols = v_cols(v)
-        v_df = df[cols].copy()
-        v_df.columns = renamed_cols(v, cols)
-        non_meta_cols = set(v_df.columns)
-
-        logging.debug('coalescing near writes for voice %u', v)
-        v_df = coalesce_near_writes(v_df, ('freq1', 'pwduty1', 'freq3'), near=near)
-
-        # split on gate on transitions into SSFs
+    def split_gate_to_ssfs(v, v_df):
         logging.debug('splitting to SSFs for voice %u', v)
         v_df['diff_gate1'] = v_df['gate1'].astype(np.int8).diff(periods=1).fillna(0).astype(pd.Int8Dtype()).fillna(0)
         v_df['ssf'] = v_df['diff_gate1']
@@ -428,7 +310,9 @@ def split_vdf(sid, df, near=16, guard=96, maxprspeed=8):
         v_df['ssf'] = v_df['ssf'].cumsum().astype(np.uint64)
         v_df = v_df.reset_index()
         logging.debug('%u raw SSFs for voice %u', v_df['ssf'].tail(1), v)
+        return v_df
 
+    def remove_redundant_state(v, v_df):
         if v_df['atk1'].max() or v_df['dec1'].max():
             logging.debug('removing redundant AD for voice %u', v)
             # select AD from when gate on
@@ -453,7 +337,6 @@ def split_vdf(sid, df, near=16, guard=96, maxprspeed=8):
         v_df.loc[v_df['diff_gate1'] != 1, ['atk1', 'dec1', 'sus1', 'rel1']] = pd.NA
         v_df.drop(['diff_gate1'], axis=1, inplace=True)
 
-        # TODO: Skip SSFs with sample playback.
         # http://www.ffd2.com/fridge/chacking/c=hacking20.txt
         # http://www.ffd2.com/fridge/chacking/c=hacking21.txt
         # https://codebase64.org/doku.php?id=base:vicious_sid_demo_routine_explained
@@ -469,8 +352,6 @@ def split_vdf(sid, df, near=16, guard=96, maxprspeed=8):
         v_df.loc[(v_df['test1'] == 1) & (v_df['clock'] <= v_df['test1_first']), ['freq1', 'pwduty1', 'flt1']] = pd.NA
         v_df.drop(['test1_first'], axis=1, inplace=True)
 
-        # fold noise1 + other waveforms, to waveform 0.
-        # v_df.loc[(v_df['noise1'] == 1) & ((v_df['pulse1'] == 1) | (v_df['saw1'] == 1) | (v_df['tri1'] == 1)), ['noise1', 'pulse1', 'saw1', 'tri1']] = 0
         # remove modulator voice state while sync1/ring1 not set
         v_df.loc[(v_df['freq3'] == 0), ['ring1', 'sync1']] = 0
         v_df.loc[(v_df['ring1'] == 1) & (v_df['tri1'] == 0), ['ring1']] = 0
@@ -496,7 +377,51 @@ def split_vdf(sid, df, near=16, guard=96, maxprspeed=8):
         # also removes SSFs with no waveform.
         v_df = v_df[(v_df['clock'] <= v_df['waveform_last'])]
         v_df.drop(['waveform_last'], axis=1, inplace=True)
+        return v_df
 
+    df = set_sid_dtype(df)
+    df = coalesce_near_writes(df, ('fltcoff',), near=near)
+    # when filter is not routed, cutoff and resonance do not matter.
+    df.loc[(df['flthi'] == 0) & (df['fltband'] == 0) & (df['fltlo'] == 0), ['fltcoff', 'fltres']] = pd.NA
+    # never use externally filtered audio
+    df['fltext'] = pd.NA
+    v_dfs = []
+    ssfs = 0
+    non_meta_cols = set()
+
+    for v in (0, 1, 2, 3):
+        logging.debug('splitting voice %u', v)
+
+        if v:
+            if df['gate%u' % v].max() == 0:
+                continue
+            cols = v_cols(v)
+            v_df = df[cols].copy()
+            v_df['vol'] = pd.NA
+            v_df.columns = renamed_cols(v, cols)
+
+            logging.debug('coalescing near writes for voice %u', v)
+            v_df = coalesce_near_writes(v_df, ('freq1', 'pwduty1', 'freq3'), near=near)
+            v_df = split_gate_to_ssfs(v, v_df)
+            v_df = remove_redundant_state(v, v_df)
+            non_meta_cols = set(v_df.columns)
+        else:
+            cols = v_cols(1)
+            v_df = df[cols].copy()
+            non_vol_cols = copy.deepcopy(cols)
+            non_vol_cols.remove('vol')
+            v_df.columns = renamed_cols(1, cols)
+            v_df.loc[:, non_vol_cols] = pd.NA
+
+            diff_vol = v_df['vol'].astype(np.int8).diff(periods=1).fillna(0).astype(pd.Int8Dtype()).fillna(0)
+            v_df['ssf'] = diff_vol
+            v_df.loc[v_df['ssf'] != 0, ['ssf']] = 1
+            v_df['ssf'] = v_df['ssf'].cumsum().astype(np.uint64)
+            v_df = v_df.reset_index()
+            v_df.set_index('ssf', inplace=True)
+            non_meta_cols = {'vol'}
+
+        non_meta_cols -= {'clock'}
         logging.debug('calculating clock for voice %u', v)
         v_df['clock_start'] = v_df.groupby(['ssf'], sort=False)['clock'].min()
         v_df['next_clock_start'] = v_df['clock_start'].shift(-1).astype(pd.Int64Dtype())
@@ -510,19 +435,10 @@ def split_vdf(sid, df, near=16, guard=96, maxprspeed=8):
         # extract only changes
         logging.debug('extracting only state changes for voice %u (rows before %u)', v, len(v_df))
         v_df = v_df.reset_index().set_index('clock')
-        v_df = squeeze_diffs(v_df, v_df.columns)
+        v_df = squeeze_diffs(v_df, list(non_meta_cols))
+
         logging.debug('extracted only state changes for voice %u (rows after %u)', v, len(v_df))
         v_df = v_df.reset_index().set_index('ssf')
-
-        # remove empty SSFs
-        for col in ('freq1', 'vol', 'gate1'):
-            logging.debug('removing empty SSFs with no %s for voice %u (%u rows before)', col, v, len(v_df))
-            v_df['max_col'] = v_df.groupby('ssf', sort=False)[col].max()
-            v_df = v_df[v_df['max_col'] > 0]
-            v_df.drop(['max_col'], axis=1, inplace=True)
-        v_df['test1_min'] = v_df.groupby('ssf', sort=False)['test1'].min()
-        v_df = v_df[v_df['test1_min'] == 0]
-        v_df.drop(['test1_min'], axis=1, inplace=True)
 
         if v_df.empty:
             continue
@@ -533,8 +449,7 @@ def split_vdf(sid, df, near=16, guard=96, maxprspeed=8):
         logging.debug('pr_speeds for voice %u: %s', v, sorted(pr_speeds))
         pr_speeds = v_df.reset_index()[['ssf', 'pr_speed']].groupby('pr_speed')['ssf'].nunique().to_dict()
         sorted_pr_speeds = sorted(pr_speeds.items(), key=lambda x: x[1], reverse=True)
-        logging.debug('min/mean/max rate %u/%u/%u for voice %u (counts %s)',
-            v_df['rate'].min(), v_df['rate'].mean(), v_df['rate'].max(), v, sorted_pr_speeds)
+        logging.debug(f'min/mean/max rate {v_df.rate.min()}/{v_df.rate.mean()}/{v_df.rate.max()} for voice {v} (counts {sorted_pr_speeds})')
 
         v_df['clock'] -= v_df['clock_start']
         v_df.reset_index(level=0, inplace=True)
@@ -556,16 +471,6 @@ def split_vdf(sid, df, near=16, guard=96, maxprspeed=8):
             yield (v, v_df.drop(['v'], axis=1))
 
 
-def jittermatch_df(df1, df2, jitter_col, jitter_max):
-    df1_col = df1[jitter_col].reset_index(drop=True).astype(pd.Int64Dtype())
-    df2_col = df2[jitter_col].reset_index(drop=True).astype(pd.Int64Dtype())
-    if len(df1_col) == len(df2_col):
-        diff = df1_col - df2_col
-        diff_max = diff.abs().max()
-        return pd.notna(diff_max) and diff_max < jitter_max
-    return False
-
-
 def ssf_start_duration(sid, ssf_df):
     clock_duration = ssf_df['clock'].max() + sid.clockq
     next_clock_start = ssf_df['next_clock_start'].iat[-1]
@@ -578,7 +483,7 @@ def ssf_start_duration(sid, ssf_df):
 
 
 def pad_ssf_duration(sid, ssf_df, first_clock_duration):
-    clock_start, clock_duration = ssf_start_duration(sid, ssf_df)
+    _clock_start, clock_duration = ssf_start_duration(sid, ssf_df)
     last_row_df = ssf_df[-1:].copy()
     last_row_df['clock'] = clock_duration
     last_row_df = last_row_df.astype(ssf_df.dtypes.to_dict())

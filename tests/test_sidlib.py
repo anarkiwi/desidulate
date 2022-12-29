@@ -4,7 +4,8 @@ import unittest
 from io import StringIO
 import pandas as pd
 from desidulate.fileio import read_csv
-from desidulate.sidlib import squeeze_diffs, coalesce_near_writes, remove_end_repeats, df_waveform_order, get_sid, calc_rates, bits2byte
+from desidulate.sidlib import squeeze_diffs, coalesce_near_writes, remove_end_repeats, df_waveform_order, calc_rates, bits2byte
+from desidulate.sidwrap import get_sid
 
 
 class SIDLibTestCase(unittest.TestCase):

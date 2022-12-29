@@ -14,8 +14,9 @@ from concurrent.futures import ProcessPoolExecutor
 import numpy as np
 import pandas as pd
 from desidulate.fileio import wav_path, out_path, read_csv
-from desidulate.sidlib import get_sid, resampledf_to_pr
+from desidulate.sidlib import resampledf_to_pr
 from desidulate.sidwav import df2wav
+from desidulate.sidwrap import get_sid
 from desidulate.sidmidi import SidMidiFile, midi_args
 from desidulate.ssf import add_freq_notes_df, SidSoundFragment
 

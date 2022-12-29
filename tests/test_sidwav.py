@@ -6,7 +6,7 @@ import tempfile
 import pandas as pd
 import numpy as np
 from desidulate.sidwav import state2samples, write_wav, loudestf
-from desidulate.sidlib import get_sid
+from desidulate.sidwrap import get_sid
 
 
 class SidWavTestCase(unittest.TestCase):

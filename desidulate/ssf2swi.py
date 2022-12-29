@@ -2,7 +2,8 @@
 
 import argparse
 import pandas as pd
-from desidulate.sidlib import resampledf_to_pr, get_sid, CONTROL_BITS, timer_args
+from desidulate.sidlib import resampledf_to_pr, CONTROL_BITS, timer_args
+from desidulate.sidwrap import get_sid
 from desidulate.ssf import add_freq_notes_df
 from desidulate.swilib import sw_rle_diff, dot0
 

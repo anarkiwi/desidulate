@@ -9,8 +9,9 @@
 import argparse
 import logging
 from desidulate.fileio import wav_path
-from desidulate.sidlib import get_sid, reg2state, timer_args
+from desidulate.sidlib import reg2state, timer_args
 from desidulate.sidwav import state2samples, write_wav
+from desidulate.sidwrap import get_sid, SID_SAMPLE_FREQ
 
 
 def main():
@@ -20,7 +21,7 @@ def main():
     parser.add_argument('logfile', default='vicesnd.sid', help='log file to read')
     parser.add_argument('--maxstates', default=int(10 * 1e6), help='maximum number of SID states to analyze')
     parser.add_argument('--wavfile', default='', help='WAV file to write')
-    parser.add_argument('--samplerate', default=22050, type=int, help='sample rate')
+    parser.add_argument('--samplerate', default=SID_SAMPLE_FREQ, type=int, help='sample rate')
     timer_args(parser)
     args = parser.parse_args()
     wavfile = args.wavfile

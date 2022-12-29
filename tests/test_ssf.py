@@ -4,8 +4,9 @@ import os
 import tempfile
 import unittest
 import pandas as pd
-from desidulate.sidlib import get_sid, reg2state, state2ssfs
+from desidulate.sidlib import reg2state, state2ssfs
 from desidulate.sidmidi import SidMidiFile, MAX_VEL
+from desidulate.sidwrap import get_sid
 from desidulate.ssf import SidSoundFragment, add_freq_notes_df
 
 
@@ -80,7 +81,7 @@ class SSFTestCase(unittest.TestCase):
             ssf_dfs = add_freq_notes_df(sid, ssf_dfs)
             ssf = None
             row = None
-            for row in ssf_log_df.itertuples():
+            for row in ssf_log_df[ssf_log_df.voice > 0].itertuples():
                 ssf_df = ssf_dfs[ssf_dfs['hashid'] == row.hashid].set_index('clock')
                 ssf = SidSoundFragment(True, sid, ssf_df, smf)
                 if ssf and row.clock == 104:
