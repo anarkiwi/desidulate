@@ -8,6 +8,8 @@
 
 import copy
 import logging
+import warnings
+warnings.simplefilter(action='ignore', category=FutureWarning)
 from collections import defaultdict
 import pandas as pd
 import numpy as np
