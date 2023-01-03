@@ -132,7 +132,7 @@ def set_sid_dtype(df):
     for col in df.columns:
         if col.startswith('freq') or col.startswith('pwduty') or col == 'fltcoff':
             col_type = pd.UInt16Dtype()
-        elif col[-1].isdigit() or col.startswith('flt'):
+        elif col[-1].isdigit() or col.startswith('flt') or col == 'vol':
             col_type = pd.UInt8Dtype()
         else:
             continue
@@ -262,6 +262,11 @@ def hash_vdf(vdf, non_meta_cols, hashid='hashid_noclock', ssf='ssf'):
     meta_cols = set(vdf.columns) - non_meta_cols
     uniq = vdf.drop(list(meta_cols), axis=1).drop_duplicates(ignore_index=True)
     merge_cols = list(uniq.columns)
+    dtypes = set(uniq.dtypes.to_dict().values())
+    valid_dtypes = {pd.UInt8Dtype(), pd.UInt16Dtype(), pd.Int64Dtype()}
+    if dtypes - valid_dtypes:
+        logging.error('invalid dtypes to hash_vdf: %s', dtypes - valid_dtypes)
+        raise ValueError
     uniq['row_hash'] = uniq.apply(hash_tuple, axis=1)
     logging.debug('%u unique voice states', len(uniq))
     vdf = vdf.merge(uniq, how='left', on=merge_cols)
@@ -385,7 +390,8 @@ def split_vdf(sid, df, near=16, guard=96, maxprspeed=8):
     # when filter is not routed, cutoff and resonance do not matter.
     df.loc[(df['flthi'] == 0) & (df['fltband'] == 0) & (df['fltlo'] == 0), ['fltcoff', 'fltres']] = pd.NA
     # never use externally filtered audio
-    df['fltext'] = pd.NA
+    df.loc[:, 'fltext'] = pd.NA
+    df = set_sid_dtype(df)
     v_dfs = []
     ssfs = 0
     non_meta_cols = set()
@@ -398,7 +404,7 @@ def split_vdf(sid, df, near=16, guard=96, maxprspeed=8):
                 continue
             cols = v_cols(v)
             v_df = df[cols].copy()
-            v_df['vol'] = pd.NA
+            v_df.loc[:, 'vol'] = pd.NA
             v_df.columns = renamed_cols(v, cols)
 
             logging.debug('coalescing near writes for voice %u', v)
@@ -423,6 +429,7 @@ def split_vdf(sid, df, near=16, guard=96, maxprspeed=8):
             non_meta_cols = {'vol'}
 
         non_meta_cols -= {'clock'}
+        v_df = set_sid_dtype(v_df)
         logging.debug('calculating clock for voice %u', v)
         v_df['clock_start'] = v_df.groupby(['ssf'], sort=False)['clock'].min()
         v_df['next_clock_start'] = v_df['clock_start'].shift(-1).astype(pd.Int64Dtype())
