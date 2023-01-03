@@ -28,9 +28,10 @@ CANON_REG_ORDER = (
     'atk1', 'dec1', 'sus1', 'rel1', 'vol')
 
 
-def bits2byte(df, cols):
-    byte_col = df[cols[0]].fillna(0)
-    for i, col in enumerate(cols[1:], start=1):
+def bits2byte(df, cols, startbit=0):
+    byte_col = df[cols[0]].copy()
+    byte_col.loc[:] = 0
+    for i, col in enumerate(cols[startbit:], start=startbit):
         byte_col += df[col].fillna(0) * 2**i
     return byte_col
 
@@ -264,8 +265,9 @@ def hash_vdf(vdf, non_meta_cols, hashid='hashid_noclock', ssf='ssf'):
     uniq = vdf.drop(list(meta_cols), axis=1).drop_duplicates(ignore_index=True)
     merge_cols = list(uniq.columns)
     dtypes = set(uniq.dtypes.to_dict().values())
-    if dtypes - {pd.UInt8Dtype(), pd.UInt16Dtype()}:
-        logging.error('invalid dtypes to hash_vdf: %s', dtypes)
+    valid_dtypes = {pd.UInt8Dtype(), pd.UInt16Dtype(), pd.Int64Dtype()}
+    if dtypes - valid_dtypes:
+        logging.error('invalid dtypes to hash_vdf: %s', dtypes - valid_dtypes)
         raise ValueError
     uniq['row_hash'] = uniq.apply(hash_tuple, axis=1)
     logging.debug('%u unique voice states', len(uniq))
