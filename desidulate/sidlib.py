@@ -26,9 +26,11 @@ CANON_REG_ORDER = (
     'atk1', 'dec1', 'sus1', 'rel1', 'vol')
 
 
-def bits2byte(df, cols):
-    byte_col = df[cols[0]].fillna(0)
-    for i, col in enumerate(cols[1:], start=1):
+def bits2byte(df, cols, startbit=0):
+    byte_col = df[cols[0]]
+    byte_col.loc[:] = 0
+    byte_col = byte_col.astype(pd.UInt8Dtype())
+    for i, col in enumerate(cols[startbit:], start=startbit):
         byte_col += df[col].fillna(0) * 2**i
     return byte_col
 
