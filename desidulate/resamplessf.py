@@ -7,11 +7,10 @@
 ## The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 
 import argparse
-import logging
 import pandas as pd
 
 from desidulate.fileio import read_csv, out_path
-from desidulate.sidlib import resample_ssf
+from desidulate.sidlib import resample_ssfs
 
 parser = argparse.ArgumentParser(description='Downsample SSFs to PR frames')
 parser.add_argument('ssffile', help='SSF file')
@@ -23,10 +22,9 @@ def main():
     args = parser.parse_args()
     df = read_csv(args.ssffile, dtype=pd.Int64Dtype())
     if not df.empty:
-        df = df[(df.clock <= args.max_clock) & (df.pr_speed <= args.max_pr_speed)].drop(['rate', 'count', 'hashid_noclock', 'clock'], axis=1)
-        df = resample_ssf(df)
+        df = df[(df.clock <= args.max_clock) & (df.pr_speed <= args.max_pr_speed)]
+        df = resample_ssfs(df)
         df.to_csv(out_path(args.ssffile, 'resample_ssf.zst'), index=False)
-
 
 
 if __name__ == '__main__':
