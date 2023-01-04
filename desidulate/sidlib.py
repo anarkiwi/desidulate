@@ -132,18 +132,19 @@ def control_label(df):
     return df.merge(control_df, how='left', on='control')
 
 
-def resample_ssf(df):
-    resample_dfs = []
+def resample_ssf(ssf_df):
+    resample_df = ssf_df.drop_duplicates(['pr_frame', 'control'], keep='last').reset_index(drop=True).copy()
+    control_labels = remove_repeats(list(squeeze_diffs(resample_df, ['control'])['control_label']))
+    resample_df['control_labels'] = '-'.join(control_labels)
+    resample_df = resample_df.drop(['control', 'control_label'], axis=1)
+    return resample_df
 
-    for _hashid, ssf_df in control_label(set_sid_dtype(df)).groupby('hashid'):  # pylint: disable=no-member
-        resample_df = ssf_df.drop_duplicates(['pr_frame', 'control'], keep='last').reset_index(drop=True).copy()
-        control_labels = remove_repeats(list(squeeze_diffs(resample_df, ['control'])['control_label']))
-        resample_df['control_labels'] = '-'.join(control_labels)
-        resample_df = resample_df.drop(['control', 'control_label'], axis=1)
-        resample_dfs.append(resample_df)
 
-    resample_dfs = pd.concat(resample_dfs)
-    return hash_vdf(resample_dfs, set(resample_dfs.columns) - set(CANON_REG_ORDER), 'resample_hashid', 'hashid')
+def resample_ssfs(df):
+    resampleable_ssfs = control_label(set_sid_dtype(df[df.pr_speed > 0]))
+    resampleable_ssfs = resampleable_ssfs.drop(['rate', 'count', 'hashid_noclock', 'clock'], axis=1)
+    resampled_dfs = pd.concat([resample_ssf(ssf_df) for _hashid, ssf_df in resampleable_ssfs.groupby('hashid')])
+    return hash_vdf(resampled_dfs, set(resampled_dfs.columns) - set(CANON_REG_ORDER), 'resample_hashid', 'hashid')
 
 
 def timer_args(parser):
