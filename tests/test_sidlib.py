@@ -4,7 +4,7 @@ import unittest
 from io import StringIO
 import pandas as pd
 from desidulate.fileio import read_csv
-from desidulate.sidlib import squeeze_diffs, coalesce_near_writes, remove_end_repeats, df_waveform_order, calc_rates, bits2byte
+from desidulate.sidlib import squeeze_diffs, coalesce_near_writes, remove_end_repeats, calc_rates, bits2byte
 from desidulate.sidwrap import get_sid
 
 
@@ -252,58 +252,6 @@ clock,gate1,freq1,pwduty1,pulse1,noise1,tri1,saw1,test1,sync1,ring1,freq3,test3,
         self.assertEqual([1, 2], remove_end_repeats([1, 2]))
         self.assertEqual([1, 2, 3, 1, 2], remove_end_repeats([1, 2, 3, 1, 2, 1, 2, 1, 2]))
         self.assertEqual([1, 2, 3], remove_end_repeats([1, 2, 3, 1, 2, 3]))
-
-    def test_df_waveform_order(self):
-        df = self.str2df('''
-clock,pulse1,noise1,sync1,ring1,test1,tri1,saw1
-0,1,0,,,,,
-100,0,1,,,,,
-150,0,1,,,,,
-200,1,0,,,,,
-250,1,0,,,,,
-''').reset_index()
-        self.assertEqual(['p', 'n', 'p'], df_waveform_order(df))
-
-        df = self.str2df('''
-clock,pulse1,noise1,sync1,ring1,test1,tri1,saw1
-0,,,,,,,
-100,0,1,,,,,
-150,0,1,,,,,
-200,1,0,,,,,
-250,1,0,,,,,
-''').reset_index()
-        self.assertEqual(['0', 'n', 'p'], df_waveform_order(df))
-
-        df = self.str2df('''
-clock,pulse1,noise1,sync1,ring1,test1,tri1,saw1
-0,,,,,,,
-100,0,1,,,,,
-150,0,1,,,,,
-200,1,1,,,,,
-250,1,0,,,,,
-''').reset_index()
-        self.assertEqual(['0', 'n', 'np', 'p'], df_waveform_order(df))
-
-        df = self.str2df('''
-clock,pulse1,noise1,sync1,ring1,test1,tri1,saw1
-0,,,,,,,
-100,0,1,,,,,
-150,0,1,,,,,
-200,1,1,,,,,
-250,1,0,,,,,
-300,,,,,,,
-''').reset_index()
-        self.assertEqual(['0', 'n', 'np', 'p', '0'], df_waveform_order(df))
-
-        df = self.str2df('''
-clock,pulse1,noise1,sync1,ring1,test1,tri1,saw1
-0,1,0,,,,,
-50,,,,,,,
-75,,,,,,,
-100,0,1,,,,,
-200,1,0,,,,,
-''').reset_index()
-        self.assertEqual(['p', '0', 'n', 'p'], df_waveform_order(df))
 
     def test_squeeze_diffs(self):
         df = self.str2df('''
