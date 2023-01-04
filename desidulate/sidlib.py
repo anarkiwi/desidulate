@@ -124,26 +124,25 @@ def bits2control(val):
 def control_label(df):
     control_reg = bits2byte(df, V1_CONTROL_BITS, startbit=1)
     df['control'] = control_reg
-    uniq_control_reg = control_reg.unique()
-    vals = []
-    for val in uniq_control_reg:
-        vals.append({'control': val, 'control_label': bits2control(val)})
-    control_df = pd.DataFrame(vals)
+    control_df = pd.DataFrame([{'control': val, 'control_label': bits2control(val)} for val in control_reg.unique()])
     return df.merge(control_df, how='left', on='control')
 
 
-def resample_ssf(ssf_df):
-    resample_df = ssf_df.drop_duplicates(['pr_frame', 'control'], keep='last').reset_index(drop=True).copy()
-    control_labels = remove_repeats(list(squeeze_diffs(resample_df, ['control'])['control_label']))
-    resample_df['control_labels'] = '-'.join(control_labels)
-    resample_df = resample_df.drop(['control', 'control_label'], axis=1)
-    return resample_df
+def control_labels_by_group(ssf_df):
+    return '-'.join(remove_repeats(list(squeeze_diffs(ssf_df, ['control'])['control_label'])))
+
+
+def control_labels(df):
+    labels = df.groupby('hashid').apply(control_labels_by_group)
+    labels.name = 'control_labels'
+    return df.merge(labels, how='left', on='hashid')
 
 
 def resample_ssfs(df):
-    resampleable_ssfs = control_label(set_sid_dtype(df[df.pr_speed > 0]))
+    resampleable_ssfs = df[df.pr_speed > 0]
     resampleable_ssfs = resampleable_ssfs.drop(['rate', 'count', 'hashid_noclock', 'clock'], axis=1)
-    resampled_dfs = pd.concat([resample_ssf(ssf_df) for _hashid, ssf_df in resampleable_ssfs.groupby('hashid')])
+    resampled_dfs = resampleable_ssfs.drop_duplicates(['hashid', 'pr_frame', 'control'], keep='last')
+    resampled_dfs = resampled_dfs.drop(['control', 'control_label', 'control_labels'], axis=1)
     return hash_vdf(resampled_dfs, set(resampled_dfs.columns) - set(CANON_REG_ORDER), 'resample_hashid', 'hashid')
 
 
