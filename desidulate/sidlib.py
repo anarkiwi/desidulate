@@ -19,8 +19,8 @@ from desidulate.fileio import read_csv
 FLTEXT = False
 ADSR_COLS = ['atk1', 'dec1', 'sus1', 'rel1']
 CONTROL_BITS = ['gate', 'sync', 'ring', 'test', 'tri', 'saw', 'pulse', 'noise']
-WAVEFORM_COLS = tuple(sorted((('S', 'sync1'), ('R', 'ring1'), ('t', 'tri1'), ('s', 'saw1'), ('p', 'pulse1'), ('n', 'noise1'))))
-WAVEFORM_COLS_ORIG = [col[1] for col in WAVEFORM_COLS]
+V1_CONTROL_BITS = [bit + '1' for bit in CONTROL_BITS]
+V1_CONTROL_BITS_LABELS = {'gate1': 'g', 'sync1': 'S', 'ring1': 'R', 'test1': 'T', 'tri1': 't', 'saw1': 's', 'pulse1': 'p', 'noise1': 'n'}
 CANON_REG_ORDER = (
     'gate1', 'freq1', 'pwduty1', 'pulse1', 'noise1', 'tri1', 'saw1', 'test1',
     'sync1', 'ring1', 'freq3', 'test3',
@@ -33,7 +33,7 @@ def bits2byte(df, cols, startbit=0):
     byte_col.loc[:] = 0
     for i, col in enumerate(cols[startbit:], start=startbit):
         byte_col += df[col].fillna(0) * 2**i
-    return byte_col
+    return byte_col.rename(None)
 
 
 def calc_rates(sid, maxprspeed, vdf, ratemin=128):
@@ -53,7 +53,7 @@ def calc_rates(sid, maxprspeed, vdf, ratemin=128):
         rate_col_df[rate_col] = rate_col_df['clock']
         rate_col_df.loc[(diff == 0) | diff.isna(), [rate_col]] = pd.NA
 
-    control_col = bits2byte(vdf, [col + '1' for col in CONTROL_BITS])
+    control_col = bits2byte(vdf, V1_CONTROL_BITS)
     filter_col = bits2byte(vdf, ['flt1', 'fltlo', 'fltband', 'flthi'])
     for rate_col, col in (('control_rate', control_col), ('filter_rate', filter_col)):
         diff = col.groupby(['ssf'], sort=False).diff()
@@ -81,7 +81,6 @@ def calc_rates(sid, maxprspeed, vdf, ratemin=128):
 
 
 def resampledf_to_pr(ssf_df):
-    pr_speed = ssf_df['pr_speed'].iat[0]
     first_row = ssf_df.iloc[0]
     resample_df = ssf_df.drop_duplicates('pr_frame', keep='last').reset_index(drop=True).copy()
     resample_df_clock = ssf_df[['pr_frame']].reset_index().drop_duplicates('pr_frame', keep='first').copy()
@@ -103,22 +102,48 @@ def remove_end_repeats(waveforms):
     return waveforms
 
 
-def df_waveform_order(df):
-    waveforms = []
-    squeeze_df = df[WAVEFORM_COLS_ORIG].fillna(0)
-    for row in squeeze_df.itertuples():
-        row_waveforms = (
-            (mapped_col, getattr(row, waveform_col)) for mapped_col, waveform_col in WAVEFORM_COLS)
-        row_waveforms = [
-            waveform_col for waveform_col, waveform_val in row_waveforms if waveform_val]
-        if row_waveforms:
-            row_waveforms = ''.join(row_waveforms)
-        else:
-            row_waveforms = '0'
-        if not waveforms or row_waveforms != waveforms[-1]:
-            waveforms.append(row_waveforms)
-            waveforms = remove_end_repeats(waveforms)
-    return waveforms
+def remove_repeats(seq):
+    non_repeats = seq[:1]
+    for i in seq[1:]:
+        if i != non_repeats[-1]:
+            non_repeats.append(i)
+            non_repeats = remove_end_repeats(non_repeats)
+    return non_repeats
+
+
+def bits2control(val):
+    labels = []
+    for i, bit in enumerate(V1_CONTROL_BITS):
+        if 2**i & val:
+            labels.append(V1_CONTROL_BITS_LABELS[bit])
+    if labels:
+        return ''.join(labels)
+    return '0'
+
+
+def control_label(df):
+    control_reg = bits2byte(df, V1_CONTROL_BITS, startbit=1)
+    df['control'] = control_reg
+    uniq_control_reg = control_reg.unique()
+    vals = []
+    for val in uniq_control_reg:
+        vals.append({'control': val, 'control_label': bits2control(val)})
+    control_df = pd.DataFrame(vals)
+    return df.merge(control_df, how='left', on='control')
+
+
+def resample_ssf(df):
+    resample_dfs = []
+
+    for _hashid, ssf_df in control_label(set_sid_dtype(df)).groupby('hashid'):  # pylint: disable=no-member
+        resample_df = ssf_df.drop_duplicates(['pr_frame', 'control'], keep='last').reset_index(drop=True).copy()
+        control_labels = remove_repeats(list(squeeze_diffs(resample_df, ['control'])['control_label']))
+        resample_df['control_labels'] = '-'.join(control_labels)
+        resample_df = resample_df.drop(['control', 'control_label'], axis=1)
+        resample_dfs.append(resample_df)
+
+    resample_dfs = pd.concat(resample_dfs)
+    return hash_vdf(resample_dfs, set(resample_dfs.columns) - set(CANON_REG_ORDER), 'resample_hashid', 'hashid')
 
 
 def timer_args(parser):
@@ -260,8 +285,7 @@ def hash_tuple(s):
     return hash(tuple(s))
 
 
-def hash_vdf(vdf, non_meta_cols, hashid='hashid_noclock', ssf='ssf'):
-    meta_cols = set(vdf.columns) - non_meta_cols
+def hash_vdf(vdf, meta_cols, hashid='hashid_noclock', ssf='ssf'):
     uniq = vdf.drop(list(meta_cols), axis=1).drop_duplicates(ignore_index=True)
     merge_cols = list(uniq.columns)
     dtypes = set(uniq.dtypes.to_dict().values())
@@ -472,7 +496,7 @@ def split_vdf(sid, df, near=16, guard=96, maxprspeed=8):
     if v_dfs:
         v_dfs = pd.concat(v_dfs)
         logging.debug('calculating row hashes on %s', sorted(non_meta_cols))
-        v_dfs = hash_vdf(v_dfs, non_meta_cols)
+        v_dfs = hash_vdf(v_dfs, set(v_dfs.columns) - non_meta_cols)
         prefix_cols = ['pr_speed', 'clock']
         meta_cols = [col for col in v_dfs.columns if col not in CANON_REG_ORDER and col not in prefix_cols]
         v_dfs = v_dfs[prefix_cols + [col for col in CANON_REG_ORDER if col in v_dfs.columns] + meta_cols]
