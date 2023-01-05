@@ -12,6 +12,5 @@ jobs:
         PYFILES=$(find . -type f -name \*py|sort) && \
         PYTHONPATH=. pylint -E ${PYFILES} && pytype -P. -k . && \
         sudo pip3 install . && \
-        docker build -f Dockerfile.sidplayfp . -t sidplayfp -t anarkiwi/sidplayfp && \
         coverage run --source=desidulate -m unittest discover tests && \
         coverage report -m
