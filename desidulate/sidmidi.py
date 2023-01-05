@@ -279,7 +279,7 @@ class SidMidiFile:
             return None
 
         rows = []
-        for row, row_waveforms in row_states:
+        for row in row_states:
             clock = row.Index
             last_clock = clock
             rows.append(row)
@@ -289,8 +289,6 @@ class SidMidiFile:
                 last_gate_clock = clock
             last_gate = row.gate1
             if row.test1:
-                continue
-            if not row_waveforms:
                 continue
             if row.closest_note == last_note:
                 continue

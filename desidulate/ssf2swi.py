@@ -2,15 +2,12 @@
 
 import argparse
 import pandas as pd
-from desidulate.sidlib import resampledf_to_pr, CONTROL_BITS, timer_args
+from desidulate.sidlib import CONTROL_BITS, timer_args
 from desidulate.sidwrap import get_sid
 from desidulate.ssf import add_freq_notes_df
 from desidulate.swilib import sw_rle_diff, dot0
 
 
-# -8369400230369463243, C64Music/MUSICIANS/H/Hubbard_Rob/Commando.ssf.xz
-# -6332327843409751282, C64Music/MUSICIANS/L/Linus/Ride_the_High_Country.ssf.xz
-# -1975247557004053752, C64Music/MUSICIANS/L/Linus/Cauldron_II_Remix.ssf.xz
 parser = argparse.ArgumentParser(description='Transcribe SSF to Sid Wizard instrument')
 parser.add_argument('ssffile', help='SSF file')
 parser.add_argument('hashid', type=int, help='hashid to transcribe')
@@ -68,9 +65,7 @@ def filter_from_row(row):
 
 def main():
     df = pd.read_csv(args.ssffile, dtype=pd.Int64Dtype())
-    ssf_df = df[df.hashid == args.hashid].drop(['hashid_noclock', 'count', 'rate', 'vol', 'hashid', 'fltext'], axis=1)
-    ssf_df = resampledf_to_pr(ssf_df).reset_index(drop=True)
-
+    ssf_df = df[df.hashid == args.hashid].drop(['hashid_noclock', 'count', 'rate', 'vol', 'hashid', 'fltext'], axis=1).reset_index(drop=True)
     atk1, dec1, sus1, rel1, pr_speed, test1_initial = ssf_df[['atk1', 'dec1', 'sus1', 'rel1', 'pr_speed', 'test1']].iloc[0]
     ssf_df = ssf_df.drop(['atk1', 'dec1', 'sus1', 'rel1', 'pr_speed'], axis=1)
 

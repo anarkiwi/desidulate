@@ -80,16 +80,6 @@ def calc_rates(sid, maxprspeed, vdf, ratemin=128):
     return (rate, pr_speed)
 
 
-def resampledf_to_pr(ssf_df):
-    first_row = ssf_df.iloc[0]
-    resample_df = ssf_df.drop_duplicates('pr_frame', keep='last').reset_index(drop=True).copy()
-    resample_df_clock = ssf_df[['pr_frame']].reset_index().drop_duplicates('pr_frame', keep='first').copy()
-    resample_df = resample_df.merge(resample_df_clock, on='pr_frame').set_index('clock').sort_index()
-    for col in ADSR_COLS:
-        resample_df[col] = int(getattr(first_row, col))
-    return resample_df
-
-
 def remove_end_repeats(waveforms):
     repeat_len = int(len(waveforms) / 2)
     if repeat_len > 1:
@@ -128,22 +118,11 @@ def control_label(df):
     return df.merge(control_df, how='left', on='control')
 
 
-def control_labels_by_group(ssf_df):
-    return '-'.join(remove_repeats(list(squeeze_diffs(ssf_df, ['control'])['control_label'])))
-
-
 def control_labels(df):
-    labels = df.groupby('hashid').apply(control_labels_by_group)
+    df = control_label(df)
+    labels = df.groupby('hashid').apply(lambda ssf_df: '-'.join(remove_repeats(list(squeeze_diffs(ssf_df, ['control'])['control_label']))))
     labels.name = 'control_labels'
     return df.merge(labels, how='left', on='hashid')
-
-
-def resample_ssfs(df):
-    resampleable_ssfs = df[df.pr_speed > 0]
-    resampleable_ssfs = resampleable_ssfs.drop(['rate', 'count', 'hashid_noclock', 'clock'], axis=1)
-    resampled_dfs = resampleable_ssfs.drop_duplicates(['hashid', 'pr_frame', 'control'], keep='last')
-    resampled_dfs = resampled_dfs.drop(['control', 'control_label', 'control_labels'], axis=1)
-    return hash_vdf(resampled_dfs, set(resampled_dfs.columns) - set(CANON_REG_ORDER), 'resample_hashid', 'hashid')
 
 
 def timer_args(parser):
