@@ -29,7 +29,6 @@ def main():
     parser.add_argument('--minclock', default=0, type=int, help='Min clock value')
     parser.add_argument('--maxclock', default=0, type=int, help='Max clock value')
     parser.add_argument('--voicemask', default=','.join([str(v) for v in ALL_VOICES]), type=str, help='Voice mask')
-    parser.add_argument('--dfext', default='zst', help='default dataframe extension')
     midi_args(parser)
     args = parser.parse_args()
     voicemask = frozenset([int(v) for v in args.voicemask.split(',')])
@@ -68,11 +67,13 @@ def main():
     sid = get_sid(args.pal, args.cia)
     smf = SidMidiFile(sid, args.bpm)
     parser = SidSoundFragmentParser(args.ssflogfile, args.percussion, sid)
-    parser.read_patches(args.dfext)
+    parser.read_ssfs()
 
     ssf_cache = {}
     ssf_instruments = []
     for row in ssf_log_df.itertuples():
+        if row.hashid not in parser.ssf_dfs:
+            continue
         ssf = ssf_cache.get(row.hashid, None)
         if ssf is None:
             ssf_df = parser.ssf_dfs[row.hashid]
@@ -85,9 +86,10 @@ def main():
             ssf = SidSoundFragment(args.percussion, sid, ssf_df, smf, wav_file=wav_file)
             ssf_cache[row.hashid] = ssf
             ssf_instruments.append(ssf.instrument({'hashid': row.hashid}))
+            logging.info('parsed ssf %d (%u of %u)', row.hashid, len(ssf_cache), len(parser.ssf_dfs))
         ssf.smf_transcribe(smf, row.clock, row.voice, row.duration)
 
-    ssf_instrument_file = out_path(args.ssflogfile, '.'.join(('inst.txt', args.dfext)))
+    ssf_instrument_file = out_path(args.ssflogfile, 'inst.txt.zst')
     ssf_instrument_df = pd.DataFrame(ssf_instruments)
     ssf_instrument_df.to_csv(ssf_instrument_file, index=False)
 

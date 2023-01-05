@@ -10,11 +10,9 @@
 # http://www.ucapps.de/howto_sid_wavetables_1.html
 
 import logging
-from collections import Counter
-from itertools import groupby
 import pandas as pd
 from desidulate.fileio import out_path, read_csv
-from desidulate.sidlib import set_sid_dtype, resampledf_to_pr
+from desidulate.sidlib import set_sid_dtype, control_labels
 from desidulate.sidmidi import closest_midi, MEMBRANE_DRUM_MAP, CYMBAL_DRUMS
 from desidulate.sidwav import state2samples, samples_loudestf, readwav
 
@@ -38,24 +36,16 @@ def add_freq_notes_df(sid, ssfs_df):
 
 class SidSoundFragment:
 
-    @staticmethod
-    def _waveform_state(ssf):
-        return [frozenset(
-            waveform[:-1] for waveform in ('noise1', 'pulse1', 'tri1', 'saw1')
-            if pd.notna(getattr(row, waveform)) and getattr(row, waveform) > 0)
-                for row in ssf.itertuples()]
-
     def __init__(self, percussion, sid, df, smf, wav_file=None, initial_frames=INITIAL_FRAMES):
-        self.df = resampledf_to_pr(df)
+        self.df = df
         self.initial_clocks = sid.clockq * (initial_frames + 1)
         self.percussion = percussion
-        waveform_states = self._waveform_state(self.df)
-        self.waveform_order = tuple([frozenset(i[0]) for i in groupby(waveform_states)])
-        self.waveforms = frozenset().union(*self.waveform_order)
-        self.noisephases = len([waveforms for waveforms in self.waveform_order if 'noise' in waveforms])
-        self.pulsephases = len([waveforms for waveforms in self.waveform_order if 'pulse' in waveforms])
-        self.all_noise = self.waveforms == {'noise'}
-        self.midi_notes = tuple(smf.get_midi_notes_from_events(zip(self.df.itertuples(), waveform_states)))
+        self.waveform_order = tuple(self.df.iloc[0]['control_labels'].split('-'))
+        self.waveforms = frozenset(self.waveform_order)
+        self.noisephases = len([waveforms for waveforms in self.waveform_order if 'n' in waveforms])
+        self.pulsephases = len([waveforms for waveforms in self.waveform_order if 'p' in waveforms])
+        self.all_noise = self.waveforms == {'n'}
+        self.midi_notes = tuple(smf.get_midi_notes_from_events(self.df.itertuples()))
         self.midi_pitches = tuple([midi_note[1] for midi_note in self.midi_notes])
         self.total_duration = 0
         self.max_midi_note = 0
@@ -93,7 +83,7 @@ class SidSoundFragment:
             self.samples = samples[:max_samples]
         else:
             rate = sid.resid.sampling_frequency
-            self.samples = state2samples(self.df, sid, skiptest=True, maxclock=self.one_2n_clocks)
+            self.samples = state2samples(self.df.drop(['control_labels', 'control_label'], axis=1), sid, skiptest=True, maxclock=self.one_2n_clocks)
         if len(self.samples):
             self.loudestf = samples_loudestf(self.samples, rate)
             self._set_pitches(sid)
@@ -171,13 +161,12 @@ class SidSoundFragmentParser:
         self.percussion = percussion
         self.sid = sid
         self.ssf_dfs = {}
-        self.patch_count = Counter()
 
-    def read_patches(self, dfext):
-        patch_log = out_path(self.logfile, '.'.join(('ssf', dfext)))
-        ssfs_df = add_freq_notes_df(self.sid, read_csv(patch_log, dtype=pd.Int64Dtype()))
-        for hashid, ssf_df in ssfs_df.groupby('hashid', sort=False):
-            self.patch_count[hashid] = ssf_df['count'].max()
-            self.ssf_dfs[hashid] = ssf_df.drop(
-                ['hashid', 'count'], axis=1).set_index('clock').fillna(method='ffill')
-        logging.info('read %u patches from %s', len(self.ssf_dfs), patch_log)
+    def read_ssfs(self):
+        ssfs_df = add_freq_notes_df(self.sid, read_csv(out_path(self.logfile, 'ssf.zst'), dtype=pd.Int64Dtype()))
+        # TODO: handle vol/samples
+        ssfs_df = control_labels(ssfs_df)
+        ssfs_df = ssfs_df[ssfs_df['vol'].isna()]
+        ssfs_df['vol'] = 15
+        self.ssf_dfs = {hashid: ssf_df.set_index('clock').fillna(method='ffill') for hashid, ssf_df in ssfs_df.groupby('hashid')}
+        logging.info('read %u patches', len(self.ssf_dfs))

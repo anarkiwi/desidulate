@@ -23,7 +23,6 @@ def main():
     df = set_sid_dtype(read_csv(args.ssffile, dtype=pd.Int64Dtype()))
     if not df.empty:
         df = df[(df.clock <= args.max_clock) & (df.pr_speed <= args.max_pr_speed)]
-        df = control_label(df)
         df = control_labels(df)
         for labels, ssf_df in df.groupby('control_labels'):
             if labels:
