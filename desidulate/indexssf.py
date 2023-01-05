@@ -10,7 +10,7 @@ import argparse
 import pandas as pd
 
 from desidulate.fileio import read_csv, out_path
-from desidulate.sidlib import set_sid_dtype, control_label, control_labels
+from desidulate.sidlib import set_sid_dtype, control_labels, unique_control_labels
 
 parser = argparse.ArgumentParser(description='Index SSFs with waveforms')
 parser.add_argument('ssffile', help='SSF file')
@@ -24,9 +24,10 @@ def main():
     if not df.empty:
         df = df[(df.clock <= args.max_clock) & (df.pr_speed <= args.max_pr_speed)]
         df = control_labels(df)
-        for labels, ssf_df in df.groupby('control_labels'):
+        df = unique_control_labels(df)
+        for labels, ssf_df in df.groupby('unique_control_labels'):
             if labels:
-                ssf_df['hashid'].drop_duplicates().to_csv(out_path(args.ssffile, '%s.index_ssf.zst' % labels), index=False)
+                ssf_df[['hashid', 'hashid_noclock']].drop_duplicates().to_csv(out_path(args.ssffile, '%s.index_ssf.zst' % labels), index=False)
 
 
 if __name__ == '__main__':

@@ -125,6 +125,12 @@ def control_labels(df):
     return df.merge(labels, how='left', on='hashid')
 
 
+def unique_control_labels(df):
+    labels = df.groupby('hashid').apply(lambda ssf_df: '-'.join(sorted(waveform for waveform in ssf_df['control_label'].unique() if 'T' not in waveform)))
+    labels.name = 'unique_control_labels'
+    return df.merge(labels, on='hashid', how='left')
+
+
 def timer_args(parser):
     video_parser = parser.add_mutually_exclusive_group(required=False)
     video_parser.add_argument('--pal', dest='pal', action='store_true', help='Use PAL clock')
