@@ -125,14 +125,6 @@ def control_labels(df):
     return df.merge(labels, how='left', on='hashid')
 
 
-def resample_ssfs(df):
-    resampleable_ssfs = df[df.pr_speed > 0]
-    resampleable_ssfs = resampleable_ssfs.drop(['rate', 'count', 'hashid_noclock', 'clock'], axis=1)
-    resampled_dfs = resampleable_ssfs.drop_duplicates(['hashid', 'pr_frame', 'control'], keep='last')
-    resampled_dfs = resampled_dfs.drop(['control', 'control_label', 'control_labels'], axis=1)
-    return hash_vdf(resampled_dfs, set(resampled_dfs.columns) - set(CANON_REG_ORDER), 'resample_hashid', 'hashid')
-
-
 def timer_args(parser):
     video_parser = parser.add_mutually_exclusive_group(required=False)
     video_parser.add_argument('--pal', dest='pal', action='store_true', help='Use PAL clock')

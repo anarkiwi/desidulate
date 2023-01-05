@@ -10,9 +10,9 @@ import argparse
 import pandas as pd
 
 from desidulate.fileio import read_csv, out_path
-from desidulate.sidlib import set_sid_dtype, control_label, control_labels, resample_ssfs
+from desidulate.sidlib import set_sid_dtype, control_label, control_labels
 
-parser = argparse.ArgumentParser(description='Downsample SSFs to PR frames')
+parser = argparse.ArgumentParser(description='Index SSFs with waveforms')
 parser.add_argument('ssffile', help='SSF file')
 parser.add_argument('--max_clock', default=500000, type=int, help='include number of cycles')
 parser.add_argument('--max_pr_speed', default=8, type=int, help='max pr_speed')
@@ -27,8 +27,6 @@ def main():
         for labels, ssf_df in df.groupby('control_labels'):
             if labels:
                 ssf_df['hashid'].drop_duplicates().to_csv(out_path(args.ssffile, '%s.index_ssf.zst' % labels), index=False)
-        rdf = resample_ssfs(df)
-        rdf.to_csv(out_path(args.ssffile, 'resample_ssf.zst'), index=False)
 
 
 if __name__ == '__main__':
