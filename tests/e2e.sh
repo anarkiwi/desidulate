@@ -12,4 +12,5 @@ for DIR in $2 $3 ; do
     reg2ssf --pal $DIR/test.dump.zst
     ssf2wav --pal $DIR/test.ssf.zst
     ssf2midi --pal $DIR/test.log.zst
+    indexssf $DIR/test.ssf.zst
 done

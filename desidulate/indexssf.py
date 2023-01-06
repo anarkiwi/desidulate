@@ -25,9 +25,10 @@ def main():
         df = df[(df.clock <= args.max_clock) & (df.pr_speed <= args.max_pr_speed)]
         df = control_labels(df)
         df = unique_control_labels(df)
+        vols = df[df['vol'].notna()]['vol'].nunique()
         for labels, ssf_df in df.groupby('unique_control_labels'):
             if labels:
-                ssf_df[['hashid', 'hashid_noclock']].drop_duplicates().to_csv(out_path(args.ssffile, '%s.index_ssf.zst' % labels), index=False)
+                ssf_df[['hashid', 'hashid_noclock']].drop_duplicates().to_csv(out_path(args.ssffile, '%u.%s.index_ssf.zst' % (vols, labels)), index=False)
 
 
 if __name__ == '__main__':
