@@ -15,4 +15,5 @@ jobs:
         coverage run --source=desidulate -m unittest discover tests && \
         coverage report -m &&
         ./tests/e2e.sh http://www.hvsc.c64.org/download/C64Music/MUSICIANS/H/Hubbard_Rob/Commando.sid test1 test2 && \
-        diff -b test1/test.ssf.zst test2/test.ssf.zst
+        chmod a-w test2 && \
+        rsync -ic test1/* test2/

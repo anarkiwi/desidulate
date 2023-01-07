@@ -22,21 +22,21 @@ from desidulate.ssf import add_freq_notes_df, SidSoundFragment
 
 class RenderWav:
 
-    def __init__(self, sid, smf, args):
-        self.sid = sid
+    def __init__(self, smf, args):
         self.smf = smf
         self.args = args
 
     def render(self, ssf_df, wavfile):
         ssf_df = ssf_df.set_index('clock')
         ssf_df = ssf_df.fillna(method='ffill')
-        df2wav(ssf_df, self.sid, wavfile, skiptest=self.args.skiptest)
+        sid = get_sid(self.args.pal, self.args.cia)
+        df2wav(ssf_df, sid, wavfile, skiptest=self.args.skiptest)
         logging.info(ssf_df.to_string())
         if self.args.play:
             os.system(' '.join(['play', wavfile]))
         if self.args.skip_ssf_parser:
             return
-        ssf = SidSoundFragment(self.args.percussion, self.sid, ssf_df, self.smf)
+        ssf = SidSoundFragment(self.args.percussion, sid, ssf_df, self.smf)
         logging.info(ssf.instrument({}))
 
 
@@ -86,7 +86,7 @@ def main():
     df['vol'] = 15
 
     global rw
-    rw = RenderWav(sid, smf, args)
+    rw = RenderWav(smf, args)
     with ProcessPoolExecutor(max_workers=args.workers) as pool:
         for hashid, ssf_df in df.groupby('hashid'):
             wavfile = out_path(args.ssffile, '%u.wav' % hashid)
