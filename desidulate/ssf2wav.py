@@ -29,7 +29,7 @@ class RenderWav:
     def render(self, ssf_df, wavfile):
         ssf_df = ssf_df.set_index('clock')
         ssf_df = ssf_df.fillna(method='ffill')
-        sid = get_sid(args.pal, args.cia)
+        sid = get_sid(self.args.pal, self.args.cia)
         df2wav(ssf_df, sid, wavfile, skiptest=self.args.skiptest)
         logging.info(ssf_df.to_string())
         if self.args.play:
