@@ -1,5 +1,5 @@
 attrs==22.2.0
-coverage==7.0.3
+coverage==7.0.4
 wheel==0.38.4
 pytype==2022.12.15
 pylint==2.15.9
