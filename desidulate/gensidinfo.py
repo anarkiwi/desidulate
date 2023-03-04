@@ -74,6 +74,8 @@ def scrape_tunelengths(tunelengthfile):
             tunelengths = {}
             for song, raw in enumerate(tunelength_raw, start=1):
                 raw_match = tunelength_time_re.match(raw)
+                if raw_match is None:
+                    raise ValueError(raw)
                 tunelength = int(raw_match.group(1)) * 60
                 tunelength += int(raw_match.group(2))
                 if raw_match.group(3):
