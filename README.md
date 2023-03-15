@@ -47,12 +47,12 @@ $ vsid -sounddev dump -soundarg C64Music/MUSICIANS/L/Linus/Cauldron_II_Remix.sid
 $ reg2ssf C64Music/MUSICIANS/L/Linus/Cauldron_II_Remix.sid.dump
 ```
 
-_reg2ssf_ identifies all SSFs (see above) and writes them to `C64Music/MUSICIANS/L/Linus/Cauldron_II_Remix.ssf.xz`, and log file `C64Music/MUSICIANS/L/Linus/Cauldron_II_Remix.log.xz`.
+_reg2ssf_ identifies all SSFs (see above) and writes them to `C64Music/MUSICIANS/L/Linus/Cauldron_II_Remix.ssf.zst`, and log file `C64Music/MUSICIANS/L/Linus/Cauldron_II_Remix.log.zst`.
 
 SSFs are output in order of frequency of occurence, most first:
 
 ```
-$ xzcat C64Music/MUSICIANS/L/Linus/Cauldron_II_Remix.ssf.xz |head
+$ zstdcat C64Music/MUSICIANS/L/Linus/Cauldron_II_Remix.ssf.zst |head
 hashid,clock,pr_frame,gate1,freq1,pwduty1,pulse1,noise1,tri1,saw1,test1,sync1,ring1,freq3,test3,flt1,fltcoff,fltres,fltlo,fltband,flthi,fltext,atk1,dec1,sus1,rel1,vol,rate,pr_speed,hashid_noclock,count
 -2174233589037180891,0,0,1,,,,,,,1,,,,,,,,,,,,0,2,10,0,15,19339,1,-6871201304917122305,286
 -2174233589037180891,19689,1,1,53414,,0,1,0,0,0,,,,,0,,,,,,,,,,,15,19339,1,-6871201304917122305,286
@@ -66,7 +66,7 @@ hashid,clock,pr_frame,gate1,freq1,pwduty1,pulse1,noise1,tri1,saw1,test1,sync1,ri
 ### Transcribing to SMF
 
 ```
-$ ssf2midi C64Music/MUSICIANS/L/Linus/Cauldron_II_Remix.log.xz
+$ ssf2midi C64Music/MUSICIANS/L/Linus/Cauldron_II_Remix.log.zst
 ```
 
 _ssf2midi_ generates a SMF file `C64Music/MUSICIANS/L/Linus/Cauldron_II_Remix.mid` from _reg2ssf_ log and ssf files (note only the path to the log file is specified).
@@ -76,7 +76,7 @@ desidulate will generate a multitrack SMF (one track for each voice, and an addi
 ### Transcribing to WAV
 
 ```
-$ ssf2wav C64Music/MUSICIANS/L/Linus/Cauldron_II_Remix.log.xz --hashid -5281139747119741370 --play
+$ ssf2wav C64Music/MUSICIANS/L/Linus/Cauldron_II_Remix.log.zst --hashid -5281139747119741370 --play
 		     hashid  pr_frame  gate1  freq1  pwduty1  pulse1  noise1  tri1  saw1  test1  sync1  ring1  freq3  test3  flt1  fltcoff  fltres  fltlo  fltband  flthi  fltext  atk1  dec1  sus1  rel1  vol   rate  pr_speed      hashid_noclock  count    real_freq  closest_note
 clock
 0      -5281139747119741370         0      1   <NA>     <NA>    <NA>    <NA>  <NA>  <NA>      1   <NA>   <NA>   <NA>   <NA>  <NA>     <NA>    <NA>   <NA>     <NA>   <NA>    <NA>     0     2    14     0   15  19383         1  757979854999595997    193         <NA>          <NA>
@@ -97,7 +97,7 @@ desidulate can, with some limitations, transcribe an SSF to a Sid Wizard instrum
 1. Generate WAVs for every SSF in a song:
 
 ```
-$ ssf2wav C64Music/MUSICIANS/L/Linus/Cauldron_II_Remix.ssf.xz
+$ ssf2wav C64Music/MUSICIANS/L/Linus/Cauldron_II_Remix.ssf.zst
 ```
 
 2. Listen to the WAVs, to find the instrument you wish to transcribe, which will be indentified with a hashid in the filename.
@@ -105,7 +105,7 @@ $ ssf2wav C64Music/MUSICIANS/L/Linus/Cauldron_II_Remix.ssf.xz
 3. Transcribe the SSF into an instrument (in this case, a kick sound): 
 
 ```
-$ ssf2swi C64Music/MUSICIANS/L/Linus/Cauldron_II_Remix.ssf.xz -1975247557004053752
+$ ssf2swi C64Music/MUSICIANS/L/Linus/Cauldron_II_Remix.ssf.zst -1975247557004053752
 multispeed: 1
 ADSR: 05F0
 
