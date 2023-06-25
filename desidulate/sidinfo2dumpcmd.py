@@ -26,8 +26,11 @@ def main():
         cycles = int(clock_freq * (row.length + 1))
         dname = os.path.join(args.hvscdir, os.path.dirname(path))
         bname = os.path.basename(path)
-        dbname = '%s.dump' % bname
+        dbname = '%s/%u/%s.dump' % (bname, row.song, bname)
         dbname = dbname.replace('.sid', '-%u' % row.song)
+        dbpath = os.path.dirname(dbname)
+        if not os.path.exists(dbpath):
+            os.makedirs(dbpath)
         vice_cmd = [
             'docker', 'run', '--rm', '-v', '%s:/vice' % dname, '-i', VICEIMAGE,
             'vsid', '-warp', '-console', '-silent', '-sounddev', 'dump',
