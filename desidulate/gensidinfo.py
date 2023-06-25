@@ -31,7 +31,12 @@ tunelength_time_re = re.compile(r'(\d+)\:(\d+)\.*(\d*)$')
 
 def scrape_sidinfo(i, sidfile, tunelengths, cache):
     logging.info('scraping %u: %s', i, sidfile)
-    sidinfo_file = str(sidfile).replace('.sid', '.sidinfo')
+    sidinfo_file = str(sidfile)
+    sidinfo_file = sidinfo_file[:sidinfo_file.rfind(".")]
+    sidinfo_file = os.path.join(sidinfo_file, os.path.basename(sidinfo_file)) + ".sidinfo"
+    sidinfo_dir = os.path.dirname(sidinfo_file)
+    if not os.path.exists(sidinfo_dir):
+        os.makedirs(sidinfo_dir)
     if not os.path.exists(sidinfo_file) or not cache:
         with open(sidfile, 'rb') as f:
             md5_hash = hashlib.md5(f.read()).hexdigest()
@@ -47,6 +52,7 @@ def scrape_sidinfo(i, sidfile, tunelengths, cache):
             results.append(result)
         sidinfo_file_tmp = sidinfo_file.replace(
             os.path.basename(sidinfo_file), '.' + os.path.basename(sidinfo_file))
+
         with open(sidinfo_file_tmp, 'w', encoding='utf8') as f:
             f.write(json.dumps(results))
         os.rename(sidinfo_file_tmp, sidinfo_file)
