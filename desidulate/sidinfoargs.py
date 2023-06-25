@@ -31,7 +31,8 @@ def main():
         if filter_re and not filter_re.match(filename):
             continue
         if args.ext:
-            filename = '.'.join(('%s-%u' % (filename, row.song), args.ext))
+            bfilename = os.path.basename(filename)
+            filename = '.'.join(('%s/%u/%s-%u' % (filename, row.song, bfilename, row.song), args.ext))
         try:
             size = os.path.getsize(filename)
         except OSError:
