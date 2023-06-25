@@ -33,7 +33,7 @@ def scrape_sidinfo(i, sidfile, tunelengths, cache):
     logging.info('scraping %u: %s', i, sidfile)
     sidinfo_file = str(sidfile)
     sidinfo_file = sidinfo_file[:sidinfo_file.rfind(".")]
-    sidinfo_file = os.path.basename(sidinfo_file) + ".sidinfo"
+    sidinfo_file = os.path.join(os.path.join(sidinfo_file, os.path.basename(sidinfo_file)), os.path.basename(sidinfo_file) + ".sidinfo")
     sidinfo_dir = os.path.dirname(sidinfo_file)
     if not os.path.exists(sidinfo_dir):
         os.makedirs(sidinfo_dir)
