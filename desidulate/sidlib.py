@@ -246,7 +246,7 @@ def reg2state(snd_log_name, nrows=(10 * 1e6)):
 def coalesce_near_writes(vdf, cols, near=16):
     vdf = vdf.reset_index()
     clock_diff = vdf['clock'].astype(np.int64).diff(-1).astype(pd.Int64Dtype())
-    near_cond = ((clock_diff < 0) & (clock_diff > -near))
+    near_cond = ((clock_diff < 0) & (clock_diff >= -near))
     for b2_reg in cols:
         logging.debug('coalesce %s', b2_reg)
         b2_next = vdf[b2_reg].shift(-1)
@@ -511,12 +511,12 @@ def pad_ssf_duration(sid, ssf_df, first_clock_duration):
     return ssf_df
 
 
-def state2ssfs(sid, df, maxprspeed=8):
+def state2ssfs(sid, df, maxprspeed=8, near=16):
     ssf_log = []
     ssf_dfs = {}
     ssf_count = defaultdict(int)
 
-    for v, v_df in split_vdf(sid, df, maxprspeed=maxprspeed):
+    for v, v_df in split_vdf(sid, df, maxprspeed=maxprspeed, near=near):
         ssfs = v_df['ssf'].nunique()
         voice_ssfs = set()
         logging.debug('splitting %u SSFs for voice %u', ssfs, v)

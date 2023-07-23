@@ -75,6 +75,11 @@ class SidWrap:
         self.int_freq = self.clock_freq / self.clockq
         self.vid_int_freq = self.clock_freq / self.video_clockq
 
+        us_per_sample = 1e6 / sampling_frequency
+        us_per_cycle = 1e6 / self.clock_freq
+        self.one_sample_cycles = int(us_per_sample / us_per_cycle)
+        logging.info('one sample lasts %u cycles (one sample lasts %fus)', self.one_sample_cycles, us_per_sample)
+
         logging.info('using PR frequency %f Hz (%u cycles)', self.int_freq, self.clockq)
         self.resid = SoundInterfaceDevice(
             model=model, clock_frequency=self.clock_freq,
