@@ -29,7 +29,7 @@ def main():
 
     sid = get_sid(args.pal, args.cia)
     df = reg2state(args.logfile, nrows=int(args.maxstates))
-    ssf_log_df, ssf_df = state2ssfs(sid, df, maxprspeed=args.maxprspeed)
+    ssf_log_df, ssf_df = state2ssfs(sid, df, maxprspeed=args.maxprspeed, near=sid.one_sample_cycles)
 
     for ext, filedf in (
             ('.'.join(('log', args.dfext)), ssf_log_df),
