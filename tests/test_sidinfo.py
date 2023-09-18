@@ -32,7 +32,11 @@ class SidInfoTestCase(unittest.TestCase):
                 ('C64Music/MUSICIANS/T/Timoc/Noisemaster_3.sid', [{'magicID': 'RSID', 'version': 2, 'dataOffset': 124, 'loadAddress': 0, 'initAddress': 49152, 'playAddress': 0, 'songs': 1, 'startSong': 1, 'speed': 'VBI', 'name': 'Noisemaster 3', 'author': 'Torsten Kruse (Timoc)', 'released': '1988 INXS', 'binformat': 'built-in', 'psidSpecific': 'c64', 'clock': 'PAL', 'sidmodel': '6581', 'sidmodel2': 'Unknown', 'sidmodel3': 'Unknown', 'startPage': 4, 'pageLength': 85, 'secondSIDAddress': 0, 'thirdSIDAddress': 0, 'pal': 1, 'sids': 1, 'cia': 16421, 'song': 1}]),
                 ('C64Music/MUSICIANS/H/Hubbard_Rob/5_Title_Tunes.sid', [{'magicID': 'PSID', 'version': 2, 'dataOffset': 124, 'loadAddress': 0, 'initAddress': 2832, 'playAddress': 2880, 'songs': 5, 'startSong': 1, 'speed': speed, 'name': '5 Title Tunes', 'author': 'Rob Hubbard', 'released': '1985 Rob Hubbard', 'binformat': 'built-in', 'psidSpecific': 'c64', 'clock': 'PAL', 'sidmodel': '6581', 'sidmodel2': 'Unknown', 'sidmodel3': 'Unknown', 'startPage': 0, 'pageLength': 0, 'secondSIDAddress': 0, 'thirdSIDAddress': 0, 'pal': 1, 'sids': 1, 'cia': cia, 'song': song} for song, speed, cia in ((1, 'VBI', 0), (2, 'VBI', 0), (3, 'CIA', 16421), (4, 'VBI', 0), (5, 'VBI', 0))]),
                 ):
-            result = self.run_sidinfo(sidfile)
+            try:
+                result = self.run_sidinfo(sidfile)
+            except urllib.error.HTTPError as e:
+                print("WARNING: HVSC down?: %s" % e)
+                continue
             self.assertEqual(expected_result, result)
 
 
