@@ -3,6 +3,6 @@ music21==9.1.0
 numpy==1.26.0
 pandas==2.1.1
 pyarrow==13.0.0
-pyresidfp==0.7.0
+pyresidfp==0.7.1
 scipy==1.11.3
 zstandard==0.21.0
