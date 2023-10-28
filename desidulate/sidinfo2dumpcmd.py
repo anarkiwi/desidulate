@@ -28,12 +28,12 @@ def main():
         bname = os.path.basename(path)
         dbname = '%s/%u/%s' % (bname, row.song, bname)
         dbname = dbname.replace('.sid', '')
-        dbname = dbname + '-%u.dump' % row.song
+        dbname = dbname + '-%u.dump.zst' % row.song
         dbpath = os.path.join(dname, os.path.dirname(dbname))
         vice_cmd = [
             'docker', 'run', '--rm', '-v', '%s:/vice' % dname, '-i', VICEIMAGE,
-            'vsid', '-warp', '-console', '-silent', '-sounddev', 'dump',
-            '-soundarg', os.path.join('/vice', dbname),
+            'vsiddump.py', os.path.join('/vice', dbname),
+            '-warp', '-console', '-silent',
             '-limit', str(cycles),
             '-tune', str(row.song),
             os.path.join('/vice', bname)]
