@@ -2,7 +2,7 @@ docker==7.0.0
 music21==9.1.0
 numpy==1.26.2
 pandas==2.1.4
-pyarrow==14.0.1
+pyarrow==14.0.2
 pyresidfp==0.7.1
 scipy==1.11.4
 zstandard==0.22.0
