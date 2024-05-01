@@ -5,13 +5,13 @@ import os
 from pyresidfp import SoundInterfaceDevice
 from desidulate.fileio import read_csv
 
-VICEIMAGE = 'anarkiwi/headlessvice'
+VICEIMAGE = "anarkiwi/headlessvice"
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('sidinfo', type=str)
-    parser.add_argument('--hvscdir', default='/local/hvsc', type=str)
+    parser.add_argument("sidinfo", type=str)
+    parser.add_argument("--hvscdir", default="/local/hvsc", type=str)
     args = parser.parse_args()
 
     df = read_csv(args.sidinfo)
@@ -26,23 +26,35 @@ def main():
         cycles = int(clock_freq * (row.length + 1))
         dname = os.path.join(args.hvscdir, os.path.dirname(path))
         bname = os.path.basename(path)
-        dbname = '%s/%u/%s' % (bname, row.song, bname)
-        dbname = dbname.replace('.sid', '')
-        dbname = dbname + '-%u.dump' % row.song
+        dbname = "%s/%u/%s" % (bname, row.song, bname)
+        dbname = dbname.replace(".sid", "")
+        dbname = dbname + "-%u.dump.zst" % row.song
         dbpath = os.path.join(dname, os.path.dirname(dbname))
         vice_cmd = [
-            'docker', 'run', '--rm', '-v', '%s:/vice' % dname,
-            '--name', '-'.join(['vsid', bname, str(row.song)]),
-            '-i', VICEIMAGE,
-            'vsid', '-warp', '-console', '-silent', '-sounddev', 'dump',
-            '-soundarg', os.path.join('/vice', dbname),
-            '-limit', str(cycles),
-            '-tune', str(row.song),
-            os.path.join('/vice', bname)]
+            "docker",
+            "run",
+            "--rm",
+            "-v",
+            "%s:/vice" % dname,
+            "--name",
+            "-".join(["vsid", os.path.basename(dname), bname, str(row.song)]),
+            "-i",
+            VICEIMAGE,
+            "/usr/local/bin/vsiddump.py",
+            os.path.join("/vice", dbname),
+            "-warp",
+            "-console",
+            "-silent",
+            "-limit",
+            str(cycles),
+            "-tune",
+            str(row.song),
+            os.path.join("/vice", bname),
+        ]
         if not os.path.exists(dbpath):
             os.makedirs(dbpath)
-        print(' '.join(vice_cmd))
+        print(" ".join(vice_cmd))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
