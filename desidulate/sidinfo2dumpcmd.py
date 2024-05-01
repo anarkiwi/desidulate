@@ -31,7 +31,9 @@ def main():
         dbname = dbname + '-%u.dump' % row.song
         dbpath = os.path.join(dname, os.path.dirname(dbname))
         vice_cmd = [
-            'docker', 'run', '--rm', '-v', '%s:/vice' % dname, '-i', VICEIMAGE,
+            'docker', 'run', '--rm', '-v', '%s:/vice' % dname,
+            '--name', '-'.join(['vsid', bname, str(row.song)]),
+            '-i', VICEIMAGE,
             'vsid', '-warp', '-console', '-silent', '-sounddev', 'dump',
             '-soundarg', os.path.join('/vice', dbname),
             '-limit', str(cycles),
