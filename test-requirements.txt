@@ -3,4 +3,4 @@ coverage==7.6.1
 wheel==0.44.0
 pytype==2024.9.13
 pylint==3.2.7
-pytest==8.3.2
+pytest==8.3.3
