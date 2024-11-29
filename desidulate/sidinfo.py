@@ -101,7 +101,7 @@ SID_HEADERS = (
 )
 
 
-def scrape_cia_timer(sidfile, validate_ctrl, tune, cutoff_time=0.5):
+def scrape_cia_timer(sidfile, validate_ctrl, tune, cutoff_time=1):
     siddir = os.path.realpath(os.path.dirname(sidfile))
     client = docker.from_env()
     timer_low = 0
@@ -111,7 +111,7 @@ def scrape_cia_timer(sidfile, validate_ctrl, tune, cutoff_time=0.5):
     instruction_cutoff = cutoff_time * 1e6
     instructions = 0
     cmd = [
-        f'-t{cutoff_time}', '-q', '--none', '--cpu-debug', '-os', '--delay=0', f'-o{tune}',
+        f'-t{cutoff_time}', '-q', '--cpu-debug', '--delay=0', f'-os{tune}', '-w/dev/null',
         os.path.join('tmp', os.path.basename(sidfile))]
     sidplayfp = client.containers.run(
         SIDPLAYFP_IMAGE, cmd,
