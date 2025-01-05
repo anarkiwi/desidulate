@@ -1,4 +1,4 @@
-attrs==24.2.0
+attrs==24.3.0
 coverage==7.6.10
 wheel==0.45.1
 pytype==2024.10.11
