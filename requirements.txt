@@ -1,6 +1,6 @@
 docker==7.1.0
 music21==9.3.0
-numpy==2.2.1
+numpy==2.2.4
 pandas==2.2.3
 pyarrow==18.1.0
 pyresidfp==0.13.2
