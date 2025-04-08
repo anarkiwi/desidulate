@@ -1,6 +1,6 @@
 attrs==25.3.0
 coverage==7.6.10
-wheel==0.45.1
+wheel==0.46.1
 pytype==2024.10.11
 pylint==3.3.5
 pytest==8.3.4
