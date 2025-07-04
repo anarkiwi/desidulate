@@ -10,7 +10,7 @@ jobs:
     - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
     - name: test
       run: |
-        sudo apt-get update && sudo apt-get install python3-dev && \
+        sudo apt-get update && sudo apt-get dist-upgrade && sudo apt-get install python3-dev && \
         sudo pip3 install -U -r test-requirements.txt -r requirements.txt && \
         PYFILES=$(find tests desidulate -type f -name \*py|sort) && \
         PYTHONPATH=. pylint -E ${PYFILES} && pytype -P. -k . && \
