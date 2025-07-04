@@ -6,12 +6,12 @@ on:
     - cron: '0 0,12 * * *'
 jobs:
   test:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
     - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
     - name: test
       run: |
         sudo apt-get update && sudo apt-get install python3-dev && \
-        sudo pip3 install -U -r test-requirements.txt -r requirements.txt && \
-        sudo pip3 install . && \
+        pip3 install --user -U -r test-requirements.txt -r requirements.txt && \
+        pip3 install --user . && \
         pytest .
