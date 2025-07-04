@@ -8,10 +8,10 @@ jobs:
     - name: test
       run: |
         sudo apt-get update && sudo apt-get dist-upgrade && sudo apt-get install python3-dev && \
-        sudo pip3 install -U -r test-requirements.txt -r requirements.txt && \
+        pip3 install --user -U -r test-requirements.txt -r requirements.txt && \
         PYFILES=$(find tests desidulate -type f -name \*py|sort) && \
         PYTHONPATH=. pylint -E ${PYFILES} && pytype -P. -k . && \
-        sudo pip3 install . && \
+        pip3 install --user . && \
         coverage run --source=desidulate -m unittest discover tests && \
         coverage report -m
     - name: e2e_test
