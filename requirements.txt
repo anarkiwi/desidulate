@@ -4,6 +4,6 @@ numpy==2.3.2
 pandas==2.3.1
 pyarrow==20.0.0
 pyresidfp==0.13.2
-requests==2.32.4
+requests==2.32.5
 scipy==1.16.1
 zstandard==0.24.0
