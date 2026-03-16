@@ -20,7 +20,7 @@ class SSFTestCase(unittest.TestCase):
         df = add_freq_notes_df(sid, df)
         df["pr_speed"] = 1
         df["pr_frame"] = df["clock"].floordiv(sid.clockq)
-        df = df.fillna(method="ffill")
+        df = df.ffill()
         df = control_labels(df).set_index("clock")
         return SidSoundFragment(percussion=percussion, sid=sid, smf=smf, df=df)
 
