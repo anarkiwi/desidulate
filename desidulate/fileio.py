@@ -9,31 +9,41 @@ import pandas as pd
 
 
 def read_csv(*args, **kwargs):
-    return pd.read_csv(*args, **kwargs, engine='pyarrow')
+    return pd.read_csv(*args, **kwargs, engine="pyarrow")
 
 
 def out_path(snd_log_name, new_ext):
     snd_log_name = os.path.expanduser(snd_log_name)
     base = os.path.basename(snd_log_name)
-    recogized_exts = {'zst', 'xz', 'gz', 'dump', 'log', 'sid', 'txt', 'ssf', 'index_ssf'}
+    recogized_exts = {
+        "zst",
+        "xz",
+        "gz",
+        "dump",
+        "log",
+        "sid",
+        "txt",
+        "ssf",
+        "index_ssf",
+    }
     while True:
-        dot = base.rfind('.')
+        dot = base.rfind(".")
         if dot <= 0:
             break
-        ext = base[dot+1:]
+        ext = base[dot + 1 :]
         if not ext:
             break
         if ext not in recogized_exts:
             break
         base = base[:dot]
-    return os.path.join(os.path.dirname(snd_log_name), '.'.join((base, new_ext)))
+    return os.path.join(os.path.dirname(snd_log_name), ".".join((base, new_ext)))
 
 
 def midi_path(snd_log_name):
-    return out_path(snd_log_name, 'mid')
+    return out_path(snd_log_name, "mid")
 
 
 def wav_path(snd_log_name, hashid=None):
     if hashid:
-        return out_path(snd_log_name, '%d.wav' % hashid)
-    return out_path(snd_log_name, 'wav')
+        return out_path(snd_log_name, "%d.wav" % hashid)
+    return out_path(snd_log_name, "wav")

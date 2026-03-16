@@ -4,35 +4,41 @@ import unittest
 from io import StringIO
 import pandas as pd
 from desidulate.fileio import read_csv
-from desidulate.sidlib import squeeze_diffs, coalesce_near_writes, remove_end_repeats, calc_rates, bits2byte
+from desidulate.sidlib import (
+    squeeze_diffs,
+    coalesce_near_writes,
+    remove_end_repeats,
+    calc_rates,
+    bits2byte,
+)
 from desidulate.sidwrap import get_sid
 
 
 class SIDLibTestCase(unittest.TestCase):
 
     def test_bits2byte(self):
-        df = pd.DataFrame([{'col1': 0, 'col2': 1, 'col3': 0, 'col4': 1}])
+        df = pd.DataFrame([{"col1": 0, "col2": 1, "col3": 0, "col4": 1}])
         self.assertEqual(10, bits2byte(df, df.columns).iat[0])
-        df = pd.DataFrame([{'col1': 1, 'col2': 0, 'col3': 1, 'col4': 0}])
+        df = pd.DataFrame([{"col1": 1, "col2": 0, "col3": 1, "col4": 0}])
         self.assertEqual(5, bits2byte(df, df.columns).iat[0])
-        df = pd.DataFrame([{'col1': 1}])
+        df = pd.DataFrame([{"col1": 1}])
         self.assertEqual(1, bits2byte(df, df.columns).iat[0])
 
     def str2df(self, df_str):
-        return read_csv(StringIO(df_str), dtype=pd.UInt64Dtype()).set_index('clock')
+        return read_csv(StringIO(df_str), dtype=pd.UInt64Dtype()).set_index("clock")
 
     def ssfdf(self, df_str, ssf=1):
         df = self.str2df(df_str)
         if ssf is not None:
-            df['ssf'] = ssf
-        df = df.reset_index().set_index('ssf')
-        df['clock'] += 1024
-        df['clock_start'] = df['clock'].min()
+            df["ssf"] = ssf
+        df = df.reset_index().set_index("ssf")
+        df["clock"] += 1024
+        df["clock_start"] = df["clock"].min()
         return df
 
     def test_calc_rates(self):
         sid = get_sid(pal=True, cia=0)
-        df = self.ssfdf('''
+        df = self.ssfdf("""
 clock,gate1,freq1,pwduty1,pulse1,noise1,tri1,saw1,test1,sync1,ring1,freq3,test3,flt1,fltcoff,fltres,fltlo,fltband,flthi,fltext,atk1,dec1,sus1,rel1,vol
 0,1,,,,,,,1,,,,,,,,,,,,9,0,10,0,15
 4946,1,65535,,0,1,0,0,0,,,,,0,,,,,,,,,,,15
@@ -41,22 +47,22 @@ clock,gate1,freq1,pwduty1,pulse1,noise1,tri1,saw1,test1,sync1,ring1,freq3,test3,
 44191,0,65535,,0,0,1,0,0,,,,,0,,,,,,,,,,,15
 44213,0,65535,,0,1,0,0,0,,,,,0,,,,,,,,,,,15
 786407,0,65535,,0,1,0,0,0,,,,,0,,,,,,,,,,,15
-''')
+""")
         rate, pr_speed = calc_rates(sid, 20, df)
         self.assertEqual(4798, rate.iat[-1])
         self.assertEqual(4, pr_speed.iat[-1])
 
-        df = self.ssfdf('''
+        df = self.ssfdf("""
 clock,gate1,freq1,pwduty1,pulse1,noise1,tri1,saw1,test1,sync1,ring1,freq3,test3,flt1,fltcoff,fltres,fltlo,fltband,flthi,fltext,atk1,dec1,sus1,rel1,vol
 20000,1,,,,,,,1,,,,,,,,,,,,2,9,10,15,10
 200036,1,2145,,0,0,0,1,0,,,,,0,,,,,,,,,,,10
 264219,1,2145,,0,0,0,1,0,,,,,0,,,,,,,,,,,10
-''')
+""")
         rate, pr_speed = calc_rates(sid, 20, df)
         self.assertEqual(sid.clockq, rate.iat[-1])
         self.assertEqual(1, pr_speed.iat[-1])
 
-        df = self.ssfdf('''
+        df = self.ssfdf("""
 clock,gate1,freq1,pwduty1,pulse1,noise1,tri1,saw1,test1,sync1,ring1,freq3,test3,flt1,fltcoff,fltres,fltlo,fltband,flthi,fltext,atk1,dec1,sus1,rel1,vol
 0,1,32768,,0,0,1,0,0,,,,,0,,,,,,,0,0,15,0,0
 6,1,,,0,0,0,0,1,,,,,,,,,,,,,,,,
@@ -68,12 +74,12 @@ clock,gate1,freq1,pwduty1,pulse1,noise1,tri1,saw1,test1,sync1,ring1,freq3,test3,
 258,1,,,0,0,0,0,1,,,,,,,,,,,,,,,,
 272,1,,,0,0,0,0,0,,,,,,,,,,,,,,,,
 378,1,32768,,0,0,1,0,0,,,,,0,,,,,,,,,,,
-''')
+""")
         rate, pr_speed = calc_rates(sid, 20, df, ratemin=64)
         self.assertEqual(106, rate.iat[-1])
         self.assertEqual(0, pr_speed.iat[-1])
 
-        df = self.ssfdf('''
+        df = self.ssfdf("""
 clock,gate1,freq1,pwduty1,pulse1,noise1,tri1,saw1,test1,sync1,ring1,freq3,test3,flt1,fltcoff,fltres,fltlo,fltband,flthi,fltext,atk1,dec1,sus1,rel1,vol
 0,1,1536,256,1,0,0,0,0,,,,,0,,,,,,,0,0,15,15,15
 19452,1,63744,,0,1,0,0,0,,,,,0,,,,,,,,,,,15
@@ -82,12 +88,12 @@ clock,gate1,freq1,pwduty1,pulse1,noise1,tri1,saw1,test1,sync1,ring1,freq3,test3,
 78278,0,1536,400,1,0,0,0,0,,,,,0,,,,,,,,,,,15
 97974,0,1536,432,1,0,0,0,0,,,,,0,,,,,,,,,,,15
 117964,0,1536,432,1,0,0,0,0,,,,,0,,,,,,,,,,,15
-''')
+""")
         rate, pr_speed = calc_rates(sid, 20, df)
         self.assertEqual(19452, rate.iat[-1])
         self.assertEqual(1, pr_speed.iat[-1])
 
-        df = self.ssfdf('''
+        df = self.ssfdf("""
 clock,gate1,freq1,pwduty1,pulse1,noise1,tri1,saw1,test1,sync1,ring1,freq3,test3,flt1,fltcoff,fltres,fltlo,fltband,flthi,fltext,atk1,dec1,sus1,rel1,vol
 0,1,4455,,0,1,0,0,0,,,,,3,1573,5,1,0,0,0,0,0,11,0,15
 782,1,13307,,0,1,0,0,0,,,,,3,1573,5,1,0,0,0,,,,,15
@@ -217,23 +223,23 @@ clock,gate1,freq1,pwduty1,pulse1,noise1,tri1,saw1,test1,sync1,ring1,freq3,test3,
 84322,0,31013,,0,1,0,0,0,,,,,3,1554,5,1,0,0,0,,,,,15
 85164,0,4455,,0,1,0,0,0,,,,,3,1554,5,1,0,0,0,,,,,15
 170351,0,4455,,0,1,0,0,0,,,,,3,1554,5,1,0,0,0,,,,,15
-''')
+""")
         rate, pr_speed = calc_rates(sid, 30, df)
         self.assertEqual(815, rate.iat[-1])
         self.assertEqual(24, pr_speed.iat[-1])
 
-        df = self.ssfdf('''
+        df = self.ssfdf("""
 clock,gate1,freq1,pwduty1,pulse1,noise1,tri1,saw1,test1,sync1,ring1,freq3,test3,flt1,fltcoff,fltres,fltlo,fltband,flthi,fltext,atk1,dec1,sus1,rel1,vol
 0,1,0,,0,0,1,1,0,,,,,0,,,,,,,0,0,14,0,15
 1245,0,,,0,0,0,0,0,,,,,,,,,,,,,,,,15
 1963,0,,,0,0,0,0,0,,,,,,,,,,,,,,,,8
 13255,0,4864,,0,0,1,1,0,,,,,0,,,,,,,,,,,8
-''')
+""")
         rate, pr_speed = calc_rates(sid, 20, df)
         self.assertEqual(1245, rate.iat[-1])
         self.assertEqual(16, pr_speed.iat[-1])
 
-        df = self.ssfdf('''
+        df = self.ssfdf("""
 clock,gate1,freq1,pwduty1,pulse1,noise1,tri1,saw1,test1,sync1,ring1,freq3,test3,flt1,fltcoff,fltres,fltlo,fltband,flthi,fltext,atk1,dec1,sus1,rel1,vol
 0,1,,,,,,,1,,,,,,,,,,,,0,2,9,0,3
 19700,1,5948,2075,1,0,0,0,0,,,,,1,512,15,1,1,0,0,,,,,3
@@ -242,99 +248,99 @@ clock,gate1,freq1,pwduty1,pulse1,noise1,tri1,saw1,test1,sync1,ring1,freq3,test3,
 39464,0,5948,2076,1,0,0,0,0,,,,,1,256,15,1,1,0,0,,,,,3
 58681,0,5948,2077,1,0,0,0,0,,,,,1,256,15,1,1,0,0,,,,,3
 78573,0,5948,2077,1,0,0,0,0,,,,,1,256,15,1,1,0,0,,,,,3
-''')
+""")
         rate, pr_speed = calc_rates(sid, 20, df)
         self.assertEqual(19277, rate.iat[-1])
         self.assertEqual(1, pr_speed.iat[-1])
 
-
     def test_remove_end_repeats(self):
         self.assertEqual([1, 2], remove_end_repeats([1, 2]))
-        self.assertEqual([1, 2, 3, 1, 2], remove_end_repeats([1, 2, 3, 1, 2, 1, 2, 1, 2]))
+        self.assertEqual(
+            [1, 2, 3, 1, 2], remove_end_repeats([1, 2, 3, 1, 2, 1, 2, 1, 2])
+        )
         self.assertEqual([1, 2, 3], remove_end_repeats([1, 2, 3, 1, 2, 3]))
 
     def test_squeeze_diffs(self):
-        df = self.str2df('''
+        df = self.str2df("""
 clock,gate1,pulse1,noise1
 100,1,1,0
 200,1,0,1
-''')
-        s_df = squeeze_diffs(df, ['gate1', 'pulse1', 'noise1'])
+""")
+        s_df = squeeze_diffs(df, ["gate1", "pulse1", "noise1"])
         self.assertEqual(df.to_string(), s_df.to_string())
-        df = self.str2df('''
+        df = self.str2df("""
 clock,gate1,pulse1,noise1
 100,1,1,0
 200,1,1,0
 300,1,0,1
 400,1,0,1
-''')
-        s_df = squeeze_diffs(df, ['gate1', 'pulse1', 'noise1'])
+""")
+        s_df = squeeze_diffs(df, ["gate1", "pulse1", "noise1"])
         df = df[~df.index.isin((200, 400))]
         self.assertEqual(df.to_string(), s_df.to_string())
 
     def test_coalesce_near_writes(self):
-        df = self.str2df('''
+        df = self.str2df("""
 clock,freq1
 80,100
 100,100
 108,200
 116,300
 124,400
-''')
-        df_coalesced = self.str2df('''
+""")
+        df_coalesced = self.str2df("""
 clock,freq1
 80,100
 100,400
 108,400
 116,400
 124,400
-''')
-        df = coalesce_near_writes(df, ['freq1'], near=16)
+""")
+        df = coalesce_near_writes(df, ["freq1"], near=16)
         self.assertEqual(df.to_string(), df_coalesced.to_string())
 
-        df = self.str2df('''
+        df = self.str2df("""
 clock,freq1
 80,100
 100,100
 101,200
 120,200
-''')
-        df_coalesced = coalesce_near_writes(df, ['freq1'], near=16)
-        df = self.str2df('''
+""")
+        df_coalesced = coalesce_near_writes(df, ["freq1"], near=16)
+        df = self.str2df("""
 clock,freq1
 80,100
 100,200
 101,200
 120,200
-''')
+""")
         self.assertEqual(df.to_string(), df_coalesced.to_string())
 
-        df = self.str2df('''
+        df = self.str2df("""
 clock,freq1
 100,100
 201,200
-''')
-        df_coalesced = coalesce_near_writes(df, ['freq1'], near=16)
+""")
+        df_coalesced = coalesce_near_writes(df, ["freq1"], near=16)
         self.assertEqual(df.to_string(), df_coalesced.to_string())
 
-        df = self.str2df('''
+        df = self.str2df("""
 clock,freq1
 39085,3747
 39123,3594
 39132,3338
 58651,3338
-''')
-        df_coalesced = coalesce_near_writes(df, ['freq1'], near=16)
-        df = self.str2df('''
+""")
+        df_coalesced = coalesce_near_writes(df, ["freq1"], near=16)
+        df = self.str2df("""
 clock,freq1
 39085,3747
 39123,3338
 39132,3338
 58651,3338
-''')
+""")
         self.assertEqual(df.to_string(), df_coalesced.to_string())
 
 
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

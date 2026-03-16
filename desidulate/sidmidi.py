@@ -35,7 +35,10 @@ CRASH_CYMBAL1 = 49
 
 HIGHEST_MEMBRANE_HZ = 400
 MEMBRANE_DRUMS = [KICK_DRUM, BASS_DRUM, LOW_TOM, LOW_MID_TOM, HIGH_MID_TOM, HIGH_TOM]
-MEMBRANE_DRUM_MAP = [(drum, int(i * (HIGHEST_MEMBRANE_HZ / len(MEMBRANE_DRUMS)))) for i, drum in enumerate(MEMBRANE_DRUMS, start=1)]
+MEMBRANE_DRUM_MAP = [
+    (drum, int(i * (HIGHEST_MEMBRANE_HZ / len(MEMBRANE_DRUMS))))
+    for i, drum in enumerate(MEMBRANE_DRUMS, start=1)
+]
 CYMBAL_DRUMS = [PEDAL_HIHAT, CLOSED_HIHAT, OPEN_HIHAT, ACCOUSTIC_SNARE, ELECTRIC_SNARE]
 
 BASS_SPLIT_PITCH = 60
@@ -44,9 +47,14 @@ DRUM_CHANNEL = 10
 
 def midi_args(parser):
     timer_args(parser)
-    parser.add_argument('--bpm', default=None, type=int, help='MIDI BPM (default derive from video int. frequency)')
-    parser.add_argument('--percussion', dest='percussion', action='store_true')
-    parser.add_argument('--no-percussion', dest='percussion', action='store_false')
+    parser.add_argument(
+        "--bpm",
+        default=None,
+        type=int,
+        help="MIDI BPM (default derive from video int. frequency)",
+    )
+    parser.add_argument("--percussion", dest="percussion", action="store_true")
+    parser.add_argument("--no-percussion", dest="percussion", action="store_false")
     parser.set_defaults(pal=True, percussion=True)
 
 
@@ -79,7 +87,7 @@ def add_event(track, event, delta_clock, channel):
 
 def add_end_of_track(track, channel):
     eot = make_event(track, midi.MetaEvents.END_OF_TRACK, channel)
-    eot.data = b''
+    eot.data = b""
     add_event(track, eot, 0, channel)
     track.updateEvents()
     return track
@@ -95,7 +103,7 @@ def write_midi(file_name, tpqn, tracks):
     smf.tracks.append(track_zero())
     for track in tracks:
         smf.tracks.append(track)
-    smf.open(file_name, 'wb')
+    smf.open(file_name, "wb")
     smf.write()
     smf.close()
 
@@ -122,7 +130,7 @@ class SidMidiFile:
         self.sid = sid
         if bpm is None:
             bpm = bpm_from_int(sid.vid_int_freq)
-            logging.info('using %f BPM (video int. freq %fHz)', bpm, sid.vid_int_freq)
+            logging.info("using %f BPM (video int. freq %fHz)", bpm, sid.vid_int_freq)
         self.bpm = bpm
         self.lead_program = lead_program
         self.bass_program = bass_program
@@ -131,7 +139,10 @@ class SidMidiFile:
         self.drum_pitches = defaultdict(list)
         self.tpqn = 960
         self.sid_env_max = 15
-        self.sid_velocity = {i: int(i / self.sid_env_max * MAX_MIDI_VEL) for i in range(self.sid_env_max + 1)}
+        self.sid_velocity = {
+            i: int(i / self.sid_env_max * MAX_MIDI_VEL)
+            for i in range(self.sid_env_max + 1)
+        }
         self.one_4n_clocks = sid.qn_to_clock(1, self.bpm)
         self.one_2n_clocks = self.one_4n_clocks * 2
         self.one_8n_clocks = self.one_4n_clocks / 2
@@ -149,8 +160,10 @@ class SidMidiFile:
     def get_duration(self, clocks):
         return round(clocks / self.sid.clockq) * self.sid.clockq
 
-    #@lru_cache
-    def sid_adsr_to_velocity(self, clock, last_gate_clock, atk1, dec1, sus1, rel1, gate1):
+    # @lru_cache
+    def sid_adsr_to_velocity(
+        self, clock, last_gate_clock, atk1, dec1, sus1, rel1, gate1
+    ):
         if gate1:
             if atk1:
                 attack_clock = self.sid.attack_clock[atk1]
@@ -167,7 +180,9 @@ class SidMidiFile:
             rel_clock = self.sid.decay_release_clock[rel1]
             rel_time = clock - last_gate_clock
             if rel_time < rel_clock:
-                return round(self.neg_vel_scale(rel_time, rel_clock) * (sus1 / self.sid_env_max))
+                return round(
+                    self.neg_vel_scale(rel_time, rel_clock) * (sus1 / self.sid_env_max)
+                )
         return 0
 
     def clock_to_ticks(self, clock):
@@ -196,7 +211,7 @@ class SidMidiFile:
             last_pitch_data = clock_order[-1]
             deoverlapped = []
             for i, pitch_data in enumerate(clock_order[:-1]):
-                next_pitch_data = clock_order[i+1]
+                next_pitch_data = clock_order[i + 1]
                 clock, duration, pitch, velocity = pitch_data
                 next_clock = next_pitch_data[0]
                 duration = min(duration, next_clock - clock)
@@ -212,7 +227,9 @@ class SidMidiFile:
         for pitch_data in self.deoverlap_pitches(voice_pitch_data):
             clock, duration, pitch, velocity = pitch_data
             assert velocity
-            last_clock = self.add_note(track, channel, pitch, velocity, last_clock, clock, duration)
+            last_clock = self.add_note(
+                track, channel, pitch, velocity, last_clock, clock, duration
+            )
         add_end_of_track(track, channel)
         return track
 
@@ -230,21 +247,25 @@ class SidMidiFile:
                     else:
                         lead_pitch_data.append(pitch_data)
                 for program, pitch_data in (
-                        (self.lead_program, lead_pitch_data),
-                        (self.bass_program, bass_pitch_data)):
+                    (self.lead_program, lead_pitch_data),
+                    (self.bass_program, bass_pitch_data),
+                ):
                     if pitch_data:
                         track_pitches.append((None, program, pitch_data))
         for voicenum, voice_pitch_data in self.drum_pitches.items():
             if voice_pitch_data:
-                track_pitches.append((DRUM_CHANNEL, self.drum_program, voice_pitch_data))
+                track_pitches.append(
+                    (DRUM_CHANNEL, self.drum_program, voice_pitch_data)
+                )
 
         tracks = []
         for smf_track, pitches in enumerate(track_pitches, start=1):
             channel, program, voice_pitch_data = pitches
             if channel is None:
                 channel = smf_track
-            tracks.append(self.write_pitches(
-                smf_track, channel, program, voice_pitch_data))
+            tracks.append(
+                self.write_pitches(smf_track, channel, program, voice_pitch_data)
+            )
         write_midi(file_name, self.tpqn, tracks)
 
     def add_pitch(self, voicenum, clock, duration, pitch, velocity):
@@ -271,7 +292,9 @@ class SidMidiFile:
             # TODO: add pitch bend if significantly different to canonical note.
             # https://github.com/magenta/magenta/issues/1902
             # TODO: use aftertouch to simulate envelopes.
-            velocity = self.sid_adsr_to_velocity(vel_clock, last_gate_clock, atk1, dec1, sus1, rel1, row.gate1)
+            velocity = self.sid_adsr_to_velocity(
+                vel_clock, last_gate_clock, atk1, dec1, sus1, rel1, row.gate1
+            )
             velocity = compand_velocity(velocity)
             assert velocity >= MIN_VEL and velocity <= MAX_VEL, (velocity, row)
             if velocity:

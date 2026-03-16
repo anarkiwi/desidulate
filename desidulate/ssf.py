@@ -21,30 +21,45 @@ INITIAL_FRAMES = 4
 
 def add_freq_notes_df(sid, ssfs_df):
     real_freqs = {
-        freq: freq * sid.freq_scaler for freq in ssfs_df['freq1'].unique() if pd.notna(freq)}
+        freq: freq * sid.freq_scaler
+        for freq in ssfs_df["freq1"].unique()
+        if pd.notna(freq)
+    }
     closest_notes = {
-        real_freq: closest_midi(real_freq)[1] for real_freq in real_freqs.values()}
+        real_freq: closest_midi(real_freq)[1] for real_freq in real_freqs.values()
+    }
     freq_map = [
-        (freq, real_freq, closest_notes[real_freq]) for freq, real_freq in real_freqs.items()]
+        (freq, real_freq, closest_notes[real_freq])
+        for freq, real_freq in real_freqs.items()
+    ]
     freq_map.extend([(pd.NA, pd.NA, pd.NA)])
     freq_notes_df = pd.DataFrame.from_records(
-        freq_map, columns=['freq1', 'real_freq', 'closest_note']).astype(pd.Float64Dtype())
-    freq_notes_df['freq1'] = freq_notes_df['freq1'].astype(pd.UInt16Dtype())
-    freq_notes_df['closest_note'] = freq_notes_df['closest_note'].astype(pd.UInt8Dtype())
-    return set_sid_dtype(ssfs_df).merge(freq_notes_df, how='left', on='freq1')
+        freq_map, columns=["freq1", "real_freq", "closest_note"]
+    ).astype(pd.Float64Dtype())
+    freq_notes_df["freq1"] = freq_notes_df["freq1"].astype(pd.UInt16Dtype())
+    freq_notes_df["closest_note"] = freq_notes_df["closest_note"].astype(
+        pd.UInt8Dtype()
+    )
+    return set_sid_dtype(ssfs_df).merge(freq_notes_df, how="left", on="freq1")
 
 
 class SidSoundFragment:
 
-    def __init__(self, percussion, sid, df, smf, wav_file=None, initial_frames=INITIAL_FRAMES):
+    def __init__(
+        self, percussion, sid, df, smf, wav_file=None, initial_frames=INITIAL_FRAMES
+    ):
         self.df = df
         self.initial_clocks = sid.clockq * (initial_frames + 1)
         self.percussion = percussion
-        self.waveform_order = tuple(self.df.iloc[0]['control_labels'].split('-'))
+        self.waveform_order = tuple(self.df.iloc[0]["control_labels"].split("-"))
         self.waveforms = frozenset(self.waveform_order)
-        self.noisephases = len([waveforms for waveforms in self.waveform_order if 'n' in waveforms])
-        self.pulsephases = len([waveforms for waveforms in self.waveform_order if 'p' in waveforms])
-        self.all_noise = self.waveforms == {'n'}
+        self.noisephases = len(
+            [waveforms for waveforms in self.waveform_order if "n" in waveforms]
+        )
+        self.pulsephases = len(
+            [waveforms for waveforms in self.waveform_order if "p" in waveforms]
+        )
+        self.all_noise = self.waveforms == {"n"}
         self.midi_notes = tuple(smf.get_midi_notes_from_events(self.df.itertuples()))
         self.midi_pitches = tuple([midi_note[1] for midi_note in self.midi_notes])
         self.total_duration = 0
@@ -54,11 +69,16 @@ class SidSoundFragment:
         self.initial_midi_pitches = []
         if self.midi_notes:
             self.initial_midi_notes = tuple(
-                [midi_note for midi_note in self.midi_notes if midi_note[0] < self.initial_clocks])
+                [
+                    midi_note
+                    for midi_note in self.midi_notes
+                    if midi_note[0] < self.initial_clocks
+                ]
+            )
             self.initial_midi_pitches = tuple(
-                [midi_note[1] for midi_note in self.initial_midi_notes])
-            self.total_duration = sum(
-                [midi_note[2] for midi_note in self.midi_notes])
+                [midi_note[1] for midi_note in self.initial_midi_notes]
+            )
+            self.total_duration = sum([midi_note[2] for midi_note in self.midi_notes])
             self.max_midi_note = max(self.midi_pitches)
             self.min_midi_note = min(self.midi_pitches)
         self.initial_pitch_drop = 0
@@ -83,7 +103,12 @@ class SidSoundFragment:
             self.samples = samples[:max_samples]
         else:
             rate = sid.resid.sampling_frequency
-            self.samples = state2samples(self.df.drop(['control_labels', 'control_label'], axis=1), sid, skiptest=True, maxclock=self.one_2n_clocks)
+            self.samples = state2samples(
+                self.df.drop(["control_labels", "control_label"], axis=1),
+                sid,
+                skiptest=True,
+                maxclock=self.one_2n_clocks,
+            )
         if len(self.samples):
             self.loudestf = samples_loudestf(self.samples, rate)
             self._set_pitches(sid)
@@ -118,7 +143,13 @@ class SidSoundFragment:
             # TODO: pitched noise percussion.
             if self.all_noise or self.noisephases > 1:
                 self.drum_pitches.append(
-                    (clock, self.total_duration, self.drum_noise_duration(sid, self.total_duration), velocity))
+                    (
+                        clock,
+                        self.total_duration,
+                        self.drum_noise_duration(sid, self.total_duration),
+                        velocity,
+                    )
+                )
                 return
 
             # Membrane percussion must be no longer than 1 quarter note.
@@ -128,7 +159,8 @@ class SidSoundFragment:
                         if self.loudestf < drum_cutoff_hz:
                             # http://www.ucapps.de/howto_sid_wavetables_1.html
                             self.drum_pitches.append(
-                                (clock, self.total_duration, drum, velocity))
+                                (clock, self.total_duration, drum, velocity)
+                            )
                             return
 
         self._set_nondrum_pitches()
@@ -142,15 +174,20 @@ class SidSoundFragment:
             for clock, duration, pitch, velocity in self.drum_pitches:
                 if pd.notna(total_duration) and clock > total_duration:
                     break
-                smf.add_drum_pitch(voicenum, first_clock + clock, duration, pitch, velocity)
+                smf.add_drum_pitch(
+                    voicenum, first_clock + clock, duration, pitch, velocity
+                )
 
     def instrument(self, base_instrument):
-        base_instrument.update({
-            'drum_instrument': self.drum_instrument,
-            'samples': len(self.samples),
-            'loudestf': self.loudestf,
-            'last_clock': self.df.index[-1],
-            'initial_pitch_drop': self.initial_pitch_drop})
+        base_instrument.update(
+            {
+                "drum_instrument": self.drum_instrument,
+                "samples": len(self.samples),
+                "loudestf": self.loudestf,
+                "last_clock": self.df.index[-1],
+                "initial_pitch_drop": self.initial_pitch_drop,
+            }
+        )
         return base_instrument
 
 
@@ -163,10 +200,15 @@ class SidSoundFragmentParser:
         self.ssf_dfs = {}
 
     def read_ssfs(self):
-        ssfs_df = add_freq_notes_df(self.sid, read_csv(out_path(self.logfile, 'ssf.zst'), dtype=pd.Int64Dtype()))
+        ssfs_df = add_freq_notes_df(
+            self.sid, read_csv(out_path(self.logfile, "ssf.zst"), dtype=pd.Int64Dtype())
+        )
         # TODO: handle vol/samples
         ssfs_df = control_labels(ssfs_df)
-        ssfs_df = ssfs_df[ssfs_df['vol'].isna()]
-        ssfs_df['vol'] = 15
-        self.ssf_dfs = {hashid: ssf_df.set_index('clock').fillna(method='ffill') for hashid, ssf_df in ssfs_df.groupby('hashid')}
-        logging.info('read %u patches', len(self.ssf_dfs))
+        ssfs_df = ssfs_df[ssfs_df["vol"].isna()]
+        ssfs_df["vol"] = 15
+        self.ssf_dfs = {
+            hashid: ssf_df.set_index("clock").fillna(method="ffill")
+            for hashid, ssf_df in ssfs_df.groupby("hashid")
+        }
+        logging.info("read %u patches", len(self.ssf_dfs))

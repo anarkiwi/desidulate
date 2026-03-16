@@ -78,16 +78,24 @@ class SidWrap:
         us_per_sample = 1e6 / sampling_frequency
         us_per_cycle = 1e6 / self.clock_freq
         self.one_sample_cycles = int(us_per_sample / us_per_cycle)
-        logging.info('one sample lasts %u cycles (one sample lasts %fus)', self.one_sample_cycles, us_per_sample)
+        logging.info(
+            "one sample lasts %u cycles (one sample lasts %fus)",
+            self.one_sample_cycles,
+            us_per_sample,
+        )
 
-        logging.info('using PR frequency %f Hz (%u cycles)', self.int_freq, self.clockq)
+        logging.info("using PR frequency %f Hz (%u cycles)", self.int_freq, self.clockq)
         self.resid = SoundInterfaceDevice(
-            model=model, clock_frequency=self.clock_freq,
-            sampling_frequency=sampling_frequency)
+            model=model,
+            clock_frequency=self.clock_freq,
+            sampling_frequency=sampling_frequency,
+        )
         self.attack_clock = {
-            k: int(v / 1e3 * self.clock_freq) for k, v in self.ATTACK_MS.items()}
+            k: int(v / 1e3 * self.clock_freq) for k, v in self.ATTACK_MS.items()
+        }
         self.decay_release_clock = {
-            k: int(v / 1e3 * self.clock_freq) for k, v in self.DECAY_RELEASE_MS.items()}
+            k: int(v / 1e3 * self.clock_freq) for k, v in self.DECAY_RELEASE_MS.items()
+        }
 
     def qn_to_clock(self, qn, bpm):
         return self.clock_freq * 60 / bpm * qn

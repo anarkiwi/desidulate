@@ -21,46 +21,55 @@ from desidulate.ssf import SidSoundFragment, SidSoundFragmentParser
 
 
 def main():
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
     ALL_VOICES = frozenset([1, 2, 3])
-    parser = argparse.ArgumentParser(description='Convert ssf log into a MIDI file')
-    parser.add_argument('ssflogfile', default='', help='SSF log file to read')
-    parser.add_argument('--midifile', default='', help='MIDI file to write')
-    parser.add_argument('--minclock', default=0, type=int, help='Min clock value')
-    parser.add_argument('--maxclock', default=0, type=int, help='Max clock value')
-    parser.add_argument('--voicemask', default=','.join([str(v) for v in ALL_VOICES]), type=str, help='Voice mask')
+    parser = argparse.ArgumentParser(description="Convert ssf log into a MIDI file")
+    parser.add_argument("ssflogfile", default="", help="SSF log file to read")
+    parser.add_argument("--midifile", default="", help="MIDI file to write")
+    parser.add_argument("--minclock", default=0, type=int, help="Min clock value")
+    parser.add_argument("--maxclock", default=0, type=int, help="Max clock value")
+    parser.add_argument(
+        "--voicemask",
+        default=",".join([str(v) for v in ALL_VOICES]),
+        type=str,
+        help="Voice mask",
+    )
     midi_args(parser)
     args = parser.parse_args()
-    voicemask = frozenset([int(v) for v in args.voicemask.split(',')])
+    voicemask = frozenset([int(v) for v in args.voicemask.split(",")])
 
     ssf_log_df = read_csv(args.ssflogfile, dtype=pd.Int64Dtype())
     cols = set(ssf_log_df.columns)
 
     if len(ssf_log_df) == 0:
-        print('empty SSF log')
+        print("empty SSF log")
         sys.exit(0)
 
-    if cols != {'clock', 'hashid', 'voice'}:
-        print('not an SSF log file (cols %s)' % cols)
+    if cols != {"clock", "hashid", "voice"}:
+        print("not an SSF log file (cols %s)" % cols)
         sys.exit(1)
 
     if args.maxclock:
-        ssf_log_df = ssf_log_df[ssf_log_df['clock'] <= args.maxclock]  # pylint: disable=unsubscriptable-object
+        ssf_log_df = ssf_log_df[
+            ssf_log_df["clock"] <= args.maxclock
+        ]  # pylint: disable=unsubscriptable-object
     if args.minclock:
-        ssf_log_df = ssf_log_df[ssf_log_df['clock'] >= args.minclock]  # pylint: disable=unsubscriptable-object
-        min_clock = ssf_log_df['clock'].min()
-        ssf_log_df['clock'] -= min_clock
+        ssf_log_df = ssf_log_df[
+            ssf_log_df["clock"] >= args.minclock
+        ]  # pylint: disable=unsubscriptable-object
+        min_clock = ssf_log_df["clock"].min()
+        ssf_log_df["clock"] -= min_clock
 
     if voicemask != ALL_VOICES:
-        ssf_log_df = ssf_log_df[ssf_log_df['voice'].isin(voicemask)]
+        ssf_log_df = ssf_log_df[ssf_log_df["voice"].isin(voicemask)]
 
-    logging.info('read %u ssf log entries from %s', len(ssf_log_df), args.ssflogfile)
+    logging.info("read %u ssf log entries from %s", len(ssf_log_df), args.ssflogfile)
 
     vdfs = []
-    for v, vdf in ssf_log_df.groupby('voice'):
-        vdf['duration'] = vdf['clock'].shift(-1)
-        vdf['duration'] -= vdf['clock']
-        vdf['duration'] -= 1
+    for v, vdf in ssf_log_df.groupby("voice"):
+        vdf["duration"] = vdf["clock"].shift(-1)
+        vdf["duration"] -= vdf["clock"]
+        vdf["duration"] -= 1
         vdfs.append(vdf)
     ssf_log_df = pd.concat(vdfs)
 
@@ -77,7 +86,7 @@ def main():
         ssf = ssf_cache.get(row.hashid, None)
         if ssf is None:
             ssf_df = parser.ssf_dfs[row.hashid]
-            wav_file = out_path(args.ssflogfile, '%d.wav' % row.hashid)
+            wav_file = out_path(args.ssflogfile, "%d.wav" % row.hashid)
             if not os.path.exists(wav_file):
                 wav_file = None
             duration = row.duration
@@ -85,11 +94,16 @@ def main():
                 ssf_df.rename(index={ssf_df.index[-1]: duration}, inplace=True)
             ssf = SidSoundFragment(args.percussion, sid, ssf_df, smf, wav_file=wav_file)
             ssf_cache[row.hashid] = ssf
-            ssf_instruments.append(ssf.instrument({'hashid': row.hashid}))
-            logging.info('parsed ssf %d (%u of %u)', row.hashid, len(ssf_cache), len(parser.ssf_dfs))
+            ssf_instruments.append(ssf.instrument({"hashid": row.hashid}))
+            logging.info(
+                "parsed ssf %d (%u of %u)",
+                row.hashid,
+                len(ssf_cache),
+                len(parser.ssf_dfs),
+            )
         ssf.smf_transcribe(smf, row.clock, row.voice, row.duration)
 
-    ssf_instrument_file = out_path(args.ssflogfile, 'inst.txt.zst')
+    ssf_instrument_file = out_path(args.ssflogfile, "inst.txt.zst")
     ssf_instrument_df = pd.DataFrame(ssf_instruments)
     ssf_instrument_df.to_csv(ssf_instrument_file, index=False)
 
@@ -99,5 +113,5 @@ def main():
     smf.write(midifile)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

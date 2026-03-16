@@ -5,9 +5,9 @@ from itertools import groupby
 
 
 def dot0(hexval):
-    val = [(hexval[i:i+2]) for i in range(0, len(hexval), 2)]
-    val = ['..' if i == '00' else i for i in val]
-    return ''.join(val)
+    val = [(hexval[i : i + 2]) for i in range(0, len(hexval), 2)]
+    val = [".." if i == "00" else i for i in val]
+    return "".join(val)
 
 
 def sw_rle_diff(col, diffmult):
@@ -31,13 +31,13 @@ def sw_rle_diff(col, diffmult):
                     compressed_pairs.append(((prefix, vals[0][0])))
                 diff *= diffmult
                 if diff < 0:
-                    diff = ord(struct.pack('b', diff))
+                    diff = ord(struct.pack("b", diff))
                 compressed_pairs.append((len_vals, diff))
     while len(compressed_pairs) > 1:
         lastpair = compressed_pairs[-1]
-        if lastpair[0] > 0x7f or lastpair[1] > 0:
+        if lastpair[0] > 0x7F or lastpair[1] > 0:
             break
         compressed_pairs = compressed_pairs[:-1]
-    compressed_pairs = ['%2.2X%2.2X' % i for i in compressed_pairs]
-    compressed_pairs.extend(['0000'] * (len(col) - len(compressed_pairs)))
+    compressed_pairs = ["%2.2X%2.2X" % i for i in compressed_pairs]
+    compressed_pairs.extend(["0000"] * (len(col) - len(compressed_pairs)))
     return compressed_pairs
