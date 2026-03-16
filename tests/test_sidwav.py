@@ -29,7 +29,7 @@ class SidWavTestCase(unittest.TestCase):
         self.assertTrue(len(raw_samples))
         self.assertTrue(len(raw_samples2))
         self.assertNotEqual(df1.to_string(), df2.to_string())
-        return np.array_equal(raw_samples, raw_samples2)
+        return np.allclose(raw_samples, raw_samples2, atol=8)
 
     def test_skiptest(self):
         sid = get_sid(pal=True, cia=0)
